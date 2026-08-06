@@ -26,6 +26,18 @@ Every service validates that token **by signature, locally**, against the realm'
 published keys. Nothing calls Keycloak per request (§B6) — which is also what
 lets a site keep working when the wide-area link drops.
 
+## ⚠️ Since 7 Aug 2026: Keycloak authenticates people, not services
+
+ADR-011 was narrowed: **service-to-service calls no longer carry a Keycloak
+token.** They present the per-installation shared credential
+(`ORCA_INTERNAL_CREDENTIAL`) on `/internal/**`, validated locally with no
+identity provider on the request path — so nothing on the gate path ever needs to
+*mint* a token, which is the half of item #7 that no caching strategy could fix.
+
+The six service-account clients below therefore carry **no weight in the target
+design**. They remain in this fixture because they are the easiest way for a
+developer to mint a user-shaped token and exercise a resource server locally.
+
 ## ⚠️ What this file does NOT decide
 
 **This is a local development fixture. It is not the realm design.**

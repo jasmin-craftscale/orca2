@@ -113,6 +113,17 @@ public class ApiExceptionHandler {
 		return respond(PlatformErrorCode.NOT_FOUND, "No such route.", List.of());
 	}
 
+	@ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+	public ResponseEntity<ApiResponse<Void>> handleNoResource(
+			org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+		// Boot 4's resource handling throws THIS for an unmatched route, not
+		// NoHandlerFoundException. Found live: without this handler an unknown path
+		// fell through to the catch-all and came back as INTERNAL_ERROR 500 — an
+		// alarming answer to a typo.
+		log.debug("{} -> no resource", RequestId.current(), ex);
+		return respond(PlatformErrorCode.NOT_FOUND, "No such route.", List.of());
+	}
+
 	// --- Identity ------------------------------------------------------------
 
 	@ExceptionHandler(AuthenticationException.class)

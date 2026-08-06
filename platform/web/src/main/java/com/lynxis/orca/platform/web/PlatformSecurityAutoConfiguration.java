@@ -11,6 +11,11 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+
+import com.lynxis.orca.platform.web.internal.InternalCallAuthenticationFilter;
+import com.lynxis.orca.platform.web.internal.InternalCallProperties;
+import com.lynxis.orca.platform.web.internal.InternalCredentialValidator;
 
 // Spring Boot 4 ships JACKSON 3. The databind package moved to `tools.jackson`;
 // only the annotations stayed at `com.fasterxml.jackson.annotation`. Copying an
@@ -54,7 +59,15 @@ import tools.jackson.databind.json.JsonMapper;
 @AutoConfiguration
 @ConditionalOnClass(SecurityFilterChain.class)
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+@org.springframework.boot.context.properties.EnableConfigurationProperties(InternalCallProperties.class)
 public class PlatformSecurityAutoConfiguration {
+
+	@Bean
+	@ConditionalOnMissingBean
+	public InternalCredentialValidator internalCredentialValidator(InternalCallProperties properties,
+			org.springframework.core.env.Environment environment) {
+		return new InternalCredentialValidator(properties, environment);
+	}
 
 	/**
 	 * Whether the OpenAPI document and Swagger UI are readable without a token.
@@ -68,17 +81,28 @@ public class PlatformSecurityAutoConfiguration {
 	@Bean
 	@ConditionalOnMissingBean(SecurityFilterChain.class)
 	public SecurityFilterChain orcaSecurityFilterChain(HttpSecurity http, JsonMapper jsonMapper,
-			org.springframework.core.env.Environment environment) throws Exception {
+			org.springframework.core.env.Environment environment,
+			InternalCallProperties internalCallProperties) throws Exception {
 		boolean publicDocs = environment.getProperty("orca.web.public-docs", Boolean.class, false);
 		return http
 				.csrf(csrf -> csrf.disable())
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+				// The service-to-service surface (§B6, ADR-011). The filter
+				// authenticates /internal/** against the per-installation shared
+				// credential and grants ROLE_ORCA_SERVICE; the matcher below then
+				// requires exactly that authority there — so a USER token, however
+				// valid, cannot call an internal endpoint, and the service
+				// credential means nothing anywhere else.
+				.addFilterBefore(new InternalCallAuthenticationFilter(internalCallProperties, jsonMapper),
+						BasicAuthenticationFilter.class)
 				.authorizeHttpRequests(requests -> {
 					requests.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
 					if (publicDocs) {
 						requests.requestMatchers("/openapi/**", "/swagger-ui/**", "/swagger-ui.html",
 								"/v3/api-docs/**", "/webjars/**").permitAll();
 					}
+					requests.requestMatchers(internalCallProperties.getPathPattern())
+							.hasAuthority(InternalCallAuthenticationFilter.SERVICE_AUTHORITY);
 					requests.anyRequest().authenticated();
 				})
 				.oauth2ResourceServer(oauth2 -> oauth2

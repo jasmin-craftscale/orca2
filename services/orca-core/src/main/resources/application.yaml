@@ -95,6 +95,15 @@ springdoc:
 
 orca:
   service: orca-core
+  # --- Service-to-service authentication (ADR-011) ----------------------------
+  # Keycloak authenticates PEOPLE. A service calling another service presents this
+  # per-installation shared credential on /internal/** instead of minting a token,
+  # so no identity provider sits on the gate path. The committed value is the
+  # local fixture: outside the `local` profile a service REFUSES TO START with it,
+  # so it cannot ship to a site by inertia.
+  internal:
+    shared-credential: ${ORCA_INTERNAL_CREDENTIAL:local-dev-internal-credential-not-for-deployment}
+
   # ⚠️ LOCAL DEVELOPMENT VALUES. §C2 states no lease duration and no renewal
   # interval, and requires instead that a service REFUSE TO START when either is
   # unset or when the duration is not longer than the renewal interval — see

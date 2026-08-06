@@ -128,7 +128,7 @@ flowchart TB
 
 | Layer | Choice | Why |
 |---|---|---|
-| **Application platform** | **Java 21 · Spring Boot** | The mainstream enterprise Java stack on a long-term-support release. A large hiring pool, and a stack any enterprise IT function already recognises and can resource |
+| **Application platform** | **Java 25 · Spring Boot 4** | The mainstream enterprise Java stack on a long-term-support release. A large hiring pool, and a stack any enterprise IT function already recognises and can resource |
 | **Process automation** | **BPMN 2.0**, executed by **Flowable** | An international standard for describing business processes, and a mature open-source engine embedded in the platform. No separate component to install or operate, and no licence fee |
 | **Database** | **SQL Server** | The engine most terminal IT functions already run, back up and monitor. The platform is written against one engine seam so a second engine remains possible, but only SQL Server is built and tested |
 | **Identity** | **Keycloak** | Standard OpenID Connect, with single sign-on against the customer's existing directory. Identity is not something to build |
@@ -348,7 +348,7 @@ flowchart TB
 | **orca-fleet** | Licence issuance and signing, the fleet registry, artifact distribution | **Security by structure.** Signing keys cannot ship on a customer's box |
 | **orca-media** | Video relay, streaming, intercom signalling | **Blast radius, and it already works.** Specialised real-time technology, delivered in the technology suited to it |
 
-**Six services are built on Java 21 and Spring Boot. orca-media is delivered in its existing technology** — real-time media is a specialism, and rewriting a working relay buys nothing.
+**Six services are built on Java 25 and Spring Boot 4. orca-media is delivered in its existing technology** — real-time media is a specialism, and rewriting a working relay buys nothing.
 
 ## B4 · How services communicate
 
@@ -423,7 +423,13 @@ That requirement is settled. **The mechanism that satisfies it in each case is o
 
 **Authentication is Keycloak**, through OpenID Connect, with single sign-on against the customer's directory. Every service validates tokens by signature locally rather than calling out to check them.
 
-**Every entry point that runs without a user — a relay, a scheduled job, a reconciler — enters an explicit system context.** There is no path that runs with no identity at all.
+**Keycloak authenticates people, not services.** A token is required of a caller acting for a user — an operator at a console, a driver in the portal, a customer's own system on the partner API. **Service-to-service calls do not carry a Keycloak token.** They present a per-installation shared credential, verified locally by the receiving service with no identity provider involved on the request path.
+
+This is a deliberate narrowing of "OpenID Connect everywhere", and the reason is availability rather than simplicity. Token *validation* is local signature verification and survives an outage; token *issuing* always requires Keycloak to be reachable, and no caching strategy fixes that. A design in which one service must mint a token to call another makes the gate loop depend on the identity provider being up — which is precisely what §A1 says the site must not depend on.
+
+**What that does not relax.** Internal calls are still authenticated. "Internal" is a property of a deployment, not of a service, and two profiles in §B7 make it false: on **thin edge** the command call that raises a barrier crosses the wide-area link, and on **hybrid** replication crosses a tier boundary. An unauthenticated actuating endpoint on either is reachable by anything that can route to the host. The credential is only as strong as the transport it travels over, so any hop that leaves the host is over TLS terminated by the site's reverse proxy.
+
+**Every entry point that runs without a user — a relay, a scheduled job, a reconciler — enters an explicit system context.** There is no path that runs with no identity at all. This is internal attribution and is independent of Keycloak: it is what names the actor in an audit trail, where the shared credential only establishes that the caller is one of ours.
 
 **Licensing.** A licence is a signed artifact issued by Lynxis operations, verified at startup. It records what the installation is entitled to run, including how many instances may be active at a site.
 
@@ -1499,7 +1505,7 @@ Seventeen decisions shape everything above. Each is recorded with what it reject
 
 | # | Decision | Rejected | What it costs | How to reverse |
 |---|---|---|---|---|
-| **001** | Build on **Java 21 / Spring Boot 3** | Quarkus — deferred rather than rejected | A JVM footprint on an appliance | Contained: the framework is not in the domain model |
+| **001** | Build on **Java 25 / Spring Boot 4** | Quarkus — deferred rather than rejected | A JVM footprint on an appliance | Contained: the framework is not in the domain model |
 | **002** | **Seven services**, drawn on transactional boundaries | A finer domain split, which would turn consistency into network hops; a single deployable, which would lose thin-edge placement | One service (runtime) is large | Split runtime along its module walls, which exist for this |
 | **003** | **SQL Server ships. PostgreSQL is deferred** — one entity model through JPA/Hibernate, behind one engine seam | Building both engines now; committing to a single engine forever | One seam to maintain with one implementation behind it | Build the second implementation when a deployment needs it |
 | **004** | **Schema-per-service in one cluster**, enforced by per-service database credentials | A database per service — it forbids the in-transaction reads that keep the gate path fast | Coordination state is duplicated per schema | Merge schemas; the credentials are the only enforcement |
@@ -1509,7 +1515,7 @@ Seventeen decisions shape everything above. Each is recorded with what it reject
 | **008** | **Device commands are synchronous, acknowledged and idempotent** — never queued | Queued commands: a replayed stale gate command is physically dangerous | A command has no delivery guarantee beyond its expiry | Not advisable; the reason is safety, not architecture |
 | **009** | **Published read-only views** as the only cross-schema read | Core-as-an-API on the gate path, which adds a network hop to every world-model lookup; shared tables, which lose ownership | Core must maintain the views as a contract | Replace a view with an API where latency permits |
 | **010** | **Single writer per entity class**; replication applies only through the owner | Log-based replication, which couples schemas across versions | A site cannot author what the tier owns | Grant a second writer, and accept reconciling conflicts |
-| **011** | **Keycloak retained**; OpenID Connect everywhere; no service mesh | Building identity; adding a mesh with mutual TLS between services — over-engineering for an appliance | A container and its memory on every appliance | Keycloak is reached through standard OIDC, so it is replaceable |
+| **011** | **Keycloak retained for USER authentication**; OpenID Connect for every caller acting for a person; **service-to-service calls carry a per-installation shared credential instead of a token**; no service mesh | Building identity; a mesh with mutual TLS between services — over-engineering for an appliance; OIDC service accounts for inter-service calls, which put token *issuing* on the gate path and stop it minutes into a wide-area outage | One credential to provision and rotate per installation, and a second authentication mechanism to understand alongside OIDC | Re-enable the service-account clients; the resource server already validates any bearer token, so the change is configuration rather than code |
 | **012** | **orca-media delivered unchanged**, in its existing technology | Rewriting it on the JVM — possible, and it buys nothing | One non-JVM component in the estate | Rewrite it when there is a reason to |
 | **013** | **The device boundary stays frozen** | Re-acquiring the driver layer — it would mean re-certifying every device vendor | The contract's constraints are inherited, including credentials returned in the clear on the configuration poll | Not without a vendor programme |
 | **014** | **Monorepo, contract-first APIs**, expand-only compatibility across adjacent versions | Per-service repositories; code-first APIs | One version truth across seven services | Split the repository once the contracts are stable |
@@ -1517,7 +1523,7 @@ Seventeen decisions shape everything above. Each is recorded with what it reject
 | **016** | **Rebuild the screen builder's authoring experience, and design the saved format for the target** — a schema version in the artifact from the first release, and one component registry every renderer imports | Freezing an inherited format, whose justification was compatibility with screens that will not exist | The format is new, so it has no field history to lean on | The format is versioned from the start, which is what makes it changeable |
 | **017** | **Write-reduction before retention.** The system persists only what a named consumer reads; large bodies are stored once per distinct content and referenced | Retention alone, which bounds how long data is kept but not how much arrives | A reference to resolve on read, and a sweep for unreferenced bodies | Inline the bodies again; the reference is an indirection, not a model change |
 
-**Three decisions changed after they were first taken**, and the reasons are worth keeping: **003** narrowed when the first deployment's engine was confirmed; **006** kept its engine half and reversed its authoring half when migration left the scope; **016** reversed its freeze when the artifacts it was compatible with ceased to exist. Each was re-signed rather than quietly reinterpreted.
+**Five decisions changed after they were first taken**, and the reasons are worth keeping: **001** moved from Java 21 / Boot 3 to Java 25 / Boot 4 before the first line was written, both being long-term-support releases; **003** narrowed when the first deployment's engine was confirmed; **006** kept its engine half and reversed its authoring half when migration left the scope; **011** narrowed "OpenID Connect everywhere" to people only, when it became clear that inter-service token *issuing* put the identity provider on the gate path; **016** reversed its freeze when the artifacts it was compatible with ceased to exist. Each was re-signed rather than quietly reinterpreted.
 
 ## D2 · External contracts, in full
 
