@@ -4,7 +4,7 @@ You are building the foundation of the ORCA platform rebuild. Everything you nee
 
 ## Read first, in this order
 
-1. **`docs/ORCA_PHASE0_BUILD_BRIEF.md`** — what you build, in nine work packages. This is your instruction set.
+1. **`docs/ORCA_PHASE0_BUILD_BRIEF.md`** — what you build, in eight work packages. This is your instruction set.
 2. **`docs/ORCA_ARCHITECTURE.md`** — the design. Read **§B10** first: it lists what the architecture guarantees and how each guarantee is verified. Those are your acceptance criteria.
 3. **`docs/PLATFORM_PRIMITIVES.md`** — what each of the five primitives is for, the named pattern behind it, and the concrete case it serves.
 4. **`docs/ORCA_OPEN_QUESTIONS_REGISTER.md`** — what is deliberately unsettled. Consult it before concluding something is missing by accident.
@@ -25,9 +25,10 @@ The repository currently holds a single Spring Initializr project — **Java 25,
 
 - `./gradlew build` from a clean tree.
 - `docker compose up` gives SQL Server and Keycloak.
-- Every service migrates its own schema on startup, and re-running is a no-op.
+- The bootstrap creates seven schemas and seven logins; every service then migrates its own schema on startup, and re-running is a no-op.
 - **All six services start at once**, each on its own port, each answering health.
 - A token from Keycloak is accepted; a tampered one is rejected.
+- **One service's login cannot read another's schema** — the attempt is refused.
 - **Each of the five build checks fails the build when deliberately violated** — prove each one by breaking it, then revert.
 
 §7 of the brief lists these as thirteen numbered checks. **Run them. Record what actually happened.** An unrun command is not a passing one, and writing a test is not evidence that it passes.
