@@ -8,7 +8,7 @@ This brief is self-contained. You do not need the conversation that produced it.
 
 ## 1 · What you are building, and why it is not a service
 
-ORCA is a gate-automation platform for logistics facilities: cameras read truck plates, customer-designed processes orchestrate devices and external systems, work automation cannot finish goes to a clerk, carriers pre-announce visits. It is being rebuilt as **seven Java 21 / Spring Boot services on Microsoft SQL Server**, deployed as one repository.
+ORCA is a gate-automation platform for logistics facilities: cameras read truck plates, customer-designed processes orchestrate devices and external systems, work automation cannot finish goes to a clerk, carriers pre-announce visits. It is being rebuilt as **seven Java 25 / Spring Boot services on Microsoft SQL Server**, deployed as one repository.
 
 **Phase 0 builds none of that.** It builds the foundation the seven services stand on: five shared primitives, the checks that enforce them, migrations, CI, and a local stack.
 
@@ -51,7 +51,8 @@ orca/
 │  ├─ outbox/  lease/  scope/  idempotency/  web/
 ├─ services/                     # each owns its schema, migrations AND contract
 │  ├─ orca-core/  orca-runtime/  orca-edge/
-│  ├─ orca-portal/  orca-sync/  orca-fleet/  orca-media/
+│  ├─ orca-portal/  orca-sync/  orca-fleet/
+│  └─ orca-media/                # README only — NOT a Gradle module
 ├─ build-checks/                 # ArchUnit rules; fail the build, not the review
 └─ deploy/
    ├─ bootstrap/                 # schemas, logins, grants — once, before any service
@@ -105,6 +106,8 @@ com.lynxis.orca.<service>.<module>
 ### What the base project is, and what you make of it
 
 You are given **one** Spring Initializr project. Turn it into a **Gradle multi-project**: the generated root becomes the parent, and you create the modules beneath it.
+
+**Twelve Gradle modules in total** — five under `platform/`, six services, and `build-checks`. `orca-media` is a README, not a module. **Six bootable applications.**
 
 **Every service module is its own bootable Spring Boot application** — its own `main` class, its own configuration, its own image. They are independently deployable and share one version catalog and one repository. That is ADR-014, and it is why the build checks can see across all seven.
 
