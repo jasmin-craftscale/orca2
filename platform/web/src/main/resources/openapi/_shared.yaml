@@ -1,0 +1,153 @@
+openapi: 3.0.3
+
+# =============================================================================
+# The shared response envelope, error object and pagination.
+#
+# DEFINED HERE AND IMPLEMENTED HERE. These schemas are the contract half of
+# platform/web; ApiResponse.java, ApiError.java and PageMeta.java are the
+# implementation half, and they sit in the same module for that reason. Putting
+# the schema anywhere else would separate the contract from the code that
+# fulfils it.
+#
+# Every service's contract $refs this file, across module boundaries, with a
+# relative path. It is NOT copied into each service: seven copies of the
+# envelope schema is the exact failure this file exists to prevent, and they
+# would diverge within a release.
+#
+# The generator resolves the cross-module reference at build time, and each
+# service also ships a fully RESOLVED copy of its own contract (built by the
+# openapi-yaml generator) so a running service can serve a self-contained
+# specification.
+# =============================================================================
+
+info:
+  title: ORCA shared components
+  description: |
+    Not a servable API. This document exists only to be referenced.
+  version: 0.0.1
+
+paths: {}
+
+components:
+  schemas:
+
+    ApiStatus:
+      type: string
+      description: |
+        Whether this response carries a result or a failure. Two values,
+        deliberately: a caller branches on `code` to tell one failure from
+        another, and on this only to know which half of the body to read.
+      enum: [SUCCESS, ERROR]
+
+    ApiResponse:
+      type: object
+      description: |
+        The one response shape, for every service, on every route (§B8, §D3).
+
+        Why an envelope, given HTTP already has status codes: because a caller
+        must be able to tell one failure from another without parsing prose. A
+        400 meaning "your JSON is malformed" and a 400 meaning "that lane is out
+        of service" are different things a partner's integration branches on, and
+        `code` is that branch point.
+      required: [status, code]
+      properties:
+        status:
+          $ref: "#/components/schemas/ApiStatus"
+        code:
+          type: string
+          description: |
+            The machine-readable code. `OK` on success. A caller branches on this
+            and never on `message`, so improving the wording of a message can
+            never break an integration.
+          example: VALIDATION_FAILED
+        message:
+          type: string
+          description: |
+            Human-readable, and never internal detail. No stack trace, no
+            exception text, no schema or table name reaches a caller on any path.
+          example: One or more fields are invalid.
+        data:
+          description: |
+            The payload. Absent on failure. Its shape is the operation's, stated
+            by the service's own contract.
+        errors:
+          type: array
+          description: Present when more than the top-level code is worth saying.
+          items:
+            $ref: "#/components/schemas/ApiError"
+        page:
+          $ref: "#/components/schemas/PageMeta"
+        requestId:
+          type: string
+          description: |
+            Echoed back so a caller can quote it in a support request and an
+            operator can find the exact request in the log. Supplied by the
+            caller as `X-Request-Id`, or generated.
+          example: 6f1c2b9e-1f5b-4a0d-9a1b-2f3c4d5e6f70
+
+    ApiError:
+      type: object
+      description: |
+        One error inside the envelope's `errors` array. A validation failure over
+        four fields is four entries, not four round trips.
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: The machine-readable code for THIS error, which may be more specific than the envelope's.
+          example: VALIDATION_FAILED
+        field:
+          type: string
+          description: The input this error is about, absent when it is about the request as a whole.
+          example: lanePriority
+        message:
+          type: string
+          description: Written for a developer reading a log. Never derived from an exception's text.
+          example: must be between 1 and 10
+
+    PageMeta:
+      type: object
+      description: |
+        Pagination metadata, carried by the envelope rather than by headers or by
+        each service's own invention.
+      required: [page, size, totalItems, totalPages]
+      properties:
+        page:
+          type: integer
+          format: int32
+          description: Zero-based page index.
+          example: 0
+        size:
+          type: integer
+          format: int32
+          description: The page size actually applied, which may be smaller than the one asked for.
+          example: 50
+        totalItems:
+          type: integer
+          format: int64
+          description: |
+            Total matching items WITHIN THE CALLER'S SCOPE. A count that escaped
+            its scope would leak the size of what the caller cannot see.
+          example: 137
+        totalPages:
+          type: integer
+          format: int32
+          example: 3
+
+    ServiceHealth:
+      type: object
+      description: |
+        The payload of a service's own contracted health route.
+
+        Distinct from `/actuator/health`, which is the orchestrator's probe
+        (§C1–C6) and is not part of any service's authored contract.
+      required: [service, status]
+      properties:
+        service:
+          type: string
+          description: The service answering, so a misrouted request is obvious.
+          example: orca-core
+        status:
+          type: string
+          enum: [UP, DOWN]
+          example: UP

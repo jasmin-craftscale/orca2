@@ -56,15 +56,31 @@ import tools.jackson.databind.json.JsonMapper;
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class PlatformSecurityAutoConfiguration {
 
+	/**
+	 * Whether the OpenAPI document and Swagger UI are readable without a token.
+	 *
+	 * <p><strong>False by default, and that is a deliberate non-decision.</strong>
+	 * Whether an installation publishes its API surface is a security question with
+	 * a named owner, not a convenience setting — so nothing here turns it on. Each
+	 * service's `local` profile does, because a developer with docker compose
+	 * running is not an installation.
+	 */
 	@Bean
 	@ConditionalOnMissingBean(SecurityFilterChain.class)
-	public SecurityFilterChain orcaSecurityFilterChain(HttpSecurity http, JsonMapper jsonMapper) throws Exception {
+	public SecurityFilterChain orcaSecurityFilterChain(HttpSecurity http, JsonMapper jsonMapper,
+			org.springframework.core.env.Environment environment) throws Exception {
+		boolean publicDocs = environment.getProperty("orca.web.public-docs", Boolean.class, false);
 		return http
 				.csrf(csrf -> csrf.disable())
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-				.authorizeHttpRequests(requests -> requests
-						.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-						.anyRequest().authenticated())
+				.authorizeHttpRequests(requests -> {
+					requests.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
+					if (publicDocs) {
+						requests.requestMatchers("/openapi/**", "/swagger-ui/**", "/swagger-ui.html",
+								"/v3/api-docs/**", "/webjars/**").permitAll();
+					}
+					requests.anyRequest().authenticated();
+				})
 				.oauth2ResourceServer(oauth2 -> oauth2
 						.jwt(Customizer.withDefaults())
 						.authenticationEntryPoint((request, response, ex) ->

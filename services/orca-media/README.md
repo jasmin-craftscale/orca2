@@ -28,3 +28,21 @@ own and is not exposed to an operator's browser as an independent surface.
 
 Video and intercom stop. The gate is unaffected — no process step depends on a
 stream, and a lane keeps running without an operator being able to see it.
+
+## Why there is no OpenAPI contract here
+
+Package 4b authors **six** contracts, one per built service, and this is the
+seventh service without one.
+
+§4b of the brief says "all seven contracts share the envelope from `_shared.yaml`",
+and §3 and §6 of the same brief say `orca-media` is "a README, not a module" and
+"a placeholder only — it is inherited and not built here". **Those two statements
+cannot both be satisfied**, and the second one wins: this service's interface
+surface is inherited, is documented in §C7 of the architecture, and is not ours to
+design. Authoring a contract for it here would be publishing an API we did not
+write, in a shape nothing in this repository implements — the exact thing §2 of the
+brief forbids.
+
+The discrepancy is reported rather than resolved. If the team wants a seventh
+document, it should be transcribed from the inherited service by whoever owns it,
+not composed here.

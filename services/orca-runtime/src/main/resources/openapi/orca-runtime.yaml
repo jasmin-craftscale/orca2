@@ -1,7 +1,7 @@
 openapi: 3.0.3
 
 # =============================================================================
-# orca-core — the authored contract, and the source of truth for its API layer.
+# orca-runtime — the authored contract, and the source of truth for its API layer.
 #
 # The Java API layer is GENERATED from this file (ADR-014). The generator emits
 # an interface and its DTOs; the controller is hand-written and implements that
@@ -12,19 +12,19 @@ openapi: 3.0.3
 # Generated sources are never committed. In version control they drift from the
 # spec and nobody notices.
 #
-# ⚠️ Phase 0 authors ONE route. The routes in §C1's interface table arrive with
+# ⚠️ Phase 0 authors ONE route. The routes in §C2's interface table arrive with
 # the behaviour behind them; writing them here now would be publishing a surface
 # nothing implements.
 # =============================================================================
 
 info:
-  title: orca-core
+  title: orca-runtime
   description: |
-    The world as configured (§C1) — tenancy, sites and lanes, users, devices, design artifacts, custom entities, licence verification.
+    The gate brain (§C2) — the process engine, visits, work items, connectors, the partner event API, notifications, operator grids, lane commands.
   version: 0.0.1
 
 servers:
-  - url: http://localhost:8081
+  - url: http://localhost:8082
     description: Local development
 
 tags:

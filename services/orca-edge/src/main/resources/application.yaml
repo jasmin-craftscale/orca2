@@ -116,3 +116,19 @@ orca:
   # See ReadinessGate: fully-qualified views this service requires before it will
   # serve. Empty in Phase 0 because orca-core publishes none yet.
   required-views: ${ORCA_REQUIRED_VIEWS:}
+
+---
+# --- The `local` profile ------------------------------------------------------
+# Activate with --spring.profiles.active=local. Nothing here is for a deployment.
+spring:
+  config:
+    activate:
+      on-profile: local
+
+orca:
+  web:
+    # Makes the contract and Swagger UI readable without a token, so a developer
+    # with docker compose running can open them. Off everywhere else: whether an
+    # installation publishes its API surface is a security decision with a named
+    # owner, not a convenience setting.
+    public-docs: true
