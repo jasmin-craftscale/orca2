@@ -144,6 +144,34 @@ Each service owns its own entry point, for example `services/orca-core/src/main/
 
 **Done when** `docker compose up` yields a working database and identity server, and a service can obtain a token and validate it **by signature, locally** — no call-out per request.
 
+### Package 2b — Service runtime configuration
+
+Six bootable applications on one developer machine. Without this package they collide on the default port and share one database login, and neither problem is visible until someone tries to run them.
+
+**Assign a port per service** in its own `application.yaml`:
+
+| Service | Port |
+|---|---|
+| `orca-core` | 8081 |
+| `orca-runtime` | 8082 |
+| `orca-edge` | 8083 |
+| `orca-portal` | 8084 |
+| `orca-sync` | 8085 |
+| `orca-fleet` | 8086 |
+
+**Each service gets its own database login and its own default schema.** This is ADR-004 — schema ownership is enforced by credentials, not by convention. A service configured with a shared administrative login has no enforcement at all, and the build checks cannot see it.
+
+Per service, in `application.yaml`:
+
+- A datasource whose **username is that service's own login**, with credentials drawn from environment variables and defaulted in `.env.example`.
+- Flyway pointed at **that service's schema only**, with its migration location inside the service.
+- Actuator exposing **health** (and nothing else it does not need).
+- The OAuth2 resource-server issuer pointing at the local Keycloak realm.
+
+**The bootstrap in `deploy/bootstrap/` creates those logins and grants each one access to its own schema and nothing more.** Proving that restriction is part of this package: **connect as one service's login and attempt to read another service's schema — the attempt must fail.** A grant that was never tested is a grant nobody knows the shape of.
+
+**Done when** all six services start simultaneously, each answers on its own port, each has migrated its own schema, and a cross-schema read using the wrong login is refused.
+
 ### Package 3 — Migrations
 
 **Each service owns its own migrations, in its own module.** A service owns its schema — that is ADR-004, enforced by database credentials — and a schema whose definition lives outside the service that owns it is not owned by it. Migrations sit under each service's own resources:
@@ -355,7 +383,8 @@ Each of the seven gets: a module, a Spring Boot application class, a health endp
 | 6 | `./gradlew integrationTest` | Testcontainers tests pass against real SQL Server |
 | 7 | `./gradlew check` | All five ArchUnit rules pass |
 | 8 | **Deliberately violate each of the five build checks, one at a time** | Each violation **fails the build**, with a message that names what is wrong |
-| 9 | Boot each of the seven services | Each starts and answers on its health endpoint |
+| 9 | Boot **all six services at once** | Each starts on its own port and answers health. No port collision, no shared login |
+| 9b | Connect as one service's login, read another's schema | **Refused.** Schema ownership is enforced by credentials, not convention |
 | 10 | Obtain a token from Keycloak and call a secured endpoint | Accepted. Then call it with a tampered token — rejected |
 
 ⚠️ **Item 8 is the one that is easy to skip and the most important.** A check that has never been seen to fail may not be wired in at all. Prove each one by breaking it, then revert the break.
