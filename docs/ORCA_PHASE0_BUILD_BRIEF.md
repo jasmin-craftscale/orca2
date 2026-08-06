@@ -111,9 +111,26 @@ You are given **one** Spring Initializr project. Turn it into a **Gradle multi-p
 
 ### Package 1 — Build wiring
 
-Register every module in `settings.gradle.kts`. Root build sets the Java 21 toolchain and one version catalog in `gradle/libs.versions.toml`; every module declares only its own dependencies.
+Register every module in `settings.gradle.kts`. The root build sets the Java 25 toolchain and one version catalog in `gradle/libs.versions.toml`; every module declares only its own dependencies.
 
-**Done when** `./gradlew build` succeeds from a clean clone with nothing installed but a JDK.
+**The root project is an aggregator and holds no code.** Spring Initializr can only generate a single application, so it produced a bootable one at the root — `src/` and `OrcaApplication.java`. **Both are removed in this package.**
+
+| | Generated state | Required state |
+|---|---|---|
+| Root `src/` | A bootable application | **Deleted** |
+| Spring Boot plugin | Applied at the root | Declared at the root with **`apply false`**, applied in each service module |
+| Root `build.gradle.kts` | Builds a jar | Aggregator only — toolchain, version catalog, shared configuration |
+| Bootable applications | One, at the root | **Seven**, one per service module |
+
+Each service owns its own entry point, for example `services/orca-core/src/main/java/com/lynxis/orca/core/CoreApplication.java`.
+
+⚠️ **Do not keep the root application "just in case."** Leaving it produces an eighth Spring Boot application that does nothing, claims the default port, and misleads everyone who clones the repository.
+
+**Before deleting it, keep what is useful:** the generated `TestcontainersConfiguration.java` shows this Spring Boot version's Testcontainers wiring. Move that pattern into the shared test configuration rather than discarding it.
+
+**A note on this Spring Boot version's starter names.** The starters were renamed in Boot 4 — it is `spring-boot-starter-webmvc`, not `spring-boot-starter-web`, and each starter has a paired `-test` artifact (`spring-boot-starter-data-jpa-test`, `spring-boot-starter-webmvc-test`) rather than one blanket `spring-boot-starter-test`. The committed `build.gradle.kts` has the correct names — **copy from it rather than from memory or from older examples.**
+
+**Done when** `./gradlew build` succeeds from a clean clone with nothing installed but a JDK, and no bootable application remains at the root.
 
 ### Package 2 — Local stack
 
