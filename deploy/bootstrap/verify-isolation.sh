@@ -56,14 +56,15 @@ for svc in "${services[@]}"; do
 	# Unqualified on purpose: it lands in this login's DEFAULT_SCHEMA, which is
 	# the mechanism the whole arrangement depends on. If the default schema were
 	# wrong, this would silently create the table in dbo.
-	out="$(as_service "$svc" "
+	as_service "$svc" "
 		IF OBJECT_ID('isolation_probe','U') IS NULL CREATE TABLE isolation_probe (owner VARCHAR(40));
 		DELETE FROM isolation_probe;
-		INSERT INTO isolation_probe (owner) VALUES ('orca_$svc');
-		SELECT s.name FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id
-		WHERE t.name = 'isolation_probe';")"
+		INSERT INTO isolation_probe (owner) VALUES ('orca_$svc');" > /dev/null
+	# Asked as its own statement, so the schema name is the only thing on stdout.
+	out="$(as_service "$svc" "SELECT TOP 1 s.name FROM sys.tables t
+		JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE t.name = 'isolation_probe';")"
 	rc=$?
-	landed="$(echo "$out" | tr -d '[:space:]' | grep -oE '^[a-z]+' | head -1)"
+	landed="$(echo "$out" | grep -vE "rows affected|^$" | tr -d "[:space:]" | head -1)"
 	if [[ $rc -eq 0 && "$landed" == "$svc" ]]; then
 		printf '  %-8s -> owns schema [%s] and wrote to it\n' "$svc" "$svc"
 	else
