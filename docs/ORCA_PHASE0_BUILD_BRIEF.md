@@ -81,12 +81,14 @@ Every module uses the same three packages, and the module names come from the ar
 com.lynxis.orca
 ├─ platform
 │  └─ outbox · lease · scope · idempotency · web
-├─ core
-│  └─ tenancy · identity · device · design · licensing
 ├─ runtime
 │  └─ execution · workitem · integration · notify · readmodel
-├─ edge · portal · sync · fleet
+├─ core · edge · portal · sync · fleet
 ```
+
+⚠️ **Only `runtime` has architecture-defined modules.** §C2 names those five and the module wall depends on them, so create them.
+
+**`core`, `edge`, `portal`, `sync` and `fleet` are flat in this phase** — the service package with `api`, `domain` and `persistence` directly beneath it. The architecture does not decompose them into modules, and **inventing a decomposition here would be exactly the failure rule §2 prohibits.** When their modules are defined, they can be added; a flat package is trivially split, and a wrong split is not.
 
 Inside every module:
 
