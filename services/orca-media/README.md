@@ -14,7 +14,7 @@ real-time media is a specialism and rewriting a working relay buys nothing
 |---|---|
 | **Gradle module** | No. `settings.gradle.kts` does not include it, and adding it would make thirteen modules where the brief says twelve |
 | **Application schema** | **None of its own.** The telephony engine reads its own `ps_*` configuration tables directly, in its own format. The platform does not read, write or model them, and they carry no ORCA retention rule |
-| **Database login** | None. There is no seventh application login for media — the bootstrap creates a login for the six JVM services only |
+| **Database schema and login** | A `media` schema and an `orca_media` login **do** exist — they are the seventh pair the bootstrap creates. They are the engine's, not the platform's: no ORCA migration writes there and no ORCA code reads it. The login exists so the engine connects as itself and is confined exactly like every other principal |
 | **OpenAPI contract** | Not authored here. Its interface surface is inherited and documented in §C7 |
 | **Health endpoint** | Its own, on its own surface (`/webrtc/api/health`, `/streamforwarder/api/health`) |
 

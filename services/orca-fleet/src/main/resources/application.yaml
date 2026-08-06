@@ -1,3 +1,99 @@
+# orca-fleet — licences and releases (§C6)
+#
+# Six bootable applications run on one developer machine, so each takes its own
+# port and its own database login. Neither problem is visible until someone tries
+# to run them all at once, which is why this file exists before there is anything
+# to run.
+
+server:
+  port: 8086
+
 spring:
   application:
     name: orca-fleet
+
+  # --- Datasource -----------------------------------------------------------
+  # The username is THIS SERVICE'S OWN LOGIN. That is ADR-004: schema ownership
+  # is enforced by credentials, not by convention. A service pointed at a shared
+  # administrative login has no enforcement at all, and no build check can see it.
+  datasource:
+    url: ${ORCA_DB_URL:jdbc:sqlserver://localhost:1433;databaseName=orca;encrypt=true;trustServerCertificate=true}
+    username: ${ORCA_FLEET_DB_USERNAME:orca_fleet}
+    password: ${ORCA_FLEET_DB_PASSWORD:Orca!Fleet2026}
+    hikari:
+      pool-name: orca-fleet
+      maximum-pool-size: 10
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Migrations own the schema. Hibernate never does, in any profile: a schema
+      # generated from entities is a schema with no history and no review.
+      ddl-auto: none
+    properties:
+      hibernate:
+        default_schema: fleet
+
+  # --- Flyway ---------------------------------------------------------------
+  # This service migrates ITS OWN SCHEMA ONLY, on its own startup, with its own
+  # credentials. No service can migrate another's, for the same reason no service
+  # can write another's tables.
+  flyway:
+    enabled: true
+    schemas: fleet
+    default-schema: fleet
+    # The bootstrap creates the schemas. A service login cannot — creating a
+    # schema is a privileged operation, and `orca_fleet` is not privileged.
+    create-schemas: false
+    locations:
+      # This service's own migrations, in this service's own module.
+      - classpath:db/migration
+      # The primitives' tables, defined once by the primitive that implements
+      # them and applied into THIS schema by THIS service's Flyway. One
+      # definition, six schemas — not a shared migrations module, which would
+      # centralise schema definition away from the services that own it.
+      - classpath:db/platform/lease
+    # An expand-only discipline across an upgrade pair (§B7) means a migration is
+    # never edited after it ships. Checksum drift is a mistake, not a workflow.
+    validate-on-migrate: true
+
+  # --- Identity -------------------------------------------------------------
+  # Tokens are validated BY SIGNATURE, LOCALLY, against the realm's published
+  # keys. Nothing calls out to Keycloak per request (§B6) — which is also what
+  # lets a site keep working when the wide-area link drops.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${ORCA_OIDC_ISSUER_URI:http://localhost:8080/realms/orca}
+
+# --- Actuator ---------------------------------------------------------------
+# Health, and nothing this service does not need. `/actuator/health` is the
+# orchestrator's probe (§C6).
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+
+# --- Swagger UI -------------------------------------------------------------
+# springdoc serves the UI. It does NOT generate the spec: the checked-in contract
+# is the source of truth, and letting springdoc introspect the code would make a
+# second one. They would disagree, and nothing would say which was right.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    path: /swagger-ui.html
+    url: /openapi/orca-fleet.yaml
+
+orca:
+  service: orca-fleet
+  # See ReadinessGate: fully-qualified views this service requires before it will
+  # serve. Empty in Phase 0 because orca-core publishes none yet.
+  required-views: ${ORCA_REQUIRED_VIEWS:}
