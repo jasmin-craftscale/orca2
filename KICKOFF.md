@@ -15,6 +15,8 @@ You are building the foundation of the ORCA platform rebuild. Everything you nee
 
 A Gradle multi-project: **twelve modules, six bootable Spring Boot applications, and no business logic at all.** Five shared primitives, the build checks that enforce them, per-service migrations and contracts, a local stack, and CI.
 
+**Each service owns its own schema, its own database login, its own migrations and its own OpenAPI contract.** Schema ownership is enforced by credentials, not by convention — proving that restriction is part of the work.
+
 The repository currently holds a single Spring Initializr project — **Java 25, Spring Boot 4.0.7, `com.lynxis.orca`** — already committed. Your first package turns it into the multi-project and removes the generated application at the root.
 
 ## The outcome that matters
@@ -28,11 +30,11 @@ The repository currently holds a single Spring Initializr project — **Java 25,
 - A token from Keycloak is accepted; a tampered one is rejected.
 - **Each of the five build checks fails the build when deliberately violated** — prove each one by breaking it, then revert.
 
-§7 of the brief lists these as eleven commands. **Run them. Record what actually happened.** An unrun command is not a passing one, and writing a test is not evidence that it passes.
+§7 of the brief lists these as thirteen numbered checks. **Run them. Record what actually happened.** An unrun command is not a passing one, and writing a test is not evidence that it passes.
 
 ## How to work
 
-- **Commit once per work package**, with a message saying what landed. Nine commits, not one.
+- **Commit once per work package**, with a message saying what landed. Eight commits, not one.
 - **Never invent a resolution to an unspecified question.** If the architecture is silent, that silence is information — leave it unbuilt and report it. A plausible guess written as working code is far harder to find later than a gap.
 - **`platform/` holds primitives, never domain.** If a class there knows what a visit, a lane or a ticket is, it belongs in a service.
 - **Tests must prove the property, not exercise the path.** "The outbox writes a row" is not a test. "Killing the process between the two writes leaves neither" is.

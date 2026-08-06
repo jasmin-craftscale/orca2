@@ -377,8 +377,10 @@ Each of the seven gets: a module, a Spring Boot application class, a health endp
 |---|---|---|
 | 1 | `git clean -xdf && ./gradlew build` | Succeeds from a clean tree with nothing installed but a JDK |
 | 2 | `docker compose -f deploy/docker-compose.yml up -d` | SQL Server and Keycloak reach healthy |
-| 3 | `./gradlew flywayMigrate` (or the equivalent task) | All schemas created, core first |
-| 4 | The same migration command, **a second time** | A no-op. No error, no duplicate objects |
+| 3 | Run `deploy/bootstrap/` against a fresh database | Seven schemas, seven logins, and grants confining each login to its own schema |
+| 4 | Start `orca-core` | It migrates its own schema on startup, with its own login |
+| 4b | Restart it | A no-op. No error, no duplicate objects |
+| 4c | Start a service that reads core's views **before** core has migrated | It **refuses to start** and names the missing view, rather than starting and failing on the first query |
 | 5 | `./gradlew test` | Every primitive's property tests pass, including the kill-mid-transaction and lease-expiry cases |
 | 6 | `./gradlew integrationTest` | Testcontainers tests pass against real SQL Server |
 | 7 | `./gradlew check` | All five ArchUnit rules pass |
