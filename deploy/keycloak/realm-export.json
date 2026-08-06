@@ -13,34 +13,10 @@
     "realm": [
       {
         "name": "orca-service",
-        "description": "Held by every service account. Marks a token as minted for a service, not a person."
+        "description": "Held by every service account. Marks a token as minted for a service rather than a person."
       }
     ]
   },
-  "clientScopes": [
-    {
-      "name": "orca-audience",
-      "description": "Puts a stable audience on every service token so a resource server can check who a token was minted for.",
-      "protocol": "openid-connect",
-      "attributes": {
-        "include.in.token.scope": "false",
-        "display.on.consent.screen": "false"
-      },
-      "protocolMappers": [
-        {
-          "name": "orca-audience",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-audience-mapper",
-          "consentRequired": false,
-          "config": {
-            "included.custom.audience": "orca",
-            "id.token.claim": "false",
-            "access.token.claim": "true"
-          }
-        }
-      ]
-    }
-  ],
   "clients": [
     {
       "clientId": "orca-core",
@@ -60,17 +36,32 @@
         "access.token.lifespan": "300",
         "use.refresh.tokens": "false"
       },
-      "defaultClientScopes": [
-        "basic",
-        "acr",
-        "roles",
-        "web-origins",
-        "profile",
-        "email",
-        "service_account",
-        "orca-audience"
-      ],
-      "optionalClientScopes": []
+      "protocolMappers": [
+        {
+          "name": "orca-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "orca",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "orca-runtime",
@@ -90,17 +81,32 @@
         "access.token.lifespan": "300",
         "use.refresh.tokens": "false"
       },
-      "defaultClientScopes": [
-        "basic",
-        "acr",
-        "roles",
-        "web-origins",
-        "profile",
-        "email",
-        "service_account",
-        "orca-audience"
-      ],
-      "optionalClientScopes": []
+      "protocolMappers": [
+        {
+          "name": "orca-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "orca",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "orca-edge",
@@ -120,17 +126,32 @@
         "access.token.lifespan": "300",
         "use.refresh.tokens": "false"
       },
-      "defaultClientScopes": [
-        "basic",
-        "acr",
-        "roles",
-        "web-origins",
-        "profile",
-        "email",
-        "service_account",
-        "orca-audience"
-      ],
-      "optionalClientScopes": []
+      "protocolMappers": [
+        {
+          "name": "orca-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "orca",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "orca-portal",
@@ -150,17 +171,32 @@
         "access.token.lifespan": "300",
         "use.refresh.tokens": "false"
       },
-      "defaultClientScopes": [
-        "basic",
-        "acr",
-        "roles",
-        "web-origins",
-        "profile",
-        "email",
-        "service_account",
-        "orca-audience"
-      ],
-      "optionalClientScopes": []
+      "protocolMappers": [
+        {
+          "name": "orca-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "orca",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "orca-sync",
@@ -180,17 +216,32 @@
         "access.token.lifespan": "300",
         "use.refresh.tokens": "false"
       },
-      "defaultClientScopes": [
-        "basic",
-        "acr",
-        "roles",
-        "web-origins",
-        "profile",
-        "email",
-        "service_account",
-        "orca-audience"
-      ],
-      "optionalClientScopes": []
+      "protocolMappers": [
+        {
+          "name": "orca-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "orca",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "orca-fleet",
@@ -210,17 +261,70 @@
         "access.token.lifespan": "300",
         "use.refresh.tokens": "false"
       },
-      "defaultClientScopes": [
-        "basic",
-        "acr",
-        "roles",
-        "web-origins",
-        "profile",
-        "email",
-        "service_account",
-        "orca-audience"
-      ],
-      "optionalClientScopes": []
+      "protocolMappers": [
+        {
+          "name": "orca-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "orca",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "scopeMappings": [
+    {
+      "client": "orca-core",
+      "roles": [
+        "orca-service"
+      ]
+    },
+    {
+      "client": "orca-runtime",
+      "roles": [
+        "orca-service"
+      ]
+    },
+    {
+      "client": "orca-edge",
+      "roles": [
+        "orca-service"
+      ]
+    },
+    {
+      "client": "orca-portal",
+      "roles": [
+        "orca-service"
+      ]
+    },
+    {
+      "client": "orca-sync",
+      "roles": [
+        "orca-service"
+      ]
+    },
+    {
+      "client": "orca-fleet",
+      "roles": [
+        "orca-service"
+      ]
     }
   ],
   "users": [
@@ -269,44 +373,6 @@
       "enabled": true,
       "serviceAccountClientId": "orca-fleet",
       "realmRoles": [
-        "orca-service"
-      ]
-    }
-  ],
-  "scopeMappings": [
-    {
-      "client": "orca-core",
-      "roles": [
-        "orca-service"
-      ]
-    },
-    {
-      "client": "orca-runtime",
-      "roles": [
-        "orca-service"
-      ]
-    },
-    {
-      "client": "orca-edge",
-      "roles": [
-        "orca-service"
-      ]
-    },
-    {
-      "client": "orca-portal",
-      "roles": [
-        "orca-service"
-      ]
-    },
-    {
-      "client": "orca-sync",
-      "roles": [
-        "orca-service"
-      ]
-    },
-    {
-      "client": "orca-fleet",
-      "roles": [
         "orca-service"
       ]
     }
