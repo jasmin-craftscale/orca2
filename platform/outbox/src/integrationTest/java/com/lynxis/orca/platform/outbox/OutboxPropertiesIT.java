@@ -56,7 +56,7 @@ class OutboxPropertiesIT {
 		// what it is, which is the point — platform/ holds no domain.
 		new JdbcTemplate(dataSource).execute(
 				"IF OBJECT_ID('" + SCHEMA + ".fact', 'U') IS NULL "
-						+ "CREATE TABLE " + SCHEMA + ".fact (id INT PRIMARY KEY, body NVARCHAR(200))");
+						+ "CREATE TABLE fact (id INT PRIMARY KEY, body NVARCHAR(200))");
 	}
 
 	@BeforeEach
@@ -81,8 +81,7 @@ class OutboxPropertiesIT {
 		// session that disappears mid-transaction. So that is what is done: the fact
 		// is written, the session is killed from outside, and the outbox write never
 		// happens.
-		try (Connection victim = PlatformDatabase.dataSource().getConnection()) {
-			victim.setSchema(SCHEMA);
+		try (Connection victim = PlatformDatabase.ownedBy(SCHEMA).getConnection()) {
 			victim.setAutoCommit(false);
 
 			int spid = spidOf(victim);
@@ -351,7 +350,7 @@ class OutboxPropertiesIT {
 	}
 
 	private static void kill(int spid) throws java.sql.SQLException {
-		try (Connection assassin = PlatformDatabase.dataSource().getConnection();
+		try (Connection assassin = PlatformDatabase.administrative().getConnection();
 				Statement statement = assassin.createStatement()) {
 			statement.execute("KILL " + spid);
 		}

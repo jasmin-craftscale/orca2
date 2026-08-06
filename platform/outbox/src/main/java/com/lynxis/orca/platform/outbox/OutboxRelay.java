@@ -3,7 +3,9 @@ package com.lynxis.orca.platform.outbox;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -132,16 +134,19 @@ public class OutboxRelay {
 	private int deliverPendingAsSystem(int batchSize) {
 		int acknowledged = 0;
 		for (OutboxConsumer consumer : consumers) {
+			// A refused fact blocks ITS OWN KEY and nothing else. That is what
+			// "ordered per key, never globally" means when something goes wrong:
+			// one unreachable destination must not stop every other lane's facts.
+			Set<String> blockedKeys = new HashSet<>();
 			for (OutboxRecord record : claim(consumer.name(), batchSize)) {
+				if (blockedKeys.contains(record.orderingKey())) {
+					continue;
+				}
 				if (offer(consumer, record)) {
 					acknowledged++;
 				}
 				else {
-					// The key is blocked until this one succeeds. Moving on to the
-					// next row of the SAME key would deliver out of order, so the
-					// remaining claimed rows for this consumer are simply released
-					// by their claim expiring.
-					break;
+					blockedKeys.add(record.orderingKey());
 				}
 			}
 		}

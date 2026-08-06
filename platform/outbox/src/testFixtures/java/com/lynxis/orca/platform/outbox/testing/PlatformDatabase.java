@@ -10,71 +10,116 @@ import org.flywaydb.core.Flyway;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /**
- * A real schema on the shared SQL Server container, migrated by the same Flyway
- * locations a service uses.
+ * A real schema on the shared SQL Server container, owned by its own login, and
+ * migrated by the same Flyway locations a service uses.
  *
  * <p>Integration tests here run against <strong>the engine that ships</strong>.
- * Nothing about the outbox's claim, the lease's guarded update or the idempotency
- * store's duplicate-key path can be tested honestly on another database: skip-locked
- * reads, {@code SYSUTCDATETIME()} and {@code OUTPUT} clauses are the mechanism, not
- * an implementation detail behind it.
+ * Nothing about the outbox's skip-locked claim, the lease's guarded update or the
+ * idempotency store's duplicate-key path can be tested honestly on another
+ * database: those are the mechanism, not an implementation detail behind it.
+ *
+ * <p><strong>Each schema gets its own login, exactly as a service does.</strong>
+ * That is not ceremony. SQL Server has no usable per-connection schema switch —
+ * {@code Connection.setSchema} does nothing, and Flyway says outright that
+ * changing the default schema is unsupported here — so the <em>only</em> thing
+ * that makes an unqualified {@code CREATE TABLE} land in the right place is the
+ * login's {@code DEFAULT_SCHEMA}. Production depends on precisely that
+ * (deploy/bootstrap sets it, and V004 asserts it), so a test that qualified its
+ * names instead would be testing something the services never do.
  */
 public final class PlatformDatabase {
+
+	/** The integration-test database, separate from anything docker compose is running. */
+	public static final String DATABASE = "orca_it";
+
+	private static final String PASSWORD = "Orca!IntegrationTest2026";
 
 	private PlatformDatabase() {
 	}
 
 	/**
-	 * Creates {@code schema} on the shared container (dropping it first if present)
-	 * and applies the given Flyway locations to it.
+	 * Creates {@code schema} and its owning login on the shared container, drops
+	 * anything left from a previous run, and applies the given Flyway locations.
 	 *
-	 * @param schema    a schema name unique to the calling test class, so classes do
-	 *                  not tread on each other when the suite runs in parallel
+	 * @param schema    a schema name unique to the calling test class
 	 * @param locations Flyway classpath locations, e.g. {@code db/platform/outbox}
 	 */
 	public static DataSource migratedSchema(String schema, String... locations) {
-		dropAndCreateSchema(schema);
-		DataSource dataSource = dataSource();
+		createDatabase();
+		createSchemaAndLogin(schema);
+		dropAllTables(schema);
+
+		DataSource owner = ownedBy(schema);
 		Flyway.configure()
-				.dataSource(dataSource)
+				.dataSource(owner)
 				.schemas(schema)
 				.defaultSchema(schema)
 				.createSchemas(false)
 				.locations(locations)
 				.load()
 				.migrate();
-		return schemaBoundDataSource(schema);
+		return owner;
 	}
 
-	/** A datasource whose connections default to {@code schema}, as a service's login would. */
-	public static DataSource schemaBoundDataSource(String schema) {
-		// A service's own login has this schema as its DEFAULT_SCHEMA, so its
-		// migrations and queries are unqualified. Tests connect as sa, so the
-		// binding is done here instead — otherwise the tests would exercise
-		// qualified names the production code never uses.
-		DriverManagerDataSource dataSource = new DriverManagerDataSource(
-				OrcaSqlServer.jdbcUrl(), OrcaSqlServer.saUsername(), OrcaSqlServer.saPassword());
-		dataSource.setSchema(schema);
-		return dataSource;
+	/** A datasource authenticating as the schema's own login, the way a service does. */
+	public static DataSource ownedBy(String schema) {
+		return new DriverManagerDataSource(url(DATABASE), "it_" + schema, PASSWORD);
 	}
 
-	public static DataSource dataSource() {
-		return new DriverManagerDataSource(
-				OrcaSqlServer.jdbcUrl(), OrcaSqlServer.saUsername(), OrcaSqlServer.saPassword());
+	/** An administrative datasource, for the few things a schema owner cannot do. */
+	public static DataSource administrative() {
+		return new DriverManagerDataSource(url(DATABASE), OrcaSqlServer.saUsername(), OrcaSqlServer.saPassword());
 	}
 
-	private static void dropAndCreateSchema(String schema) {
-		try (Connection connection = dataSource().getConnection(); Statement statement = connection.createStatement()) {
-			statement.execute("""
-					DECLARE @sql NVARCHAR(MAX) = N'';
-					SELECT @sql = @sql + N'DROP TABLE [%s].[' + name + N'];'
-					FROM sys.tables WHERE schema_id = SCHEMA_ID(N'%s');
-					EXEC sp_executesql @sql;
-					""".formatted(schema, schema));
-			statement.execute("IF SCHEMA_ID(N'%s') IS NULL EXEC('CREATE SCHEMA [%s]')".formatted(schema, schema));
+	private static String url(String database) {
+		// The container's URL already carries encrypt/trust settings; only the
+		// database is swapped.
+		String base = OrcaSqlServer.jdbcUrl();
+		return base.contains("databaseName=")
+				? base.replaceAll("databaseName=[^;]*", "databaseName=" + database)
+				: base + ";databaseName=" + database;
+	}
+
+	private static void createDatabase() {
+		DriverManagerDataSource master = new DriverManagerDataSource(
+				url("master"), OrcaSqlServer.saUsername(), OrcaSqlServer.saPassword());
+		execute(master, "IF DB_ID(N'" + DATABASE + "') IS NULL CREATE DATABASE [" + DATABASE + "]");
+	}
+
+	private static void createSchemaAndLogin(String schema) {
+		String login = "it_" + schema;
+		DataSource admin = administrative();
+		execute(admin, "IF SUSER_ID(N'" + login + "') IS NULL "
+				+ "EXEC('CREATE LOGIN [" + login + "] WITH PASSWORD = ''" + PASSWORD + "'', CHECK_POLICY = OFF')");
+		execute(admin, "IF DATABASE_PRINCIPAL_ID(N'" + login + "') IS NULL "
+				+ "EXEC('CREATE USER [" + login + "] FOR LOGIN [" + login + "]')");
+		execute(admin, "IF SCHEMA_ID(N'" + schema + "') IS NULL "
+				+ "EXEC('CREATE SCHEMA [" + schema + "] AUTHORIZATION [" + login + "]')");
+		execute(admin, "ALTER USER [" + login + "] WITH DEFAULT_SCHEMA = [" + schema + "]");
+		execute(admin, "GRANT CREATE TABLE TO [" + login + "]");
+		execute(admin, "GRANT CREATE VIEW TO [" + login + "]");
+	}
+
+	private static void dropAllTables(String schema) {
+		// Foreign keys first: outbox_delivery references outbox, so dropping in an
+		// arbitrary order fails and leaves the schema half-cleaned.
+		execute(administrative(), """
+				DECLARE @sql NVARCHAR(MAX) = N'';
+				SELECT @sql = @sql + N'ALTER TABLE [%1$s].[' + OBJECT_NAME(parent_object_id)
+				                   + N'] DROP CONSTRAINT [' + name + N'];'
+				FROM sys.foreign_keys WHERE schema_id = SCHEMA_ID(N'%1$s');
+				SELECT @sql = @sql + N'DROP TABLE [%1$s].[' + name + N'];'
+				FROM sys.tables WHERE schema_id = SCHEMA_ID(N'%1$s');
+				IF @sql <> N'' EXEC sp_executesql @sql;
+				""".formatted(schema));
+	}
+
+	private static void execute(DataSource dataSource, String sql) {
+		try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
+			statement.execute(sql);
 		}
 		catch (SQLException e) {
-			throw new IllegalStateException("Could not prepare schema " + schema, e);
+			throw new IllegalStateException("Failed: " + sql, e);
 		}
 	}
 }

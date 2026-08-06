@@ -94,6 +94,16 @@ springdoc:
 
 orca:
   service: orca-fleet
+  # ⚠️ LOCAL DEVELOPMENT VALUES. §C2 states no lease duration and no renewal
+  # interval, and requires instead that a service REFUSE TO START when either is
+  # unset or when the duration is not longer than the renewal interval — see
+  # LeaseConfigurationValidator, which is that specification. These two numbers are
+  # therefore a local profile's answer and NOT a recommendation for a site: a
+  # deployment must choose its own against its own network and restart behaviour.
+  lease:
+    duration: 30s
+    renewal-interval: 10s
+
   # See ReadinessGate: fully-qualified views this service requires before it will
   # serve. Empty in Phase 0 because orca-core publishes none yet.
   required-views: ${ORCA_REQUIRED_VIEWS:}
