@@ -1,0 +1,314 @@
+{
+  "realm": "orca",
+  "displayName": "ORCA",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      {
+        "name": "orca-service",
+        "description": "Held by every service account. Marks a token as minted for a service, not a person."
+      }
+    ]
+  },
+  "clientScopes": [
+    {
+      "name": "orca-audience",
+      "description": "Puts a stable audience on every service token so a resource server can check who a token was minted for.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "orca-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "orca",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "orca-core",
+      "name": "orca-core",
+      "description": "Service-to-service identity for orca-core. Confidential, service account only.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "secret": "local-dev-secret-orca-core",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": {
+        "access.token.lifespan": "300",
+        "use.refresh.tokens": "false"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "roles",
+        "web-origins",
+        "profile",
+        "email",
+        "service_account",
+        "orca-audience"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "orca-runtime",
+      "name": "orca-runtime",
+      "description": "Service-to-service identity for orca-runtime. Confidential, service account only.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "secret": "local-dev-secret-orca-runtime",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": {
+        "access.token.lifespan": "300",
+        "use.refresh.tokens": "false"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "roles",
+        "web-origins",
+        "profile",
+        "email",
+        "service_account",
+        "orca-audience"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "orca-edge",
+      "name": "orca-edge",
+      "description": "Service-to-service identity for orca-edge. Confidential, service account only.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "secret": "local-dev-secret-orca-edge",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": {
+        "access.token.lifespan": "300",
+        "use.refresh.tokens": "false"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "roles",
+        "web-origins",
+        "profile",
+        "email",
+        "service_account",
+        "orca-audience"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "orca-portal",
+      "name": "orca-portal",
+      "description": "Service-to-service identity for orca-portal. Confidential, service account only.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "secret": "local-dev-secret-orca-portal",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": {
+        "access.token.lifespan": "300",
+        "use.refresh.tokens": "false"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "roles",
+        "web-origins",
+        "profile",
+        "email",
+        "service_account",
+        "orca-audience"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "orca-sync",
+      "name": "orca-sync",
+      "description": "Service-to-service identity for orca-sync. Confidential, service account only.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "secret": "local-dev-secret-orca-sync",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": {
+        "access.token.lifespan": "300",
+        "use.refresh.tokens": "false"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "roles",
+        "web-origins",
+        "profile",
+        "email",
+        "service_account",
+        "orca-audience"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "orca-fleet",
+      "name": "orca-fleet",
+      "description": "Service-to-service identity for orca-fleet. Confidential, service account only.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "secret": "local-dev-secret-orca-fleet",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": {
+        "access.token.lifespan": "300",
+        "use.refresh.tokens": "false"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "roles",
+        "web-origins",
+        "profile",
+        "email",
+        "service_account",
+        "orca-audience"
+      ],
+      "optionalClientScopes": []
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-orca-core",
+      "enabled": true,
+      "serviceAccountClientId": "orca-core",
+      "realmRoles": [
+        "orca-service"
+      ]
+    },
+    {
+      "username": "service-account-orca-runtime",
+      "enabled": true,
+      "serviceAccountClientId": "orca-runtime",
+      "realmRoles": [
+        "orca-service"
+      ]
+    },
+    {
+      "username": "service-account-orca-edge",
+      "enabled": true,
+      "serviceAccountClientId": "orca-edge",
+      "realmRoles": [
+        "orca-service"
+      ]
+    },
+    {
+      "username": "service-account-orca-portal",
+      "enabled": true,
+      "serviceAccountClientId": "orca-portal",
+      "realmRoles": [
+        "orca-service"
+      ]
+    },
+    {
+      "username": "service-account-orca-sync",
+      "enabled": true,
+      "serviceAccountClientId": "orca-sync",
+      "realmRoles": [
+        "orca-service"
+      ]
+    },
+    {
+      "username": "service-account-orca-fleet",
+      "enabled": true,
+      "serviceAccountClientId": "orca-fleet",
+      "realmRoles": [
+        "orca-service"
+      ]
+    }
+  ],
+  "scopeMappings": [
+    {
+      "client": "orca-core",
+      "roles": [
+        "orca-service"
+      ]
+    },
+    {
+      "client": "orca-runtime",
+      "roles": [
+        "orca-service"
+      ]
+    },
+    {
+      "client": "orca-edge",
+      "roles": [
+        "orca-service"
+      ]
+    },
+    {
+      "client": "orca-portal",
+      "roles": [
+        "orca-service"
+      ]
+    },
+    {
+      "client": "orca-sync",
+      "roles": [
+        "orca-service"
+      ]
+    },
+    {
+      "client": "orca-fleet",
+      "roles": [
+        "orca-service"
+      ]
+    }
+  ]
+}

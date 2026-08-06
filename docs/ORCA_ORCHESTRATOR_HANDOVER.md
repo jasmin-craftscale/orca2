@@ -2,7 +2,11 @@
 
 **Read this first. It is the entry point for a new session working on the ORCA rewrite programme.**
 
-You are picking up an engagement that has been running for some weeks. The architecture is written and signed, the first build phase is about to start, and there is a register of things deliberately left open. Your job is to help the product owner run the programme — not to redesign it.
+You are picking up an engagement that has been running for some weeks. The architecture is written and signed, the first build phase is about to start, and there is a register of things deliberately left open. **Your job is to help the product owner run the programme — not to redesign it.**
+
+**Concretely, you will be asked to:** review what the build agent produces and find what its own report missed · run or supervise Spike 1 · work the open questions toward decisions · keep the document set honest as things change · and verify claims against the existing codebase when they matter.
+
+⚠️ **You are not the build agent.** A separate session builds Phase 0 from `orca/KICKOFF.md`. If you find yourself writing service code, check whether that is actually your task.
 
 **Onboard yourself properly before acting.** §7 tells you what to read and in what order. Do not act on this handover alone; it is a map, not the territory.
 
@@ -55,7 +59,7 @@ You will be asked to verify claims against this codebase. It is the evidence bas
 
 ## 4 · The target, in one page
 
-**Seven Java 21+ / Spring Boot services on Microsoft SQL Server, in one repository, deployed as six bootable applications** (the seventh, media, is inherited and not rebuilt).
+**Seven Java 25 / Spring Boot 4 services on Microsoft SQL Server, in one repository, deployed as six bootable applications** (the seventh, media, is inherited and not rebuilt).
 
 | Service | Owns |
 |---|---|
@@ -113,11 +117,14 @@ The ones that gate work:
 
 1. **`Lynxis-Gate/docs/ORCA_ARCHITECTURE.md`** — the specification. ~19,000 words, Parts A–D. **Read §B10 first** (what the architecture guarantees, with how each is verified); it is the shortest route to understanding the design's intent.
 2. **`Lynxis-Gate/docs/ORCA_OPEN_QUESTIONS_REGISTER.md`** — what is deliberately unsettled. Consult it before assuming something is missing by accident.
-3. **`orca/docs/ORCA_PHASE0_BUILD_BRIEF.md`** — what the build agent does first. **This copy is authoritative**; the Lynxis-Gate copy is a mirror.
-4. **`Lynxis-Gate/docs/ORCA_IMPLEMENTATION_PLAN.md`** — phases, and what is deliberately not planned yet.
-5. **`orca/docs/REPOSITORY_GUIDE.md`** — the repository layout and the purpose of each folder.
+3. **`orca/docs/PLATFORM_PRIMITIVES.md`** — the five shared primitives: what each prevents, the named pattern behind it, and how a service consumes it. **The shortest route to understanding why Phase 0 exists.**
+4. **`orca/docs/ORCA_PHASE0_BUILD_BRIEF.md`** — what the build agent does first. **This copy is authoritative**; the Lynxis-Gate copy is a mirror.
+5. **`Lynxis-Gate/docs/ORCA_IMPLEMENTATION_PLAN.md`** — phases, and what is deliberately not planned yet.
+6. **`orca/docs/REPOSITORY_GUIDE.md`** — the repository layout and the purpose of each folder.
 
 Skim only if relevant: `ORCA_SPIKE_STOP_RULES.md`, `ORCA_CLIENT_SOLUTION_OVERVIEW.md`, `ORCA_SOLUTION_AND_DELIVERY_PLAN.md`.
+
+⚠️ **The document set exists in both repositories and is kept in sync by hand.** They have diverged before and the divergence was silent. When you change a document that exists in both, change both — and when a claim matters, check which copy you are reading.
 
 ⚠️ **`Lynxis-Gate/docs/ORCA_SOFTWARE_ARCHITECTURE.md` is superseded** by `ORCA_ARCHITECTURE.md` and still contradicts it — it describes a BPMN modeller rebuild, workflow re-authoring and a frozen screen format, all of which were reversed. Do not read it as current, and do not circulate it.
 
@@ -137,6 +144,8 @@ These are not preferences. Each was learned by getting it wrong.
 
 **Verify by executing, not by asserting.** Writing a test is not evidence it passes. A build check nobody has watched fail may not be wired in. A rendered document can contain a broken diagram that no file check will see.
 
+**When compressing, count what leaves.** A 56,000-word architecture document was reduced to 10,000 — most of it legitimately, but it also silently dropped all 168 API endpoint rows and 16 of 24 diagrams, leaving something comprehensive on architecture and useless to a developer building a service. Distinguish *removed because obsolete* from *removed because compressing*.
+
 **Ask the product owner when a decision is theirs.** Commercial questions, scope, staffing, what to promise a client, and anything security-shaped are not yours to settle. State the options and the trade, give a recommendation, and wait.
 
 ---
@@ -145,8 +154,25 @@ These are not preferences. Each was learned by getting it wrong.
 
 **Phase 0 has not started.** The `orca` repository holds the Initializr base and the documents, on branch `phase-0-foundations`.
 
-**Next action:** a fresh session, working directory `~/Documents/Projects/orca`, pointed at `docs/ORCA_PHASE0_BUILD_BRIEF.md`, Opus with high effort, committing once per work package. It builds the five primitives, the build checks, per-service migrations, the local stack and CI — and **no business logic at all**.
+**Next action — a separate session, not this one.** Working directory `~/Documents/Projects/orca`, opened with `Read KICKOFF.md and begin.`, Opus at high effort, committing once per work package. `KICKOFF.md` sits at that repository's root and points at the brief.
+
+It builds the five primitives, the build checks, per-service migrations and contracts, the local stack and CI — **eight work packages, thirteen executed verification checks, and no business logic at all.**
+
+**When that session reports, your first job is to read its §9 report before its code** — specifically what it could not build, and every decision it made that the architecture did not dictate. Those two lists are where the review value is. Code written confidently is the least likely place to find a problem.
+
+⚠️ **One verification item is the easiest to skip while still writing a report that reads well:** deliberately violating each of the five build checks and proving each fails the build. Everything else in Phase 0 is proven by things working; the checks are only proven by things breaking. If the report is vague there, ask.
 
 **The team:** four developers. The plan is that all four work together through Phase 0 rather than taking one service each, because the five primitives are what every guarantee depends on and four parallel implementations would recreate the defect class the rewrite exists to remove.
 
 **Open with the product owner:** the review of the repository structure with the lead developer, and the four questions at the end of `REPOSITORY_GUIDE.md`.
+
+### What comes after Phase 0
+
+**Phase 1 is one vertical slice, not four services in parallel:** a plate read producing a visit, a call to the customer's system, and a confirmed barrier — across `orca-edge`, `orca-runtime` and `orca-core`. Its acceptance test is the one that matters most: **two simultaneous plate reads for the same truck produce exactly one visit, a thousand times.** Building breadth per service before that path works proves nothing about whether the primitives compose.
+
+**The recommended sequencing with four developers:**
+
+- **Spike 1 starts immediately, regardless of Phase 0.** It is the only open item where a bad answer changes the architecture, it needs one person, and it runs in a throwaway project with no repo conflict. Every week it is not run is a week the runtime design is unconfirmed.
+- **While the build agent works, the humans stay out of the repository** — it is being restructured wholesale, and concurrent work conflicts on nearly every commit. The high-value work is Spike 1, NEW-1a, NEW-1b, and the volume measurement.
+- **When Phase 0 lands:** two developers on the vertical slice, two continuing on the open questions.
+- **Core and runtime need two developers each** when service build-out starts. Between them they are 76% of the tables and 62% of the endpoints.
