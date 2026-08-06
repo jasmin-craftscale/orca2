@@ -172,11 +172,61 @@ Only `orca-runtime` is decomposed into modules — those five are named by the a
 
 ### `platform/` — the shared primitives
 
-Five modules, one implementation each: **outbox** · **lease** · **scope** · **idempotency** · **web**.
+**The problem these five solve is not "shared code". It is that each of them is a place where correctness is hard, the obvious implementation works perfectly in testing, and the failure is silent in production.**
 
-These are not utilities. **Every correctness guarantee in the architecture is a property of one of them** — nothing lost on restart, nothing half-applied, exactly one visit per truck, no query escaping its scope. That is why they are built before any service exists: four developers each starting a service would produce four subtly different versions of all five in their first week, which is precisely the defect class this rebuild exists to remove.
+That combination is why they are built once, first, by everyone — rather than five times, later, by whoever needed one that week.
 
-**The rule that keeps it healthy: `platform/` holds primitives, never domain.** If a class there knows what a visit, a lane, a ticket or a driver is, it belongs in a service. This is enforced by a build check, not by review — a shared module that accumulates domain logic becomes the thing everything depends on and nobody can change.
+Here is what each one actually prevents.
+
+#### outbox — *the fact and the notification cannot disagree*
+
+**The obvious implementation:** save the visit, then call the other service (or publish a message).
+
+**How it fails:** the save commits and the call fails — the visit happened and nobody was told. Or the call succeeds and the transaction rolls back — everyone was told about a visit that does not exist. Both leave two systems permanently disagreeing, with nothing to detect it. Under a network blip this happens perhaps once in ten thousand times, which means it is never seen in testing and is seen constantly in production.
+
+**What the primitive does:** the fact and its outbox row are written in **one transaction** — neither can exist without the other. A relay delivers afterwards, retrying until each consumer acknowledges. Delivery may be late; it cannot be lost, and it cannot describe something that did not happen.
+
+#### lease — *a dead instance cannot corrupt what it was doing*
+
+**The obvious implementation:** an `is_owner` flag, or a "last heartbeat" column, or simply letting whichever instance polls first take the work.
+
+**How it fails:** instance A owns a lane. Its network stalls for twenty seconds. The system declares it dead and gives the lane to instance B. Instance A wakes up — it never knew it had died — and finishes the write it started. Two instances have now written as owner, and the corruption is invisible because both writes looked legitimate.
+
+**What the primitive does:** the lease carries a **fence token that increases every time the lease changes hands**, and every write protected by the lease presents its token. Instance A's write arrives with an old token and is **rejected**. The zombie cannot do damage, which is a stronger property than trying to guarantee it is dead.
+
+#### scope — *forgetting once is not possible*
+
+**The obvious implementation:** `WHERE site_id = ?` in each query. Everyone knows to do it.
+
+**How it fails:** it is written correctly hundreds of times and omitted once, in a query added under time pressure a year later. The result is a customer seeing another customer's data. There is no error, no exception, no log line — just wrong rows. **This is the current system's actual position: roughly 816 hand-written conditions and no single place to fix them.**
+
+**What the primitive does:** one seam applies the scope, and **a build check fails on any query constructed outside it**. Correctness stops depending on everyone remembering, which is the only form of correctness that survives a team and a decade.
+
+#### idempotency — *a retry gets the answer, not an error*
+
+**The obvious implementation:** check whether it already happened, then do it.
+
+**How it fails in two ways.** Two concurrent requests both check, both find nothing, both proceed — the barrier rises twice. And the subtler one: a caller times out, retries, and receives *"duplicate"*. But the caller retried **because it never saw the first answer** — an error is exactly what it cannot use. It retries again, or reports a failure that succeeded.
+
+**What the primitive does:** records the key **and the outcome**. A replay returns the original result. An operation still running reports *in progress*, which is not a terminal answer, so the caller keeps waiting rather than concluding.
+
+#### web — *one shape, and no anonymous execution*
+
+**The obvious implementation:** each service returns whatever suits it; errors carry the exception message.
+
+**How it fails:** callers parse strings to tell one failure from another, so any wording change breaks an integration. Internal detail — stack traces, schema names — leaks to the caller. And scheduled work runs with no identity at all, so nothing can be authorised or attributed.
+
+**What the primitive does:** one envelope everywhere with **machine-readable codes a caller can branch on without reading the message**, no internal detail on any path, and an **explicit system identity** for every entry point that no user invoked — the relay, the reconciler, the scheduled job.
+
+#### Why first, and not when needed
+
+Every naive implementation above **works in development**. The failures need concurrency, a partition, a restart or a retry — conditions a developer building a feature does not produce.
+
+So they are not discovered during the work. They are discovered in production, individually, by six teams, at which point six services each have their own subtly different version and unifying them means touching every query and every write in the product.
+
+**Building them once, first, costs two to three weeks. Retrofitting them costs the product.**
+
+⚠️ **The rule that keeps this module honest:** if a class in `platform/` names a **visit**, a **lane**, a **ticket**, a **driver** or a **truck**, it is in the wrong place. These know about transactions, leases, keys, scopes and HTTP. They do not know what business this is — and the moment one does, every service depends on it and it can no longer be changed.
 
 ### `services/` — seven modules, six deployable applications
 
