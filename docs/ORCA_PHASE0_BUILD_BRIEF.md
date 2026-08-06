@@ -49,8 +49,7 @@ orca/
 ├─ gradle/libs.versions.toml
 ├─ platform/
 │  ├─ outbox/  lease/  scope/  idempotency/  web/
-├─ contracts/
-├─ services/                     # each owns its schema AND its migrations
+├─ services/                     # each owns its schema, migrations AND contract
 │  ├─ orca-core/  orca-runtime/  orca-edge/
 │  ├─ orca-portal/  orca-sync/  orca-fleet/  orca-media/
 ├─ build-checks/                 # ArchUnit rules; fail the build, not the review
@@ -171,7 +170,27 @@ The substance of this phase. Specifications in §5.
 
 **This is ADR-014 made enforceable.** The OpenAPI document is the source of truth; the Java API layer is generated from it.
 
-**Set up** `openapi-generator-gradle-plugin` with the `spring` generator, per service contract in `contracts/`:
+**Each service owns its contract**, alongside the schema and migrations it already owns:
+
+```
+services/orca-core/src/main/resources/openapi/orca-core.yaml
+services/orca-runtime/src/main/resources/openapi/orca-runtime.yaml
+…
+```
+
+Keeping it in the service's own resources means it ships inside the jar, so a running service can serve its own specification rather than depending on a copy kept elsewhere.
+
+**The shared components live with the primitive that implements them:**
+
+```
+platform/web/src/main/resources/openapi/_shared.yaml
+```
+
+The response envelope, the error object and pagination are **defined by `platform/web` and implemented by it**. Putting the schema anywhere else separates the contract from the code that fulfils it. Every service's contract references this file.
+
+⚠️ **One wrinkle to solve rather than avoid:** a cross-module `$ref` needs the generator to resolve a path outside the service's own module. Configure it; do not work around it by copying `_shared.yaml` into each service. Seven copies of the envelope schema is the failure this file exists to prevent.
+
+**Set up** `openapi-generator-gradle-plugin` with the `spring` generator, per service:
 
 | Setting | Value | Why |
 |---|---|---|
