@@ -10,8 +10,15 @@
 // declares only its own.
 
 plugins {
+	jacoco
 	alias(libs.plugins.spring.boot) apply false
 	alias(libs.plugins.openapi.generator) apply false
+}
+
+// The root resolves nothing of its own except JaCoCo's reporting tool, which the
+// aggregated coverage report needs.
+repositories {
+	mavenCentral()
 }
 
 // Type-safe `libs.` accessors are only generated for a project's own build script,
@@ -27,6 +34,7 @@ subprojects {
 	version = "0.0.1-SNAPSHOT"
 
 	apply(plugin = "java")
+	apply(plugin = "jacoco")
 
 	repositories {
 		mavenCentral()
@@ -94,5 +102,47 @@ subprojects {
 		testClassesDirs = integrationTest.output.classesDirs
 		classpath = integrationTest.runtimeClasspath
 		shouldRunAfter(tasks.named("test"))
+	}
+}
+
+// --- Coverage ---------------------------------------------------------------
+// One report over every module, because per-module numbers hide the module that
+// has none. Reported, not thresholded: a coverage gate set before there is
+// anything to cover is a number that gets lowered rather than met.
+tasks.register<JacocoReport>("jacocoRootReport") {
+	group = "verification"
+	description = "Aggregates coverage across every module."
+
+	val covered = subprojects.filter { it.plugins.hasPlugin("java") }
+	dependsOn(covered.map { it.tasks.named("test") })
+
+	// A module with no tests produces no exec file, and JaCoCo refuses to run over a
+	// path that is not there. Filtering at configuration time is wrong (the file
+	// does not exist yet) and at execution time is too late (the property is
+	// final), so the set is resolved lazily instead.
+	// EVERY exec file, not just test.exec. Most of what proves the primitives is in
+	// integrationTest — the kill-mid-transaction case, the lease handover, the
+	// concurrent idempotency race — and a coverage report that ignored them would
+	// report the primitives as almost untested, which is the opposite of true.
+	executionData.setFrom(project.files({
+		covered.flatMap { module ->
+			val dir = module.layout.buildDirectory.dir("jacoco").get().asFile
+			(dir.listFiles { file -> file.name.endsWith(".exec") } ?: emptyArray()).toList()
+		}
+	}))
+	sourceDirectories.setFrom(covered.map { it.layout.projectDirectory.dir("src/main/java") })
+
+	// GENERATED code is excluded. Not to flatter the number: measuring coverage of
+	// the OpenAPI generator's getters and equals() says nothing about this codebase,
+	// and it says it loudly enough to drown out what the number is for.
+	classDirectories.setFrom(covered.map { module ->
+		module.fileTree(module.layout.buildDirectory.dir("classes/java/main")) {
+			exclude("**/api/generated/**", "org/openapitools/**", "**/package-info.class")
+		}
+	})
+
+	reports {
+		xml.required = true
+		html.required = true
 	}
 }

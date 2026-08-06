@@ -2,13 +2,17 @@
 # ORCA — prove that one service's login cannot read another service's schema.
 #
 # §7 item 9b. This is not a test of the code; it is a test of the DATABASE, which
-# is where ADR-004 says the enforcement lives. A grant that was never tested is a
-# grant nobody knows the shape of.
+# is where ADR-004 says the enforcement lives. A build check cannot see a GRANT,
+# and a grant that was never tested is a grant nobody knows the shape of.
 #
 #   cd deploy && ./bootstrap/verify-isolation.sh
 #
-# Every service login is pointed at every OTHER service's schema in turn. Each
-# attempt must be refused. A single success fails this script.
+# Self-contained: each login writes a probe table in its OWN schema — which also
+# proves it owns that schema — and is then pointed at every other service's probe
+# in turn. Every one of those must be refused. A single success fails this script.
+#
+# Runs against a bootstrapped database whether or not any service has migrated,
+# so it works in CI before anything has started.
 
 set -uo pipefail
 
@@ -46,29 +50,38 @@ as_service() {
 failures=0
 checks=0
 
-echo "=== Each login reads its OWN schema (must succeed) ==="
+echo "=== Each login writes and reads a probe in its OWN schema (must succeed) ==="
 for svc in "${services[@]}"; do
 	checks=$((checks + 1))
-	# The Flyway history table is the one object every migrated schema has.
-	out="$(as_service "$svc" "SELECT COUNT(*) FROM [$svc].[flyway_schema_history];")"
-	if [[ $? -eq 0 ]]; then
-		printf '  %-8s -> own schema readable (%s migrations applied)\n' "$svc" "$(echo "$out" | tr -d '[:space:]')"
+	# Unqualified on purpose: it lands in this login's DEFAULT_SCHEMA, which is
+	# the mechanism the whole arrangement depends on. If the default schema were
+	# wrong, this would silently create the table in dbo.
+	out="$(as_service "$svc" "
+		IF OBJECT_ID('isolation_probe','U') IS NULL CREATE TABLE isolation_probe (owner VARCHAR(40));
+		DELETE FROM isolation_probe;
+		INSERT INTO isolation_probe (owner) VALUES ('orca_$svc');
+		SELECT s.name FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id
+		WHERE t.name = 'isolation_probe';")"
+	rc=$?
+	landed="$(echo "$out" | tr -d '[:space:]' | grep -oE '^[a-z]+' | head -1)"
+	if [[ $rc -eq 0 && "$landed" == "$svc" ]]; then
+		printf '  %-8s -> owns schema [%s] and wrote to it\n' "$svc" "$svc"
 	else
-		printf '  %-8s -> FAILED to read its own schema:\n%s\n' "$svc" "$out"
+		printf '  %-8s -> FAILED (landed in "%s"):\n%s\n' "$svc" "$landed" "$out"
 		failures=$((failures + 1))
 	fi
 done
 
 echo
-echo "=== Each login reads EVERY OTHER schema (must be refused) ==="
+echo "=== Each login reads EVERY OTHER schema's probe (must be refused) ==="
 for svc in "${services[@]}"; do
 	for other in "${services[@]}"; do
 		[[ "$svc" == "$other" ]] && continue
 		checks=$((checks + 1))
-		out="$(as_service "$svc" "SELECT COUNT(*) FROM [$other].[flyway_schema_history];")"
+		out="$(as_service "$svc" "SELECT owner FROM [$other].[isolation_probe];")"
 		rc=$?
 		if [[ $rc -ne 0 ]]; then
-			reason="$(echo "$out" | grep -oiE "permission denied[^.]*|The SELECT permission was denied[^.]*|Invalid object name[^.]*" | head -1)"
+			reason="$(echo "$out" | grep -oiE "The SELECT permission was denied[^.]*|permission denied[^.]*|Invalid object name[^.]*" | head -1)"
 			printf '  %-8s -> %-8s REFUSED  (%s)\n' "$svc" "$other" "${reason:-refused}"
 		else
 			printf '  %-8s -> %-8s *** READ SUCCEEDED — ISOLATION IS BROKEN ***\n' "$svc" "$other"
@@ -78,8 +91,13 @@ for svc in "${services[@]}"; do
 done
 
 echo
+echo "=== Cleaning up the probes ==="
+for svc in "${services[@]}"; do
+	as_service "$svc" "IF OBJECT_ID('isolation_probe','U') IS NOT NULL DROP TABLE isolation_probe;" > /dev/null
+done
+
 if [[ $failures -eq 0 ]]; then
-	echo "PASS — $checks checks. Each login reaches its own schema and no other."
+	echo "PASS — $checks checks. Each login owns its own schema and reaches no other."
 	exit 0
 fi
 echo "FAIL — $failures of $checks checks did not hold."

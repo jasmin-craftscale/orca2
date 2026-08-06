@@ -1,0 +1,153 @@
+name: CI
+
+# A pull request cannot merge with any of these failing. That is the whole point:
+# the architecture's guarantees are not documented and reviewed, they are executed.
+#
+# ⚠️ Making this REQUIRED is a repository setting, not a file. Add
+# "build", "unit tests", "build checks", "integration tests" and "coverage" to the
+# branch-protection rules for `main`, or this pipeline is advisory and the first
+# person in a hurry will merge past it.
+
+on:
+  push:
+    branches: [main, "phase-*"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Everything that needs no Docker daemon. Fast, and it is what most pushes hit.
+  # ---------------------------------------------------------------------------
+  build:
+    name: build · unit tests · build checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # `build` runs compile, unit tests and check — which is where the five
+      # ArchUnit rules live. integrationTest is deliberately NOT part of check, so
+      # this job needs nothing installed but a JDK.
+      - name: Build, unit tests and build checks
+        run: ./gradlew build --stacktrace
+
+      - name: Coverage report
+        run: ./gradlew jacocoRootReport
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: build/reports/jacoco/jacocoRootReport/
+          if-no-files-found: warn
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: "**/build/reports/tests/"
+
+  # ---------------------------------------------------------------------------
+  # Testcontainers against real SQL Server. Separate job because it needs a
+  # Docker daemon and because it is the slow half — the fast job should not wait
+  # behind it to tell somebody their code does not compile.
+  # ---------------------------------------------------------------------------
+  integration:
+    name: integration tests · real SQL Server
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Pulled ahead of the tests so a registry problem is reported as a registry
+      # problem rather than as a test timeout.
+      - name: Pre-pull SQL Server
+        run: docker pull mcr.microsoft.com/mssql/server:2022-latest
+
+      - name: Integration tests
+        run: ./gradlew integrationTest --stacktrace
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-reports
+          path: "**/build/reports/tests/integrationTest/"
+
+  # ---------------------------------------------------------------------------
+  # The local stack, and the bootstrap's credential isolation.
+  #
+  # §7 items 2, 3 and 9b, run on every pull request rather than once by hand.
+  # ADR-004's enforcement lives in the DATABASE, so it is the database that has
+  # to be asked — a build check cannot see a GRANT.
+  # ---------------------------------------------------------------------------
+  local-stack:
+    name: local stack · schema isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start SQL Server and Keycloak
+        working-directory: deploy
+        run: |
+          cp .env.example .env
+          docker compose up -d --wait
+
+      - name: Bootstrap — seven schemas, seven logins, confining grants
+        working-directory: deploy
+        run: ./bootstrap/run.sh
+
+      - name: Bootstrap again — must be a no-op
+        working-directory: deploy
+        run: ./bootstrap/run.sh
+
+      - name: Schema isolation — one login cannot read another's schema
+        working-directory: deploy
+        run: ./bootstrap/verify-isolation.sh
+
+      - name: Keycloak issues a service token
+        run: |
+          set -euo pipefail
+          token=$(curl -sf -d grant_type=client_credentials \
+            -d client_id=orca-core -d client_secret=local-dev-secret-orca-core \
+            http://localhost:8080/realms/orca/protocol/openid-connect/token \
+            | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])')
+          test -n "$token"
+          echo "Keycloak issued a token for orca-core"
+
+      - name: Tear down
+        if: always()
+        working-directory: deploy
+        run: docker compose down -v

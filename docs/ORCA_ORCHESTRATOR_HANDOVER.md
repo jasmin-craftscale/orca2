@@ -121,20 +121,20 @@ The ones that gate work:
 
 ## 7 · Onboard yourself in this order
 
-1. **`Lynxis-Gate/docs/ORCA_ARCHITECTURE.md`** — the specification. ~19,000 words, Parts A–D. **Read §B10 first** (what the architecture guarantees, with how each is verified); it is the shortest route to understanding the design's intent.
-2. **`Lynxis-Gate/docs/ORCA_OPEN_QUESTIONS_REGISTER.md`** — what is deliberately unsettled. Consult it before assuming something is missing by accident.
-3. **`orca/docs/PLATFORM_PRIMITIVES.md`** — the five shared primitives: what each prevents, the named pattern behind it, and how a service consumes it. **The shortest route to understanding why Phase 0 exists.**
-4. **`orca/docs/ORCA_PHASE0_BUILD_BRIEF.md`** — what the build agent does first. **This copy is authoritative**; the Lynxis-Gate copy is a mirror.
-5. **`Lynxis-Gate/docs/ORCA_IMPLEMENTATION_PLAN.md`** — phases, and what is deliberately not planned yet.
-6. **`orca/docs/REPOSITORY_GUIDE.md`** — the repository layout and the purpose of each folder.
+**The document set is deliberately small — four documents in `Lynxis-Gate/docs/`.** Everything else has been deleted rather than left to rot, because a superseded document is worse than a missing one: an agent reads it and believes it.
 
-Skim only if relevant: `ORCA_SPIKE_STOP_RULES.md`, `ORCA_CLIENT_SOLUTION_OVERVIEW.md`, `ORCA_SOLUTION_AND_DELIVERY_PLAN.md`.
+1. **`Lynxis-Gate/docs/ORCA_ARCHITECTURE.md`** — the specification, and the only account of the target. ~19,000 words, Parts A–D. **Read §B10 first** (what the architecture guarantees and how each is verified); it is the shortest route to the design's intent.
+2. **`Lynxis-Gate/docs/ORCA_OPEN_QUESTIONS_REGISTER.md`** — what is deliberately unsettled. **The least recoverable document in the set:** without it you cannot tell *unspecified because undecided* from *unspecified because forgotten*, and guessing at that difference is the most repeated failure of this engagement. Consult it before concluding anything is missing by accident.
+3. **`Lynxis-Gate/docs/ORCA_SECURITY_FINDINGS_PRIVATE.md`** 🔒 — five code-verified findings in the existing system. **Product owner and technical lead only.**
+4. **This handover** — the map.
 
-⚠️ **The document set exists in both repositories and is kept in sync by hand.** They have diverged before and the divergence was silent. When you change a document that exists in both, change both — and when a claim matters, check which copy you are reading.
+**In `~/Documents/Projects/orca/docs/`**, for the build rather than the programme: `ORCA_PHASE0_BUILD_BRIEF.md` (what the build agent does), `PLATFORM_PRIMITIVES.md` (what each shared primitive prevents, and the named pattern behind it), `REPOSITORY_GUIDE.md` (the repository layout). Read those when working on Phase 0. `orca/KICKOFF.md` is the build session's entry point.
 
-⚠️ **`Lynxis-Gate/docs/ORCA_SOFTWARE_ARCHITECTURE.md` is superseded** by `ORCA_ARCHITECTURE.md` and still contradicts it — it describes a BPMN modeller rebuild, workflow re-authoring and a frozen screen format, all of which were reversed. Do not read it as current, and do not circulate it.
+**For the existing system:** `Lynxis-Gate/CLAUDE.md` — the operating manual for that codebase.
 
----
+⚠️ **Everything else has been deleted, and that was deliberate.** The earlier corpus included a superseded architecture, a delivery plan, a technical design spec and a data dictionary, all of which had drifted from the decisions of 6 August — the design spec contradicted them in 44 places. **If you find a reference to a document that no longer exists, the document was removed, not lost.** Do not reconstruct it; the architecture and the register carry what survived.
+
+⚠️ **The schema of record is the migrations**, not a document. Once Phase 0 lands, each service's own migration files define its schema. There is no separate data dictionary to keep in step, and that is intentional.
 
 ## 8 · How to work on this programme
 

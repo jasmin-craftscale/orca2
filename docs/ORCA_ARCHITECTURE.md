@@ -715,7 +715,7 @@ flowchart TB
 
 #### Data model
 
-*The world model's core relationships. Attribute detail is in the Data Dictionary.*
+*The world model's core relationships. Attribute detail is defined by core's own migrations.*
 
 ```mermaid
 erDiagram
@@ -974,7 +974,7 @@ stateDiagram-v2
 | 1 | **A payload body is stored once.** Above a stated size threshold the body is written to `payload_blob` and the row carries a `payload_hash` reference; below it the body may be inline. **A row never carries both** — and a row with no body at all carries neither | A check constraint per table (`NOT (payload_hash IS NOT NULL AND body IS NOT NULL)`), plus a CI assertion that no row above the threshold carries an inline body. **The threshold is ruling Q**; this document states no number |
 | 2 | **No duplicated payloads.** A body already present under the same `(site_id, content_hash)` is not written again, and **no table stores a copy of another table's payload** | The blob write is an upsert by content hash, so a repeat costs a lookup and no bytes. A conformance test asserts that one visit's identical bodies yield one blob row. **The named existing instance — stated in the past tense, because it has already been remediated:** the executor used to write, into `portal_scan_data` itself, a second row keyed `key = 'row_data'` carrying the **whole scan payload again** — an ***intra*-table** duplicate of the rows beside it, not a copy of `data_set.value` as earlier revisions of this document said, and read by nothing. It was deleted on `feature/OCS-4` in July 2026 and `grep '"row_data"'` over the executor now returns nothing. **The invariant stays as a forward rule** — the defect is fixed, the rule is what stops the next one |
 | 3 | **Connector request and response bodies are bounded by default** | The existing default is **unbounded** — `CONNECTOR_MAX_RESPONSE_BYTES` defaults to `0` = disabled, code-verified on `feature/OCS-4`. The target ships a real default: over-threshold bodies are stored by reference or truncated with the truncation recorded on the row, **never inline and never unbounded**. Bounding is a **behaviour change** under quality goal 3 — a workflow whose selector reads past the bound sees something different — so the default value and the truncation semantics are **Product's ruling, not an implementation default** (ruling Q) |
-| 4 | **Every table that grows with traffic has a retention class, and `data_class` is a closed, enumerated list** | A free `varchar` lets a typo silently create a class no purge job serves, so the rows live forever. **Data Dictionary v1.8 has closed it:** `retention_policy.data_class` is narrowed from `varchar(100)` to **`varchar(50)`, matching `payload_blob.data_class`, with a `CHECK` over an 18-value closed list**; adding a value is a schema change, not a configuration change. A CI check fails on any traffic-growing table with no class — which is how `execution` and `execution_context` stopped being missed. |
+| 4 | **Every table that grows with traffic has a retention class, and `data_class` is a closed, enumerated list** | A free `varchar` lets a typo silently create a class no purge job serves, so the rows live forever. **retention-class list v1.8 has closed it:** `retention_policy.data_class` is narrowed from `varchar(100)` to **`varchar(50)`, matching `payload_blob.data_class`, with a `CHECK` over an 18-value closed list**; adding a value is a schema change, not a configuration change. A CI check fails on any traffic-growing table with no class — which is how `execution` and `execution_context` stopped being missed. |
 | 5 | **A bytes-per-visit budget is asserted in CI** | One visit through a representative workflow writes no more than a stated number of bytes across **all** tables, measured on the integration suite. A regression fails the build instead of surfacing as a disk alert two years into a deployment. **The budget number is set by ruling Q from the measurement task, not asserted here** |
 
 ### Interface surface
@@ -1185,7 +1185,7 @@ That difference is why the portal's authorization is per-principal rather than p
 
 ### What it persists
 
-**Schema `portal` — 12 tables plus its outbox pair.** Column detail is in the Data Dictionary.
+**Schema `portal` — 12 tables plus its outbox pair.** Column detail is defined by the service's own migrations.
 
 | Table | Holds | Note |
 |---|---|---|
