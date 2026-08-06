@@ -1,0 +1,46 @@
+openapi: 3.0.3
+info:
+  title: orca-core
+  description: |
+    The world as configured (§C1) — tenancy, sites and lanes, users, devices,
+    design artifacts, custom entities, licence verification.
+
+    Phase 0 authors the health route only. No product surface is contracted here
+    yet; the routes in §C1's interface table arrive with the behaviour behind them.
+  version: 0.0.1
+
+servers:
+  - url: http://localhost:8081
+    description: Local development
+
+tags:
+  - name: health
+    description: |
+      The service's own contracted health route. Distinct from Actuator's
+      /actuator/health, which is the orchestrator's probe (§C1) and is not part of
+      any service's authored contract.
+
+paths:
+  /api/v1/health:
+    get:
+      tags: [health]
+      operationId: health
+      summary: The service's own contracted health route
+      responses:
+        "200":
+          description: The service is up
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          description: UP or DOWN
+          example: UP

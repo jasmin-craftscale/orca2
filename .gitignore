@@ -36,3 +36,7 @@ out/
 ### VS Code ###
 .vscode/
 .DS_Store
+
+### ORCA ###
+# Local secrets. `.env.example` is committed with working local values; `.env` is not.
+.env

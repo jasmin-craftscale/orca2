@@ -1,0 +1,78 @@
+# The single version catalog. Every module draws from it, so no two modules can
+# disagree about a version.
+#
+# RULE (Phase 0 brief §2): no dependency beyond §3 of the brief without recording
+# why, as a comment on the entry. §3 lists what was deliberately excluded; re-adding
+# one silently reverses a signed decision.
+#
+# Deliberately excluded — do not add: Spring for Apache Kafka, Spring Cloud
+# (Config, Gateway, Eureka), Redis or any cache starter, the PostgreSQL driver,
+# Spring Session.
+
+[versions]
+# Settled: a patched minor of Boot 4 rather than 4.1.0's first release.
+springBoot = "4.0.7"
+# springdoc 3.0.x is the Boot 4.0.x line (3.0.3 builds against Boot 4.0.5).
+# 3.1.0 targets Boot 4.1 and is deliberately not taken.
+springdoc = "3.0.3"
+archunit = "1.5.0"
+# Flowable 8.0.0 is the first line built for Spring Framework 7 / Spring Boot 4.
+flowable = "8.0.0"
+openapiGenerator = "7.14.0"
+
+[libraries]
+# The Spring Boot BOM. Applied as a platform in every module by the root build, so
+# every Spring, Jackson, Flyway, Testcontainers, JUnit, Lombok and JDBC-driver
+# version comes from one place and none is named twice.
+spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot" }
+
+# --- Spring Boot starters -------------------------------------------------
+# Boot 4 renamed these. `webmvc`, not `web`; each starter has its own paired
+# -test artifact rather than one blanket spring-boot-starter-test.
+spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
+spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
+spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc" }
+spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+spring-boot-starter-security-oauth2-resource-server = { module = "org.springframework.boot:spring-boot-starter-security-oauth2-resource-server" }
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
+# orca-runtime only: §3 of the brief permits it for the WebSocket push mechanism (§B4 #5).
+spring-boot-starter-websocket = { module = "org.springframework.boot:spring-boot-starter-websocket" }
+
+# --- Test starters --------------------------------------------------------
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-starter-webmvc-test = { module = "org.springframework.boot:spring-boot-starter-webmvc-test" }
+spring-boot-starter-data-jpa-test = { module = "org.springframework.boot:spring-boot-starter-data-jpa-test" }
+spring-boot-starter-flyway-test = { module = "org.springframework.boot:spring-boot-starter-flyway-test" }
+spring-boot-starter-actuator-test = { module = "org.springframework.boot:spring-boot-starter-actuator-test" }
+spring-boot-starter-security-test = { module = "org.springframework.boot:spring-boot-starter-security-test" }
+spring-boot-starter-security-oauth2-resource-server-test = { module = "org.springframework.boot:spring-boot-starter-security-oauth2-resource-server-test" }
+spring-boot-starter-validation-test = { module = "org.springframework.boot:spring-boot-starter-validation-test" }
+spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+testcontainers-mssqlserver = { module = "org.testcontainers:testcontainers-mssqlserver" }
+
+# --- Drivers and migration ------------------------------------------------
+mssql-jdbc = { module = "com.microsoft.sqlserver:mssql-jdbc" }
+flyway-sqlserver = { module = "org.flywaydb:flyway-sqlserver" }
+
+# --- Code generation ------------------------------------------------------
+lombok = { module = "org.projectlombok:lombok" }
+
+# --- Named in §3 of the brief as permitted additions ----------------------
+springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
+archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+flowable-spring-boot-starter-process = { module = "org.flowable:flowable-spring-boot-starter-process", version.ref = "flowable" }
+
+# --- Required by the generated OpenAPI sources ----------------------------
+# openapi-generator's `spring` generator emits @Schema/@Parameter annotations from
+# swagger-annotations onto the interfaces and DTOs it produces. This is a compile
+# dependency of generated code, not a new runtime capability: it arrives with
+# springdoc, whose version manages it.
+swagger-annotations-jakarta = { module = "io.swagger.core.v3:swagger-annotations-jakarta" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
+openapi-generator = { id = "org.openapi.generator", version.ref = "openapiGenerator" }

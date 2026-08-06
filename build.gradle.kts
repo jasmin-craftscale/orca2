@@ -1,50 +1,98 @@
+// ORCA — root build.
+//
+// The root project is an AGGREGATOR. It holds no code, no `src/` and no bootable
+// application. Spring Initializr generated one at the root; Package 1 removed it,
+// because an eighth Spring Boot application that does nothing would claim the
+// default port and mislead everyone who clones the repository.
+//
+// What the root owns: the Java toolchain, the version catalog, the repositories,
+// and the shared test wiring. What it does not own: dependencies. Every module
+// declares only its own.
+
 plugins {
-	java
-	id("org.springframework.boot") version "4.0.7"
-	id("io.spring.dependency-management") version "1.1.7"
+	alias(libs.plugins.spring.boot) apply false
+	alias(libs.plugins.openapi.generator) apply false
 }
 
-group = "com.lynxis"
-version = "0.0.1-SNAPSHOT"
+// Type-safe `libs.` accessors are only generated for a project's own build script,
+// so shared configuration reaches the catalog through the extension instead.
+val catalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
-java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(25)
+fun VersionCatalog.lib(alias: String) = findLibrary(alias).orElseThrow {
+	IllegalStateException("No library '$alias' in the version catalog")
+}
+
+subprojects {
+	group = "com.lynxis"
+	version = "0.0.1-SNAPSHOT"
+
+	apply(plugin = "java")
+
+	repositories {
+		mavenCentral()
 	}
-}
 
-repositories {
-	mavenCentral()
-}
+	extensions.configure<JavaPluginExtension> {
+		toolchain {
+			languageVersion = JavaLanguageVersion.of(25)
+		}
+	}
 
-dependencies {
-	implementation("org.springframework.boot:spring-boot-starter-actuator")
-	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-	implementation("org.springframework.boot:spring-boot-starter-flyway")
-	implementation("org.springframework.boot:spring-boot-starter-security")
-	implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
-	implementation("org.springframework.boot:spring-boot-starter-validation")
-	implementation("org.springframework.boot:spring-boot-starter-webmvc")
-	implementation("org.flywaydb:flyway-sqlserver")
-	compileOnly("org.projectlombok:lombok")
-	developmentOnly("org.springframework.boot:spring-boot-devtools")
-	runtimeOnly("com.microsoft.sqlserver:mssql-jdbc")
-	annotationProcessor("org.projectlombok:lombok")
-	testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")
-	testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
-	testImplementation("org.springframework.boot:spring-boot-starter-flyway-test")
-	testImplementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server-test")
-	testImplementation("org.springframework.boot:spring-boot-starter-security-test")
-	testImplementation("org.springframework.boot:spring-boot-starter-validation-test")
-	testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
-	testImplementation("org.springframework.boot:spring-boot-testcontainers")
-	testImplementation("org.testcontainers:testcontainers-junit-jupiter")
-	testImplementation("org.testcontainers:testcontainers-mssqlserver")
-	testCompileOnly("org.projectlombok:lombok")
-	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-	testAnnotationProcessor("org.projectlombok:lombok")
-}
+	// Every module gets the Boot BOM as a platform, so no module names a version.
+	dependencies {
+		val bom = catalog.lib("spring-boot-dependencies")
+		add("implementation", platform(bom))
+		add("compileOnly", platform(bom))
+		add("annotationProcessor", platform(bom))
+		add("testImplementation", platform(bom))
+		add("testCompileOnly", platform(bom))
+		add("testAnnotationProcessor", platform(bom))
 
-tasks.withType<Test> {
-	useJUnitPlatform()
+		// Lombok is in, and used consistently (brief §3).
+		val lombok = catalog.lib("lombok")
+		add("compileOnly", lombok)
+		add("annotationProcessor", lombok)
+		add("testCompileOnly", lombok)
+		add("testAnnotationProcessor", lombok)
+
+		add("testRuntimeOnly", "org.junit.platform:junit-platform-launcher")
+	}
+
+	tasks.withType<JavaCompile>().configureEach {
+		// Spring binds constructor and handler-method parameters by name.
+		options.compilerArgs.add("-parameters")
+	}
+
+	tasks.withType<Test>().configureEach {
+		useJUnitPlatform()
+		testLogging {
+			events("failed")
+			exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+		}
+	}
+
+	// --- integrationTest -------------------------------------------------
+	// A separate source set and a separate task, deliberately NOT wired into
+	// `check`. `./gradlew build` must succeed on a clean machine with nothing
+	// installed but a JDK (brief §7 item 1); integration tests need a Docker
+	// daemon, so they run on their own command and in their own CI step.
+	val sourceSets = extensions.getByType<SourceSetContainer>()
+	val main = sourceSets["main"]
+	val integrationTest: SourceSet = sourceSets.create("integrationTest") {
+		compileClasspath += main.output
+		runtimeClasspath += main.output
+	}
+
+	configurations["integrationTestImplementation"].extendsFrom(configurations["testImplementation"])
+	configurations["integrationTestRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
+	configurations["integrationTestCompileOnly"].extendsFrom(configurations["testCompileOnly"])
+	configurations["integrationTestAnnotationProcessor"].extendsFrom(configurations["testAnnotationProcessor"])
+
+	tasks.register<Test>("integrationTest") {
+		description = "Runs integration tests against real infrastructure (Testcontainers)."
+		group = "verification"
+		testClassesDirs = integrationTest.output.classesDirs
+		classpath = integrationTest.runtimeClasspath
+		shouldRunAfter(tasks.named("test"))
+	}
 }
