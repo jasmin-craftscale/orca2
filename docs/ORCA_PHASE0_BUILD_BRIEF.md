@@ -50,11 +50,14 @@ orca/
 ├─ platform/
 │  ├─ outbox/  lease/  scope/  idempotency/  web/
 ├─ contracts/
-├─ services/
+├─ services/                     # each owns its schema AND its migrations
 │  ├─ orca-core/  orca-runtime/  orca-edge/
 │  ├─ orca-portal/  orca-sync/  orca-fleet/  orca-media/
-├─ build-checks/
+├─ build-checks/                 # ArchUnit rules; fail the build, not the review
 └─ deploy/
+   ├─ bootstrap/                 # schemas, logins, grants — once, before any service
+   ├─ docker-compose.yml
+   └─ keycloak/
 ```
 
 **Dependencies already in the base project:** Spring Web · Spring Data JPA · Validation · Spring Security · OAuth2 Resource Server · Actuator · **MS SQL Server Driver** · Flyway · Lombok · Testcontainers.
