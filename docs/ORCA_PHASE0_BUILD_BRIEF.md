@@ -53,7 +53,6 @@ orca/
 ├─ services/
 │  ├─ orca-core/  orca-runtime/  orca-edge/
 │  ├─ orca-portal/  orca-sync/  orca-fleet/  orca-media/
-├─ migrations/
 ├─ build-checks/
 └─ deploy/
 ```
@@ -140,15 +139,26 @@ Each service owns its own entry point, for example `services/orca-core/src/main/
 
 **Done when** `docker compose up` yields a working database and identity server, and a service can obtain a token and validate it **by signature, locally** — no call-out per request.
 
-### Package 3 — Migrations and ordering
+### Package 3 — Migrations
 
-Flyway under `migrations/`, one folder per schema: `core`, `runtime`, `edge`, `portal`, `sync`, `fleet`, plus `platform` for the primitives' own tables.
+**Each service owns its own migrations, in its own module.** A service owns its schema — that is ADR-004, enforced by database credentials — and a schema whose definition lives outside the service that owns it is not owned by it. Migrations sit under each service's own resources:
 
-**`core` migrates first.** It publishes the read-only views other services consume, so a dependent migration cannot run before the view it reads exists. Enforce the ordering in the runner, not in a README.
+```
+services/orca-core/src/main/resources/db/migration/
+services/orca-runtime/src/main/resources/db/migration/
+…
+```
 
-**Done when** a clean database migrates every schema in one command, and running it a second time is a no-op.
+Each service runs Flyway against **its own schema only**, on its own startup, with its own credentials. No service can migrate another's schema, for the same reason no service can write another's tables.
 
-⚠️ This is where two developers collide first. The ordering contract must exist before the second migration is written.
+**One thing is not per-service, because a service cannot do it for itself.** Creating the schemas, the per-service database logins, and the grants that restrict each login to its own schema are privileged operations — a service authenticating as `orca_core` cannot create the `orca_core` login. That bootstrap lives in `deploy/bootstrap/` as versioned SQL, and runs once against a fresh database before any service starts.
+
+**The ordering dependency is a deployment concern, not a build one.** `orca-core` publishes the read-only views other services consume, so core must have migrated before a service that reads them starts. Handle it where it belongs:
+
+- Deployment order — core migrates and starts first.
+- **A startup readiness check in each dependent service:** if a view it requires is absent, fail immediately with a message naming the missing view. A service that starts and then fails on the first query is far harder to diagnose than one that refuses to start and says why.
+
+⚠️ **Do not create a shared migrations module to enforce the ordering.** It would centralise schema definition away from the services that own it, and it does not remove the dependency — it only hides it behind one runner.
 
 ### Package 4 — The five primitives
 
@@ -197,7 +207,25 @@ Build → unit tests → integration tests on Testcontainers against real SQL Se
 
 ## 5 · The five primitives
 
-Each is an interface, **one** implementation, and tests that prove the property.
+### What `platform/` is, and what it is not
+
+**It is not a utility module.** It is the five mechanisms every service uses to be correct, built once so that "correct" means the same thing in all six.
+
+Each primitive exists because the same hard problem appears in every service, and solving it six times produces six subtly different answers. Concretely:
+
+| Primitive | The problem it solves, in one sentence | What a service does with it |
+|---|---|---|
+| **outbox** | A service must tell other services that something happened, without a message broker, and without the fact and the notification ever disagreeing | `orca-runtime` finishes a visit and writes the visit and its outbox row in one transaction. `orca-portal` is told, once, in order |
+| **lease** | Some work may only be done by one instance at a time, and the instance holding that right may die at any moment | `orca-edge` polls a lane's camera. Exactly one instance owns that lane; if it stops, another takes over, and the dead one cannot write afterwards |
+| **scope** | Every query must be limited to the data the caller may see, and forgetting once is a breach | A repository asks for work items. The scope predicate is applied by the seam, not typed into the query — and a query written outside the seam does not compile |
+| **idempotency** | The same request will arrive twice — retries, timeouts, redelivery — and must have the effect of one | `orca-runtime` sends a gate command; the response is lost; it retries. The barrier rises once, and the retry receives the first outcome rather than an error |
+| **web** | Callers need one response shape and machine-readable errors, and jobs that run without a user still need an identity | Every controller returns the same envelope. The outbox relay, which no user invoked, runs under an explicit system identity rather than none |
+
+**The rule, stated as a test you can apply to any class:** if it names a **visit**, a **lane**, a **ticket**, a **driver** or a **truck**, it does not belong in `platform/`. The primitives know about transactions, leases, keys, scopes and HTTP. They do not know what business this is.
+
+**Why this is Phase 0 and not "later, when we need it".** Retrofitting is the expensive direction. Once six services have each written their own outbox and their own scoping, unifying them means touching every query in the product — which is precisely the position the current system is in, with roughly 816 hand-written scope conditions and no single place to fix them.
+
+Each primitive below is an interface, **one** implementation, and tests that prove the property.
 
 ### P1 · Transactional outbox and relay — `platform/outbox`
 
