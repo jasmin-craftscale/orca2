@@ -1,0 +1,151 @@
+# ORCA — Open Questions and Clarifications
+
+**Working register · Revised 6 August 2026 · 25 open items**
+
+Every item below carries a **problem statement** — what is actually wrong or undecided, grounded in the code or the target architecture — and a **best suggestion**, which is my advice, not the decision.
+
+**What changed today:** twelve rows closed on the product owner's decisions, two blockers were added, and **six new decisions were created by those same rulings** — freedoms that did not exist yesterday and now need someone to use them or decline them deliberately.
+
+---
+
+## Summary
+
+| Group | Items | Nature |
+|---|---|---|
+| 🔴 **Blocking** | 2 | Cloud-tier authorization has no mechanism; the tier's shape is unconfirmed |
+| 🆕 **Created by today's decisions** | 6 | New freedoms. Each needs a deliberate take-or-decline |
+| 🟠 **High** | 6 | Blocks a date, a phase or a commitment |
+| 🧩 **Simplicity** | 3 | Machinery whose justification changed |
+| 🟡 **Medium** | 6 | Real decisions, not yet blocking |
+| 🟢 **Lower** | 5 | Settle at sign-off |
+| 📄 **Documentation** | 7 | Corpus consistency, not product decisions |
+| 📏 **Measurement** | 3 | Needs a number, not an opinion |
+
+---
+
+## 🔴 Blocking
+
+| # | Problem statement | Best suggestion |
+|---|---|---|
+| **NEW-1a** | **Multi-tenancy is real, but it lives entirely in the cloud tier — and that is where the design has no mechanism.** ✅ *The appliance half is closed: the product owner confirmed (6 Aug 2026) that one installation never carries more than one customer, and the architecture already assumed it — §9 states that **"cross-customer entities are cloud-authoritative"** because **"a single-tenant appliance database cannot represent them."*** The consequence is that the cross-customer data did not disappear; **it was relocated to the cloud**. Nine `portal` tables — `carrier`, `carrier_user`, `driver`, `driver_carrier_mapping`, `user_account`, `user_authentication_method`, `push_notification_config`, `saved_user_filter`, `user_grid_preference` — carry **neither `site_id` nor `customer_id`**, by design, because a haulage carrier delivers to terminals owned by different companies and should not register once per terminal. That tier is also *"the only service that is wholly internet-facing."* **Cross-customer data, no scoping column, public network** | ⚠️ **Engine correction (7 Aug):** every tier runs **SQL Server** — there is no PostgreSQL deployment, so any advice framed as *"use RLS on PostgreSQL in the cloud"* is void. **SQL Server has native row-level security** (all editions since 2016), so the mechanism exists for genuine tenant isolation where it is needed. **But that does not solve this row**, and the reason is unchanged: **RLS keyed on a tenant cannot express "this driver, across customers"**, which is exactly what these nine tables are for. **Design portal authorization on its own merits — it is an ownership check on the requesting principal, and RLS is not the tool.** The rule is per-principal, not per-tenant: a driver sees their own bookings across every terminal they visit; a carrier user sees their own carrier's; neither sees anyone else's. That is an ownership check on the requesting principal, and it needs to be **one enforced seam with a test that fails when a query bypasses it** — the same discipline as the appliance filter, different predicate. ⚠️ **Do not let this inherit "we'll use RLS in the cloud" by default:** RLS keyed on `customer_id` cannot express "this driver, across customers," which is exactly what these tables are for |
+| **NEW-1b** | **The cloud multi-site dashboard is unscoped and unconfirmed.** The product owner raised (6 Aug 2026) that a customer with several sites may need a cloud dashboard aggregating them, communicating with each site — **not yet confirmed.** It matters here because it decides whether the cloud tier is **one shared instance serving many customers** or **one instance per customer**. Those are different products: the first is genuinely multi-tenant and needs enforced isolation; the second is a single-customer deployment that happens to be hosted | **Confirm the shape before designing the tier, because it is cheap now and expensive later.** My suggestion: **one cloud instance per customer** for the dashboard, keeping the whole gate-side product single-tenant end to end — and let the **portal remain the one deliberately shared surface**, since that is what carriers actually need. That split keeps NEW-1a as the only place cross-customer data exists, which is much easier to reason about and to audit than a tier that is partly shared |
+
+## 🆕 Created by today's decisions
+
+*No migration means five of the nine frozen contracts were frozen only by artifacts a new client does not have. A sixth freeze — the screen format — sits outside that table and falls for the same reason. **A freedom is permission, not obligation**; each of these needs a deliberate answer, and for two of them the right answer is "change nothing."*
+
+| # | Problem statement | Best suggestion |
+|---|---|---|
+| **U2** | **The partner event API is now free, and it is the one clients integrate against.** It was frozen because *"customers have written integration code against these exact responses"* — roughly nine distinct 400s, three from a single join. New clients have written nothing. But this is also the surface a new client's own developers will work against on day one, so a poor taxonomy inherited by accident becomes their problem for years | **Take it, but narrowly.** Keep the route shape and the overall envelope — they work, and redesigning for its own sake buys nothing. Fix the two things that are genuinely poor: the validation-error taxonomy (nine 400s that a caller cannot distinguish programmatically), and the lost-race response, which closes open decision **#6** at the same time — take the 409 |
+| **U3** | **The Keycloak realm and client structure is free to design.** It was frozen because *"users, credentials and identity-provider links already live in these two realms."* None exist for a new client. The current two-realm structure was not designed — it accumulated | **Take it, and settle it together with decision #7** (local per site versus central with break-glass). Deciding the realm structure and the deployment topology separately is how the current shape happened. One design session, both answers |
+| **U5** | **The VAPID keypair, the QR payload and the WebRTC port ranges are free.** No driver has a push subscription, no QR is printed, no firewall has been configured | **Decline all three — change nothing.** There is no reason to alter a working design, and each carries deployment cost for no product benefit. One exception worth taking: **allow the VAPID keypair to rotate**, since the "must not rotate" constraint existed only to protect fielded subscriptions. Rotation being *possible* is a security improvement even if it is never exercised |
+| **U6** | **A large amount of the delivery plan describes work that no longer exists.** The conversion tooling, the assisted re-authoring flow, the comparison harness against recorded gate activity, the per-site cutover sequence, the legacy design-table staging — these were epics and stories, not asides. **With no migration, they are dead scope still carried in the plan**, and dead scope in a plan gets estimated, staffed and reported on | **Sweep the plan before it is used for estimation.** Every epic and story whose *done when* references conversion, cutover, legacy comparison or re-authoring should be struck with a one-line reason rather than silently deleted, so nobody re-adds it. ⚠️ **Two of them should survive in changed form**, and this is the part that needs judgement rather than deletion: the **comparison harness** is still the only way to prove a compiled process behaves as designed, and the **recorded gate activity** is still the best test fixture available. They stop being migration tooling and become test infrastructure |
+
+---
+
+## 🟠 High
+
+| # | Problem statement | Best suggestion |
+|---|---|---|
+| **20** | **The licence format needs an instance concept, and one commercial question remains.** ⚠️ *Twice corrected — the engineering half is now settled.* The machine fingerprint exists but **never gated startup**: `ValidateMachineID` has one non-test call site, in the licence *sync* path, where a mismatch stamps a record and stops nothing. A standby on different hardware **boots today**. Three properties make the current binding unreliable in any case: trust-on-first-use writes whatever identity is presented with no audit row; `Installed`/`Revoked` match on **any** overlap within a comma-separated set; and the read degrades to the literal `"fallback-uuid"` whenever it fails — which it does for any non-root process, since the DMI file is root-only | **Two design calls and one commercial one.** (a) Put an explicit instance or failover-pair concept in the new format — U4 above. (b) Decide whether machine identity is collected at all; if it is telemetry, say so and stop implying otherwise. (c) **For the owners:** is per-machine binding sold as enforcement? If yes, none of the three defects above may be carried into the new implementation, and the container decision must be settled first — a hardened non-root image makes the fingerprint meaningless |
+| **NEW-2** | **ORCA 1.x has no owner.** Recorded as not yet decided. It keeps running for existing customers, carries a documented 17-Critical / 38-High security posture, holds the performance remediation work and the ticket-purge defect below — and now has none of the attention | **Decide the posture, not the backlog.** Two defensible answers: maintained, or frozen with critical security patches only. What is not defensible is the current state, where the answer has never been said out loud. It needs a named owner and a budget line before it needs a plan. ⚠️ *If the answer is "frozen", say so to the existing customers rather than letting them discover it* |
+| **28** | **Purge orphans tickets, and retention is inverted.** ⚠️ *Reframed from code.* There is no `visit` table — the retention unit is the workflow execution. Two findings. **Tickets** are neither archived, nor purged, nor foreign-key constrained, and stage 3 of the purge cascade does not check them, so enabling purge leaves ticket rows pointing at deleted executions — silently, with no error and no log line. And **raw output is retained forever while extracted data is deleted**: `event_dispatch` is excluded from purge by name and has no soft-delete columns at all, while `portal_scan_data` is hard-deleted | **Split it in two, because half needs no legal input.** *Engineering, now:* add a ticket guard to stage 3 — the same `NOT EXISTS` shape already used for work items — before purge is enabled in any environment. Then decide what a ticket is: an audit artifact needs a rollup table before it can ever be purged; a transient one should be purged explicitly. *Legal, then engineering:* ask for a minimum retention per artifact class — raw device output, extracted scan data, work items, tickets, ledger. One question, five answers. Independently of both: `event_dispatch` needs a retention window regardless — unbounded growth of a `text` column holding every inbound payload is an omission, not a conservative choice |
+| **11** | **Spike 1 has no stop rule, and its scope grew today.** It tests whether Flowable can start **exactly one** process when two device events arrive for the same truck at the same instant — the property the engine decision most depends on. ⚠️ **Keeping the ORCA builder made the ORCA-to-BPMN compiler permanent runtime infrastructure**, so compiler fidelity is now inside this spike and stays load-bearing for the life of the product | **Sign the draft stop rule** (`ORCA_SPIKE_STOP_RULES.md`): eight fixtures, all-green or fail, two measures deliberately recorded rather than thresholded, and a named signatory. ⚠️ **One question in it needs answering before it can be signed** — the failure branch is *"withdraw the BPM capability from the offer."* If that is unacceptable under any circumstance, the rule does not work and Spike 1 should be reframed as a design exercise rather than a gate |
+| **16** | **Spike 2 has no stop rule, and the risk is conflation.** It gates the **Cloud profile only**. The failure mode this row exists to prevent is a red Spike 2 being read as a verdict on Flowable | **Sign the draft**, with the non-conflation written into the rule itself rather than assumed. ⚠️ **Spike 2 is blocked on NEW-1**: its tenant-isolation fixture cannot be built until SQL Server tenancy has a design. If NEW-1 is unanswered when the spike is due, do not run it partially and call it amber |
+| **21** | **Two residues survive containerisation.** The application is OS-agnostic in containers, as decided. But the DMI fingerprint read is **root-only**, so any non-root hardening turns every instance's identity into the same constant — which couples this row to #20. And **SQL Server availability groups** carry an edition and clustering model that is undecided | **Close the application half now** and keep the row open for the database half only. Take it together with the availability topology rather than as an operating-system question, because that is what it actually is |
+
+---
+
+## 🧩 Simplicity — machinery that may not be earning its keep
+
+*Raised from a read of the architecture against what actually ships. None is a defect; each is a cost that was justified by an assumption that has since changed.*
+
+| # | Problem statement | Best suggestion |
+|---|---|---|
+| **S1** | **The seven-operation dialect SPI abstracts a second engine that is not being built.** `orca-dialect` exists so one entity model can serve SQL Server and PostgreSQL, and ADR-017 added a seventh operation to it. With PostgreSQL deferred, **every one of those seven has exactly one implementation**, and each still has to be designed, tested and kept honest against a target nobody runs | **Keep the seam, shrink the surface.** A seam is one interface with one implementation — cheap, and it preserves the option. Seven hand-maintained operations with per-engine SQL for an engine that does not ship is speculative generality. Build the operations against SQL Server directly and add the abstraction back per-operation when a PostgreSQL deployment is actually funded — which is also the only point at which the second implementation can be tested honestly |
+| **S2** | **Six near-identical `service_lease` tables, one per service schema**, because a service can reach only its own schema by credential. The lease is process-coordination state with no `site_id`, no audit columns and no soft delete — the same shape six times | **Ask whether schema-per-service is earning its keep on a single-tenant appliance.** It was justified by ownership isolation — a fault stays in the service that caused it — and that argument is real. But the cost is now visible: six duplicate tables, seven database credentials, and it is the constraint that forced the duplication. On a one-customer installation, consider whether one `platform` schema readable by all services for coordination state only would be simpler without weakening ownership of *business* tables |
+| **S3** | **The ORCA→BPMN compiler is the one place the 6 August decisions added complexity rather than removed it.** Keeping the ORCA builder means a compiler that must faithfully translate every node type, forever, and a conformance harness to prove it. The alternative — a bpmn-js modeller — needed no compiler at all | **No change recommended; recorded so the cost is deliberate rather than discovered.** The product argument is sound: gate administrators are not process-modelling specialists. But this is permanent runtime infrastructure bought to avoid a watermark and a retraining cost, and it should be stated that way in the estimate rather than treated as free |
+
+---
+
+## 🟡 Medium
+
+| # | Problem statement | Best suggestion |
+|---|---|---|
+| **27** | **ADR-017 sets the payload-capture rules and deliberately no numbers** — the inline-versus-reference threshold and the connector body limit are both unset. The legacy code *fails the call* once a limit is configured | **Set a provisional threshold now so the build gate records rather than blocks**, and ratchet it down as measurements arrive. Note that "truncate instead of fail" is a behaviour change and needs Product, not just engineering |
+| **5** | **Which escalation policy, and delivered how?** ✅ *The first half is closed: work-item SLA is real, not display-only.* A time target becomes data on the work-item type, a **timer on the compiled process** fires on breach, and the breach is recorded and surfaced — stated as design in the architecture (§A2, §A3). What remains is the policy: who is told, through which channel, and whether it is configurable per work-item type | **Ship the narrow version first and do not promise more.** Breach detection, recording and operator visibility need no policy at all and are cheap because the timer is a standard construct of the engine. A configurable escalation policy — routing rules, per-tenant channels, templates, acknowledgement tracking — is a separate feature with a separate cost, and it should not be implied by the word *escalation* in any customer-facing document. ⚠️ **Note there is no SLA field on the work item today** — the thresholds are derived in the interface from timestamps, so this adds a model rather than wiring up an existing one |
+| **7** | **Keycloak on the appliance — and my earlier recommendation is withdrawn.** ⚠️ **Code analysis contradicts it.** Token *validation* is local signature verification — the right shape — but **issuing** a token always requires Keycloak. Under a central deployment the lane is reported to stop accepting logins **5–10 minutes into a WAN outage**, by deliberate design rather than oversight, and **no caching strategy fixes issuance**. "Offline login" is therefore unachievable centrally at any TTL | **Local Keycloak per site — unless Product formally withdraws the offline-login promise.** That is the trade to put in front of them: *central* saves roughly 1 GB on the appliance and avoids per-site provisioning, but the gate stops accepting logins minutes into an outage; *local* keeps the promise and buys the cloud→site provisioning obligation, which Keycloak's lack of multi-master makes real work. ⚠️ **Break-glass does not split the difference** — it covers a human operator, and the finding is that **inter-service token minting fails too**, which no break-glass credential addresses. Settle with U3 |
+| **26** | **The screen editor foundation is unconfirmed.** Headless and framework-agnostic, with each candidate subject to written licence review. Easy to conflate with the workflow builder decision, which is now closed and unrelated | **Unblocked — React is decided.** Re-evaluate the React-native editor foundations as accelerators. ⚠️ **Sequence it after U1**: if the saved format is being redesigned, the foundation should be chosen against the new format rather than the inherited one |
+| **NEW-3** | **A disconnected site can validate a ticket but has nowhere to record that it was redeemed.** Validating offline is solved — the site reads its local replica. Recording the redemption is not: under single-writer ownership the ticket is owned by the hosted tier, so a site with no link has no authority to mark it used. **Use case:** the WAN is down, a driver presents a valid QR, the gate admits them — and the same QR is presented again at another lane, or after the link returns | **Decide whether a redemption is a *fact the site owns* or a *request to the tier.*** If it is a fact the site owns, the ticket needs a site-writable redemption record that replicates as an ordinary fact and the tier must accept a redemption it did not authorise — which also means accepting that two sites could redeem the same ticket during a partition. If it is a request, the gate cannot admit on a QR while disconnected and that limit must be stated to the customer rather than discovered. ⚠️ **Raised because it was nearly lost:** the architecture document previously carried this as an open gap, and a draft of the rewrite silently asserted a solution to it. It is a real design point, not a detail |
+| **17** | **Two documents say runtime holds a device-state replica; runtime's tables contain no such table.** ⚠️ **Code analysis reports a third option neither document considered: the replica already exists** — `device_states` is replicated today, so the choice is not between two designs to build | **Verify the existing replication and rule on that, rather than designing a replica.** The ruling still has to name where device state lives in the **Cloud profile**, where edge does not run — leaving that to implication is what produced the contradiction. Spike 2 fixture C3 |
+
+---
+
+## 🟢 Lower
+
+| # | Problem statement | Best suggestion |
+|---|---|---|
+| **6** | Lost-race returns 404 today; 409 proposed | **Take the 409 and close it.** The only argument for 404 was a customer's error handling depending on it — and U2 removes that |
+| **8** | What a lane does when the cloud link is down is undefined | Product call. It decides whether Thin Edge is sellable for unattended gates — answer it before that is offered, not after |
+| **9** | Asterisk provisioning — media schema or PBX-side | Low impact either way. Decide with ops on operational preference |
+| **10** | Portal-path admission and out-of-order screen submits are both operator-visible and currently undefined | Both are now free to design rather than reproduce. Propose the tightened behaviour |
+| **22** | Automatic versus manual promotion between servers | **Keep manual.** Automatic promotion with two nodes and no third vote can leave both believing they are live — worse than an outage |
+
+---
+
+## 📄 Documentation and consistency
+
+| Severity | Problem statement | Best suggestion |
+|---|---|---|
+| 🟠 High | **The retention-class list appears in two documents, both declared closed, and they are not identical** — different groupings, and one treats the payload store as a class where the other does not. Both are enforced by a database constraint, so both cannot be right | Make the **Data Dictionary** authoritative and align the design spec to it |
+| 🟠 High | **A large part of the delivery plan is now dead scope** — see U6 | Sweep before the plan is used for estimation |
+| 🟡 Medium | **Schema and design sign-off items are two different kinds of thing being counted as one.** Verified: the Data Dictionary carries **7** "Open at schema sign-off" blocks (three holding several rulings each) plus one Spike-1 item; the design spec carries **18** numbered review questions plus **4** multi-instance items | Work the Dictionary's 7 with the solution architect. The design spec's 18 are review questions for named reviewers — route them separately and do not merge the lists |
+| 🟡 Medium | **The renderer count contradicts itself**, including inside one sentence. The architecture document rules **four** and names the fourth; the delivery plan says three in two places | Take **four**. Lower urgency now that #23 is closed, but the corpus should be internally consistent |
+| 🟡 Medium | **The component vocabulary is 35 in one document and 36 in the other** | Take **36** — what the builder emits; 35 is the preview renderer's own table. ⚠️ *U1 may make this moot by deciding the vocabulary outright* |
+| 🟡 Medium | Lease table details — whether `fleet` needs one, and whether the Cloud profile wants site scoping | Sign-off item. Low risk |
+| 🟢 Low | `device_suppression` column modelling reflects one reading of the frozen contract | Confirm at sign-off; revise if reviewers read it differently |
+
+---
+
+## 📏 Needs measuring, not deciding
+
+| Item | Problem statement | Best suggestion |
+|---|---|---|
+| **The ~20 GB/day figure** | Never independently measured; its own source analysis calls the derivation circular. It sizes the appliance disk and bounds the offline backlog | ⚠️ **Its deadline moved but did not disappear.** It was urgent because the current system would be replaced — with no migration, that system keeps running, so the window stays open. Measure it anyway: it is the only real input to #27 and #28. **One query settles it** — row count *and bytes* for `event_dispatch`, `portal_scan_data`, `node_executions`, `work_items`, `tickets` and the two `*_completed` tables |
+| **Device-retry characterisation** | The data-loss target for #19 cannot be set without it, and a number invented now becomes contractual | Run it before any RPO appears in a tender response |
+| **Admission latency baseline** | Spike 1 records it rather than thresholding it, because there is no number worth committing to yet | Correct as drafted. It becomes the threshold at the Phase-2 gate, once a baseline exists |
+| **LPR image bytes** | ⚠️ **An honest unknown:** no write path was found that persists image bytes to a table or the shared file tracker. Whether images are discarded after parse, forwarded, or written somewhere unlocated is unconfirmed — **and this is very likely where the 20 GB/day actually sits** | Confirm it as part of the measurement above. It ties #28 directly to the volume question |
+
+---
+
+## ✅ Closed on 6 August 2026
+
+| # | Question | Resolution |
+|---|---|---|
+| **3** | React or Angular? | **React** |
+| **4** | Collapse the 14 subflow twin tables? | **No twins to collapse** — converter input only, and there is no converter |
+| **12** | What ships between the first system and the first cutover? | **No cutover exists.** ⚠️ *The concern survives in a different form — a new client still cannot be sold anything until 2.0 is complete* |
+| **13** | The second video path — carry or drop? | ⚠️ **Partly reopened.** *Dropped as an inheritance question* — nothing is inherited. But code analysis reports **four media paths, not two**, that **three bypass the platform entirely**, and that **the path chosen when a camera has no configuration is one of the bypasses**. The bypass paths only work when the operator's browser can reach the camera's network — **which the Cloud profile cannot assume.** So the target needs a stated default media path; that is a design item, now tracked under the media service rather than as an inheritance decision |
+| **14** | Where are the legacy design tables staged? | **Nowhere** — not created |
+| **15** | What licence does the BPMN canvas ship under? | **Keep the ORCA builder, compile BPMN behind it.** `reactflow` 11.11.4, plain **MIT**, no watermark. bpmn-js recorded as the rejected alternative, watermark included |
+| **18** | Does fleet inherit or replace the provisioning chain? | ⚠️ **REOPENED — closing this as "replace" was too quick.** Code analysis reports **all three artifacts are in this repository** (the premise that two were missing is false), and that inherit-versus-replace is a false binary: `orca-fleet`'s scope covers the **cloud** half of provisioning — distribution, registry, licence issuance — and **none of the on-premise execution half**, reported as roughly **52k lines with no counterpart in the target**. New clients still need provisioning, so this is a **scope gap in orca-fleet**, not a migration question. **See High** |
+| **19** | Which availability arrangement, with what targets? | **Sell the arrangement now; commit RTO/RPO after the device-retry characterisation** |
+| **23** | Which renderer's behaviour is authoritative? | **Moot** — no legacy screen to match |
+| **25** | Authorable-but-unrendered component types | **Not carried forward** |
+| **U1** | — | **Take the freedom — CLOSED 6 Aug.** The saved format is designed for the target: one component registry that every renderer imports, a schema version in the artifact root from the first release, and a vocabulary that is decided rather than unioned. Recorded as design in the architecture (§A4). Requires a signed amendment to ADR-016's *freeze the saved format* half |
+| **U4** | — | **Take the freedom — CLOSED 6 Aug.** The licence format carries an explicit instance concept: the deployment identity, its role, the failover pair where one exists, and how many instances of that pair may be active at once. Recorded as design in the architecture (§B6). This is what permits a second instance at a site |
+| **24** | — | **Snapshot at publish — CLOSED 6 Aug.** Publishing writes an immutable version; a visit binds the version it started with and never re-reads the live pointer; rollback is republishing an earlier version. Made possible by U1 putting a version stamp in the format. Recorded as design in the architecture (§A4) |
+| **29** | Who designs network-address failover? | **Customer-network DNS**, on-site engineer support named as a requirement, recorded in pre-install requirements and the contract |
+| **K** | Replace Keycloak? | **Kept**, with three trims: settle #7, de-fork the themes to CSS-only, drop the unused identity-provider jar |
+
+---
+
+## If only three things move this week
+
+1. **NEW-1b — confirm whether the cloud tier is shared between customers.** It is one question, it is not yet answered, and it decides whether **NEW-1a** is an authorization design or a full multi-tenancy design. Everything else in the cloud tier waits behind it.
+2. **U1 — the screen format freeze.** Not because it is urgent, but because the freedom expires: once the builder is being written against the inherited format, taking it back costs real work.
+3. **U6 — sweep the dead scope from the plan.** Everything estimated from the plan before that sweep will be wrong.
+
+---
+
+*Working register · Revised 6 August 2026 · 23 open items. Companions: **ORCA Software Architecture Document** v1.4 · **ORCA — Solution, Architecture & Delivery Plan** v1.7 · **ORCA Technical Design Specification** v1.6 · **ORCA Data Dictionary** v1.8 · **ORCA Spike Stop Rules** (draft).*
