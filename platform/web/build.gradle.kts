@@ -16,8 +16,14 @@ dependencies {
 	api(libs.spring.boot.starter)
 	api(libs.spring.boot.starter.webmvc)
 	api(libs.spring.boot.starter.validation)
+	// The default filter chain lives here rather than six times over: §B6 states
+	// one platform-wide property ("every service validates tokens by signature
+	// locally"), and six copies is six chances for one to differ.
+	api(libs.spring.boot.starter.security.oauth2.resource.server)
 
 	testImplementation(libs.spring.boot.starter.test)
 	testImplementation(libs.spring.boot.starter.webmvc.test)
 	testImplementation(libs.spring.boot.starter.validation.test)
+	testImplementation(libs.spring.boot.starter.security.test)
+	testImplementation(libs.spring.boot.starter.security.oauth2.resource.server.test)
 }

@@ -1,1 +1,2 @@
+com.lynxis.orca.platform.scope.ScopeAutoConfiguration
 com.lynxis.orca.platform.scope.readiness.RequiredViewsAutoConfiguration

@@ -6,169 +6,56 @@ What each folder is, why it exists, and how the whole thing builds and runs. One
 
 ---
 
-## 1 · One decision first: where the Gradle root sits
-
-The repository currently nests the Gradle project one level down:
+## 1 · The structure
 
 ```
-orca/                    ← git root
-├── docs/
-└── orca/                ← Gradle root: settings.gradle.kts lives here
+orca/                                    git root = Gradle root
+├── build.gradle.kts                     AGGREGATOR — no src/, no application
+├── settings.gradle.kts                  12 modules registered
+├── gradle/libs.versions.toml            one version catalog for every module
+│
+├── platform/                            THE PRIMITIVES — no domain types
+│   ├── outbox/                          transactional outbox + relay
+│   ├── lease/                           lease with fence token
+│   ├── scope/                           the query seam
+│   ├── idempotency/                     recorded outcomes
+│   └── web/                             envelope · codes · system identity
+│       └── src/main/resources/openapi/_shared.yaml
+│
+├── services/                            SIX BOOTABLE APPLICATIONS
+│   ├── orca-core/                       CoreApplication
+│   │   └── src/main/
+│   │       ├── java/com/lynxis/orca/core/   api/ · domain/ · persistence/
+│   │       └── resources/
+│   │           ├── application.yaml          own port, own DB login
+│   │           ├── openapi/orca-core.yaml    its own contract
+│   │           └── db/migration/             its own migrations
+│   ├── orca-runtime/                    + execution · workitem · integration
+│   │                                      · notify · readmodel
+│   ├── orca-edge/  orca-portal/  orca-sync/  orca-fleet/
+│   └── orca-media/                      README only — NOT a module
+│
+├── build-checks/                        TESTS ONLY — output is build failures
+│       platform purity · module walls · scope seam
+│       error envelope · retention class
+│
+├── deploy/
+│   ├── bootstrap/                       schemas, logins, grants — once, first
+│   ├── docker-compose.yml               SQL Server 2022 + Keycloak 26
+│   ├── .env.example                     committed — working local values
+│   └── keycloak/realm-export.json
+│
+├── .github/workflows/ci.yml
+└── docs/
 ```
 
-That works, and it is legal. It has four consequences worth accepting deliberately rather than discovering:
+**12 Gradle modules. Six bootable applications. Zero business logic.**
 
-| | |
-|---|---|
-| Every build command needs a `cd` | `cd orca && ./gradlew build` |
-| CI needs a working-directory setting | Not the default, and easy to forget |
-| IDE import is from a subdirectory | Fine, but a step people get wrong on first clone |
-| `.gitignore` and `.gitattributes` exist twice | They are currently duplicated at both levels — the root pair is now dead and should go |
-
-**The alternative is git root = Gradle root**, which is what most Java monorepos do, and what removes all four.
-
-**The question that actually decides it: does the frontend live in this repository?**
-
-- **Backend only** → flatten. The extra level buys nothing.
-- **Frontend joins later** — two React applications, the kiosk display mode, both builders — → **keep the nesting**, and the layout becomes `orca/` beside `console/`. That is a good structure, and retrofitting it once seven services exist is disruptive.
-
-This guide describes the folders themselves; both layouts hold, and only the path prefix changes.
-
-⚠️ **Whichever is chosen, delete the duplicate `.gitignore` and `.gitattributes`.** Two of each in one repository is a source of confusion nobody enjoys diagnosing.
+**Each service owns its schema, its database login, its migrations and its OpenAPI contract.** The shared response envelope lives with `platform/web`, which implements it. Only `orca-runtime` is decomposed into modules — those five are named by the architecture and the module wall depends on them; every other service is flat.
 
 ---
 
-## 2 · The structure
-
-### What exists today
-
-```
-orca/                                    git root
-├── .gitattributes
-├── .gitignore
-├── docs/
-│   ├── ORCA_ARCHITECTURE.md             the specification
-│   ├── ORCA_OPEN_QUESTIONS_REGISTER.md  what is deliberately unsettled
-│   ├── ORCA_PHASE0_BUILD_BRIEF.md       what the agent builds
-│   └── REPOSITORY_GUIDE.md              this document
-└── orca/                                Gradle root — the Spring Initializr project
-    ├── build.gradle.kts
-    ├── settings.gradle.kts
-    ├── gradlew  ·  gradlew.bat
-    ├── gradle/
-    │   └── wrapper/
-    └── src/
-        ├── main/java/com/lynxis/orca/OrcaApplication.java
-        ├── main/resources/application.yaml
-        └── test/java/com/lynxis/orca/
-```
-
-One bootable application, generated. Nothing else.
-
-### What Phase 0 produces
-
-```
-orca/
-├── .gitattributes
-├── .gitignore
-├── docs/
-└── orca/
-    ├── build.gradle.kts                 AGGREGATOR — no src/, no application
-    ├── settings.gradle.kts              13 modules registered
-    ├── gradle.properties
-    ├── gradlew  ·  gradlew.bat
-    ├── gradle/
-    │   ├── libs.versions.toml           one version catalog for every module
-    │   └── wrapper/
-    │
-    ├── platform/                        THE PRIMITIVES — no domain types
-    │   ├── outbox/
-    │   │   ├── build.gradle.kts
-    │   │   └── src/main|test/java/com/lynxis/orca/platform/outbox/
-    │   ├── lease/
-    │   │   ├── build.gradle.kts
-    │   │   └── src/main|test/java/com/lynxis/orca/platform/lease/
-    │   ├── scope/
-    │   │   ├── build.gradle.kts
-    │   │   └── src/main|test/java/com/lynxis/orca/platform/scope/
-    │   ├── idempotency/
-    │   │   ├── build.gradle.kts
-    │   │   └── src/main|test/java/com/lynxis/orca/platform/idempotency/
-    │   └── web/
-    │       ├── build.gradle.kts
-    │       └── src/main|test/java/com/lynxis/orca/platform/web/
-    │
-    ├── contracts/                       API source of truth
-    │   ├── _shared.yaml                 envelope · error object · pagination
-    │   ├── orca-core.yaml
-    │   ├── orca-runtime.yaml
-    │   ├── orca-edge.yaml
-    │   ├── orca-portal.yaml
-    │   ├── orca-sync.yaml
-    │   ├── orca-fleet.yaml
-    │   └── orca-media.yaml
-    │
-    ├── services/                        SIX BOOTABLE APPLICATIONS
-    │   ├── orca-core/
-    │   │   ├── build.gradle.kts
-    │   │   └── src/
-    │   │       ├── main/java/com/lynxis/orca/core/
-    │   │       │   ├── CoreApplication.java
-    │   │       │   ├── api/
-    │   │       │   ├── domain/
-    │   │       │   └── persistence/
-    │   │       ├── main/resources/application.yaml
-    │   │       └── test/java/com/lynxis/orca/core/
-    │   ├── orca-runtime/
-    │   │   ├── build.gradle.kts
-    │   │   └── src/
-    │   │       ├── main/java/com/lynxis/orca/runtime/
-    │   │       │   ├── RuntimeApplication.java
-    │   │       │   ├── execution/     api/ · domain/ · persistence/
-    │   │       │   ├── workitem/      api/ · domain/ · persistence/
-    │   │       │   ├── integration/   api/ · domain/ · persistence/
-    │   │       │   ├── notify/        api/ · domain/ · persistence/
-    │   │       │   └── readmodel/     api/ · domain/ · persistence/
-    │   │       ├── main/resources/application.yaml
-    │   │       └── test/java/com/lynxis/orca/runtime/
-    │   ├── orca-edge/       EdgeApplication   + api/ domain/ persistence/
-    │   ├── orca-portal/     PortalApplication + api/ domain/ persistence/
-    │   ├── orca-sync/       SyncApplication   + api/ domain/ persistence/
-    │   ├── orca-fleet/      FleetApplication  + api/ domain/ persistence/
-    │   └── orca-media/      README.md only — inherited, not built
-    │
-    ├── migrations/                      ONE module, seven schema folders
-    │   ├── build.gradle.kts
-    │   └── src/main/resources/db/migration/
-    │       ├── platform/                outbox · lease · idempotency tables
-    │       ├── core/                    migrates FIRST — publishes the views
-    │       ├── runtime/
-    │       ├── edge/
-    │       ├── portal/
-    │       ├── sync/
-    │       └── fleet/
-    │
-    ├── build-checks/                    TESTS ONLY — output is build failures
-    │   ├── build.gradle.kts
-    │   └── src/test/java/com/lynxis/orca/checks/
-    │       platform purity · module walls · scope seam
-    │       error envelope · retention class
-    │
-    ├── deploy/
-    │   ├── docker-compose.yml           SQL Server 2022 + Keycloak 26
-    │   ├── .env.example                 committed — working local values
-    │   └── keycloak/realm-export.json   1 realm, 7 clients, service accounts
-    │
-    └── .github/workflows/ci.yml         build → test → integrationTest → check
-```
-
-**13 Gradle modules. Six bootable applications. Zero business logic.**
-
-Only `orca-runtime` is decomposed into modules — those five are named by the architecture and the module wall depends on them. Every other service stays flat: the service package with `api`, `domain` and `persistence` directly beneath it.
-
----
-
-## 3 · The five top-level folders
+## 2 · The five top-level folders
 
 ### `platform/` — the shared primitives
 
@@ -278,7 +165,7 @@ A module containing **only tests, no production code.** Its entire output is bui
 
 ---
 
-## 4 · The supporting folders
+## 3 · The supporting folders
 
 **`deploy/`** — `docker-compose.yml` (SQL Server and Keycloak), a committed `.env.example` with working local values, and the Keycloak realm export: one realm, one client per service, service accounts for service-to-service calls. A developer clones, copies one file, and runs.
 
@@ -288,7 +175,7 @@ A module containing **only tests, no production code.** Its entire output is bui
 
 ---
 
-## 5 · How it builds
+## 4 · How it builds
 
 One Gradle multi-project. **The root is an aggregator and holds no code** — no `src/`, no application. It sets the Java 25 toolchain and owns `gradle/libs.versions.toml`, the single version catalog every module draws from, so no two modules can disagree about a dependency version.
 
@@ -304,7 +191,7 @@ The Spring Boot plugin is declared at the root with `apply false` and applied in
 
 ---
 
-## 6 · How it runs
+## 5 · How it runs
 
 **Locally:** `docker compose up` gives SQL Server and Keycloak; each service runs from the IDE or `bootRun`. Every service validates tokens **by signature, locally** — no call-out to Keycloak per request, which is also what lets a site keep working when the wide-area link drops.
 
@@ -314,7 +201,7 @@ The Spring Boot plugin is declared at the root with `apply false` and applied in
 
 ---
 
-## 7 · What Phase 0 delivers, and what it does not
+## 6 · What Phase 0 delivers, and what it does not
 
 **Delivers:** a repository that builds, a local stack that runs, seven schemas that migrate, five primitives with tests that prove their properties, five build checks that fail the build when violated, CI, and six services that boot and report health.
 
@@ -326,7 +213,7 @@ The Spring Boot plugin is declared at the root with `apply false` and applied in
 
 ---
 
-## 8 · Questions worth raising in review
+## 7 · Questions worth raising in review
 
 1. **Does the frontend live in this repository?** It decides §1, and it is cheaper to decide now than after seven services exist.
 2. **Is `platform/` the right set of five?** They are the primitives the architecture's guarantees rest on. If your lead sees a sixth, better to know before they are built.

@@ -6,7 +6,11 @@ You are picking up an engagement that has been running for some weeks. The archi
 
 **Concretely, you will be asked to:** review what the build agent produces and find what its own report missed · run or supervise Spike 1 · work the open questions toward decisions · keep the document set honest as things change · and verify claims against the existing codebase when they matter.
 
-⚠️ **You are not the build agent.** A separate session builds Phase 0 from `orca/KICKOFF.md`. If you find yourself writing service code, check whether that is actually your task.
+**You will also work in the new codebase** at `~/Documents/Projects/orca` — reviewing what the build agent produced, extending it, debugging it, and eventually writing service code as Phase 1 begins. Treat it as yours to work in.
+
+⚠️ **One boundary, and it is about timing rather than permission.** While the Phase 0 build session is running, stay out of that repository — it is being restructured wholesale and concurrent edits conflict on nearly every commit. Once Phase 0 has landed and been reviewed, the constraint lifts.
+
+**When you do write code there:** `docs/ORCA_PHASE0_BUILD_BRIEF.md` §2 carries the ground rules, and they apply to you too — `platform/` holds no domain types, tests prove properties rather than exercise paths, and build checks land with the code they govern.
 
 **Onboard yourself properly before acting.** §7 tells you what to read and in what order. Do not act on this handover alone; it is a map, not the territory.
 
@@ -38,6 +42,8 @@ Two properties shape every decision:
 You will be asked to verify claims against this codebase. It is the evidence base, and it is frequently the only reliable source — several documents in the corpus have been wrong about it.
 
 **What it is:** 25 Go microservices (Gorilla Mux, GORM), four React applications, SQL Server, a dedicated Kafka virtual machine per customer site, Keycloak for identity.
+
+**How to navigate it:** `Lynxis-Gate/CLAUDE.md` is the operating manual for that repository — the service layout, the multi-module Go structure, the conventions that cause real bugs if missed (soft-delete filters, singular table names, dual int/UUID keys, per-engine migrations), and its security rules. **Read it before searching that codebase**, or you will misread what you find.
 
 **Where it falls short** — each of these is what a corresponding decision in the target exists to fix:
 

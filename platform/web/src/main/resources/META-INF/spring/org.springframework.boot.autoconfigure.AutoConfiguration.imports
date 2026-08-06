@@ -1,0 +1,2 @@
+com.lynxis.orca.platform.web.PlatformWebAutoConfiguration
+com.lynxis.orca.platform.web.PlatformSecurityAutoConfiguration
