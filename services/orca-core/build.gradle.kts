@@ -42,6 +42,12 @@ val generatorOptions = mapOf(
 	"openApiNullable" to "false",
 	"useTags" to "true",
 	"hideGenerationTimestamp" to "true",
+	// The generated envelope must serialise IDENTICALLY to platform/web's own
+	// ApiResponse, which is annotated NON_NULL. Without this the same envelope
+	// comes back with "message":null and "errors":[] from a generated type and
+	// without them from the hand-written one — one shape on paper, two on the wire.
+	"additionalModelTypeAnnotations" to
+		"@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)",
 )
 
 openApiGenerate {
