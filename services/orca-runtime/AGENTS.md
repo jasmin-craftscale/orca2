@@ -28,19 +28,25 @@ module's tables, and never another module's entities. §C2 works one example
 through (the lane monitor, which needs two modules' data); reach for that shape
 rather than inventing an exception.
 
-## The modules are empty, and that is the design
+## One module has code. Four do not, and the checks say which
 
-Phase 0 put no business logic anywhere: the five modules hold 20 `package-info`
-files and nothing else. Two consequences you will hit on the first real class:
+WP4 put the first classes into **`execution`** — the two delegates, the engine
+gateway and its Flowable adapter. `workitem`, `integration`, `notify` and
+`readmodel` still hold nothing but `package-info`.
 
-- Both module-wall tests carry `allowEmptyShould(true)`, because the wall had to
-  land **with** the module structure it governs rather than after the first class
-  arrived. ArchUnit would otherwise fail a rule that checked nothing.
-- `ImportedSetGuard.whatIsStillEmptyIsStated` asserts each module still has zero
-  classes, so the exemption cannot outlive its reason. **Adding the first class to
-  a module fails that test on purpose.** Remove `allowEmptyShould(true)` from
-  `ModuleWallRule` and delete the test — do not relax the assertion to make it
-  pass.
+- Both module-wall tests still carry `allowEmptyShould(true)`, because four of the
+  five sets are still empty and ArchUnit fails a rule that checked nothing.
+  **Remove it once every module is populated, not before.**
+- `ImportedSetGuard.whatIsStillEmptyIsStated` states exactly that position: it
+  asserts `execution` **has** classes and that the other four have none. Adding the
+  first class to one of those four **fails it on purpose** — remove that module
+  from its list. Do not delete the test while any module is still empty, and do not
+  relax the assertion to make it pass.
+
+⚠️ An earlier version of this file said to delete that test outright on the first
+module class. That instruction assumed all five modules would populate at once;
+they did not, and deleting it would have removed the record of four rule sets that
+really are still empty. Recorded in `phase-1-report.md` §5.11.
 
 ## Admission is the property this design turns on
 

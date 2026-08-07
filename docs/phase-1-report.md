@@ -83,6 +83,28 @@ on every run.
 
 **Named, not filled. This is the half of the report worth arguing with.**
 
+### Why the phase stopped after WP5
+
+**A judgement call about session capacity, not a blocker and not a technical
+obstacle.** Nothing in the repository, the architecture or the register prevents
+WP6 or WP7 from being built, and neither was attempted and abandoned. WP0–WP5
+leave both fully unblocked: the seam can write, the engine's schema is under
+Flyway, the process and its two ports exist, and the buffer already posts to the
+endpoint WP6 would add.
+
+The build session was running long, and the choice was between starting WP6 with
+enough room to finish it *verified* — contract change, regeneration, controller,
+idempotent batch handling, and the concurrency test through HTTP — or stopping
+with five packages proven and a report that says so. Half-built work with no
+property test behind it is the thing this programme's whole discipline exists to
+prevent, and an unverified WP6 would have been exactly that: plausible code, no
+evidence, and a reviewer unable to tell which.
+
+So the phase stopped at a clean boundary, with the tree green and every claim
+executed. **The estimate for a next session is that WP6 is small and WP7 is not** —
+WP7 carries a new catalog dependency, two stub containers, a device-command
+transport with expiry semantics, the completion outbox write, and the demo script.
+
 ### WP6 — runtime admission and the events endpoint · **not built**
 
 `/internal/events/v1` does not exist. Nothing accepts a device event over HTTP,
@@ -128,13 +150,28 @@ throws — a deployment fault belongs to site operations, not in a clerk's queue
 
 ## 4 · The §6 verification table, with real results
 
+### ⚠️ Declared deviations — three items were not run in the form the plan specifies
+
+Listed here rather than only inside the table, because a substituted test form is
+a deviation whether or not the substitution was reasonable, and a reviewer should
+meet it before the result rather than inside it.
+
+| # | Specified | Actually run | Why |
+|---|---|---|---|
+| **1** | `git clean -xdf && ./gradlew build` | `git clean -xdf -e deploy/.env -e .idea && ./gradlew build` | The literal command deletes `deploy/.env` — gitignored precisely because it holds machine-local values, and the file `AGENTS.md` warns against overwriting. A verification step must not destroy the environment it verifies. **The exclusion is a real reduction in coverage**: a clone that has never had a `.env` was not what was built from |
+| **5** | Sever edge→runtime for **≥60 s** under sustained ingest | 200 captures ingested across a sustained severed window, the pump attempting throughout, then restored | Zero-loss and preserved-order do not depend on wall-clock, and a one-minute sleep is a minute nobody runs. **What this does not cover:** anything that only manifests over time — a lease expiring mid-outage, a connection pool ageing out, a buffer crossing a size threshold |
+| **3** | Two threads, same plate, 1,000 iterations | 8 lanes in parallel × 125 sequential iterations each, two simultaneous events per iteration | More contention than a single lane, and it exercises the filtered index releasing a lane for the next truck. **What this does not cover:** 1,000 consecutive trucks through *one* lane, which is the shape a single-lane site actually has |
+
+Everything else in the table was run exactly as written, or was not run at all and
+is marked ❌.
+
 | # | Item | Result |
 |---|---|---|
-| 1 | `git clean -xdf && ./gradlew build` | **Pass**, with a deviation. ⚠️ Run as `git clean -xdf -e deploy/.env -e .idea`: the literal command deletes `deploy/.env`, which is gitignored precisely because it holds machine-local values and which `AGENTS.md` warns against overwriting. A verification step must not destroy the environment it verifies |
+| 1 | `git clean -xdf && ./gradlew build` | **Pass** — ⚠️ deviation declared above |
 | 2 | `./gradlew integrationTest` | **Pass — after a real fix.** 86 tests, 0 failures, 2m43s. The first clean run failed in six suites with "Container startup failed" while every suite passed alone. See §6 |
-| 3 | The thousand-truck test | **Pass** at the service call: 1,000/1,000, zero doubles, zero dropped events, zero deadlock retries. ❌ **Not run through HTTP** — WP6 not built |
+| 3 | The thousand-truck test | **Pass** at the service call: 1,000/1,000, zero doubles, zero dropped events, zero deadlock retries — in the lane shape declared above. ❌ **Not run through HTTP** — WP6 not built |
 | 4 | Kill runtime mid-visit, restart | ❌ **Not run.** A visit cannot be driven end to end without WP6 and WP7. Engine state is database-held and `FlowableSchemaUnderFlywayIT` proves the schema is intact, but that is not the same claim |
-| 5 | Sever edge→runtime ≥60 s under load | ⚠️ **Partial.** 200 captures ingested across a sustained severed window with the pump attempting throughout: zero loss, and the drain preserved order exactly. **Not the 60-second wall-clock form** — the properties do not depend on wall-clock, and a one-minute sleep in the suite is a minute nobody runs |
+| 5 | Sever edge→runtime ≥60 s under load | **Pass in a substituted form** — ⚠️ deviation declared above. 200 captures ingested across a sustained severed window with the pump attempting throughout: zero loss, and the drain preserved order exactly |
 | 6 | Two edge instances, one lane | **Pass.** Exactly one owns it; the successor takes it on expiry with a higher fence token; the stalled instance's late write is refused *and rolled back* |
 | 7 | Replay every command type | ❌ **Not run** — WP7 not built |
 | 8 | Command with elapsed deadline | ❌ **Not run** — WP7 not built |
@@ -212,7 +249,9 @@ In rough order of consequence.
     `orca-runtime/AGENTS.md` said to delete it when the first module class landed;
     that instruction assumed all five modules would populate at once. Four are
     still empty and still need `allowEmptyShould(true)`, so the guard now asserts
-    both halves — which is strictly more than it said before.
+    both halves — which is strictly more than it said before. **That made the
+    instruction stale, so `services/orca-runtime/AGENTS.md` was corrected in the
+    same phase** rather than left to contradict the check it describes.
 12. **Timestamps written by the pump are the owning instance's clock.** §B8 makes
     the database's clock the reference "for anything two instances must agree on";
     nothing agrees on `dispatched_at`. What two instances would have to agree on —
@@ -315,6 +354,10 @@ Reported, not silently corrected.
 4. **`docs/BPMN_EXECUTION_PROFILE.md` is marked PROPOSED** and is waiting for the
    builder developer's review. It constrains their compiler, and they have not seen
    it.
+5. **The three declared deviations in §4** are each a coverage gap, not a closed
+   item: a build from a clone with no `deploy/.env`, a genuinely time-based sever
+   test, and 1,000 consecutive trucks through one lane. None is urgent; all three
+   are cheap once there is a machine or a CI job to run them on.
 
 ---
 
