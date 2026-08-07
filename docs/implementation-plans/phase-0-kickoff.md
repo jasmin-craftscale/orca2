@@ -1,10 +1,15 @@
+> **ARCHIVED — Phase 0 is built and verified.** This was the entry point for the
+> Phase 0 build session, originally at the repository root. It is kept beside its
+> brief and report for review; delete all three together when the review is done.
+> The brief it references is now the sibling `phase-0-brief.md`.
+
 # Kickoff — ORCA Phase 0
 
 You are building the foundation of the ORCA platform rebuild. Everything you need is in this repository.
 
 ## Read first, in this order
 
-1. **`docs/ORCA_PHASE0_BUILD_BRIEF.md`** — what you build, in eight work packages. This is your instruction set.
+1. **`phase-0-brief.md`** (beside this file) — what you build, in eight work packages. This is your instruction set.
 2. **`docs/ORCA_ARCHITECTURE.md`** — the design. Read **§B10** first: it lists what the architecture guarantees and how each guarantee is verified. Those are your acceptance criteria.
 3. **`docs/PLATFORM_PRIMITIVES.md`** — what each of the five primitives is for, the named pattern behind it, and the concrete case it serves.
 4. **`docs/ORCA_OPEN_QUESTIONS_REGISTER.md`** — what is deliberately unsettled. Consult it before concluding something is missing by accident.
