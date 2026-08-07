@@ -7,7 +7,16 @@ docker compose up -d          # SQL Server + Keycloak, both with health checks
 ./bootstrap/run.sh            # ONCE, against a fresh database: schemas, logins, grants
 ```
 
-Then start any service. Each migrates its own schema on startup, with its own login.
+Then start any service **with the `local` profile** — each migrates its own
+schema on startup, with its own login:
+
+```
+./gradlew bootRun -p services/orca-core --args='--spring.profiles.active=local'
+```
+
+The profile is not optional on a laptop: the committed inter-service credential
+is recognised by name and refused outside `local`, so the public fixture cannot
+reach a customer site by inertia (ADR-011).
 
 | | |
 |---|---|

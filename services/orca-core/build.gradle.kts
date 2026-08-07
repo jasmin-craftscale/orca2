@@ -104,9 +104,13 @@ dependencies {
 	implementation(libs.flyway.sqlserver)
 	runtimeOnly(libs.mssql.jdbc)
 
-	// Swagger UI only. springdoc does NOT introspect the code — the checked-in
-	// contract is the source of truth and code-first would be a second one.
-	implementation(libs.springdoc.openapi.starter.webmvc.ui)
+	// springdoc was here and was REMOVED by review. Its UI cannot run with
+	// api-docs disabled (SwaggerConfig is @ConditionalOnBean(SpringDocConfiguration),
+	// which springdoc.api-docs.enabled=false switches off), and enabling api-docs
+	// would introspect the code — a second source of truth beside the contract,
+	// which §4b forbids. The brief's own fallback applies: serve the file
+	// statically and drop springdoc. The bundled, fully resolved contract is
+	// served at /openapi/orca-core.yaml by Spring's static-resource handling.
 
 	// --- Tests ----------------------------------------------------------
 	testImplementation(libs.spring.boot.starter.test)

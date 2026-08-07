@@ -70,7 +70,8 @@ public class PlatformSecurityAutoConfiguration {
 	}
 
 	/**
-	 * Whether the OpenAPI document and Swagger UI are readable without a token.
+	 * Whether the served OpenAPI document ({@code /openapi/**}) is readable without
+	 * a token.
 	 *
 	 * <p><strong>False by default, and that is a deliberate non-decision.</strong>
 	 * Whether an installation publishes its API surface is a security question with
@@ -98,8 +99,7 @@ public class PlatformSecurityAutoConfiguration {
 				.authorizeHttpRequests(requests -> {
 					requests.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
 					if (publicDocs) {
-						requests.requestMatchers("/openapi/**", "/swagger-ui/**", "/swagger-ui.html",
-								"/v3/api-docs/**", "/webjars/**").permitAll();
+						requests.requestMatchers("/openapi/**").permitAll();
 					}
 					requests.requestMatchers(internalCallProperties.getPathPattern())
 							.hasAuthority(InternalCallAuthenticationFilter.SERVICE_AUTHORITY);

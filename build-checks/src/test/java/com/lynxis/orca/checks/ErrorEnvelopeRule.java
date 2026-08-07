@@ -84,7 +84,12 @@ class ErrorEnvelopeRule {
 
 	private static boolean isVoid(JavaClass type) {
 		String name = type.getFullName();
-		return "void".equals(name) || "java.lang.Void".equals(name) || "java.lang.Object".equals(name);
+		// Object is deliberately NOT here. It was, and review caught what that
+		// allowed: ResponseEntity<Object> — and ResponseEntity<?>, whose erasure is
+		// Object — sailed through the check carrying any shape at all. An exemption
+		// for "we could not tell what it is" is an exemption for exactly the
+		// controllers this rule exists to catch.
+		return "void".equals(name) || "java.lang.Void".equals(name);
 	}
 
 	private static boolean isEnvelope(JavaClass type) {

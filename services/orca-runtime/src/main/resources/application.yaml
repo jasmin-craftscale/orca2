@@ -83,17 +83,6 @@ management:
       probes:
         enabled: true
 
-# --- Swagger UI -------------------------------------------------------------
-# springdoc serves the UI. It does NOT generate the spec: the checked-in contract
-# is the source of truth, and letting springdoc introspect the code would make a
-# second one. They would disagree, and nothing would say which was right.
-springdoc:
-  api-docs:
-    enabled: false
-  swagger-ui:
-    path: /swagger-ui.html
-    url: /openapi/orca-runtime.yaml
-
 # --- Flowable ---------------------------------------------------------------
 # The engine is embedded and its tables live in the `runtime` schema (§C2). It is
 # reached behind an interface so the platform is not written against a specific

@@ -186,14 +186,22 @@ The Spring Boot plugin is declared at the root with `apply false` and applied in
 ./gradlew test               unit tests
 ./gradlew integrationTest    Testcontainers, real SQL Server
 ./gradlew check              the five build checks
-./gradlew bootRun -p services/orca-core
+./gradlew bootRun -p services/orca-core --args='--spring.profiles.active=local'
 ```
+
+⚠️ **The `local` profile is required to run a service on a laptop.** Since
+ADR-011, services authenticate to each other with a per-installation credential,
+and the committed local value is recognised **by name**: a service refuses to
+start with it unless the `local` profile says this genuinely is a development
+machine. That refusal is what stops the public fixture credential reaching a
+customer site by inertia — do not work around it by changing the credential
+check; set the profile.
 
 ---
 
 ## 5 · How it runs
 
-**Locally:** `docker compose up` gives SQL Server and Keycloak; each service runs from the IDE or `bootRun`. Every service validates tokens **by signature, locally** — no call-out to Keycloak per request, which is also what lets a site keep working when the wide-area link drops.
+**Locally:** `docker compose up` gives SQL Server and Keycloak; each service runs from the IDE or `bootRun`, **with the `local` profile active** (see above). Every service validates tokens **by signature, locally** — no call-out to Keycloak per request, which is also what lets a site keep working when the wide-area link drops.
 
 **At a customer site:** the images for that deployment profile run on one server, or on more than one. A profile says *which* services run; it does not say how many instances of each. The platform is designed for more than one instance in every profile.
 

@@ -82,17 +82,6 @@ management:
       probes:
         enabled: true
 
-# --- Swagger UI -------------------------------------------------------------
-# springdoc serves the UI. It does NOT generate the spec: the checked-in contract
-# is the source of truth, and letting springdoc introspect the code would make a
-# second one. They would disagree, and nothing would say which was right.
-springdoc:
-  api-docs:
-    enabled: false
-  swagger-ui:
-    path: /swagger-ui.html
-    url: /openapi/orca-core.yaml
-
 orca:
   service: orca-core
   # --- Service-to-service authentication (ADR-011) ----------------------------

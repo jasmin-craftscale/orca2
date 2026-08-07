@@ -12,9 +12,6 @@
 [versions]
 # Settled: a patched minor of Boot 4 rather than 4.1.0's first release.
 springBoot = "4.0.7"
-# springdoc 3.0.x is the Boot 4.0.x line (3.0.3 builds against Boot 4.0.5).
-# 3.1.0 targets Boot 4.1 and is deliberately not taken.
-springdoc = "3.0.3"
 archunit = "1.5.0"
 # Flowable 8.0.0 is the first line built for Spring Framework 7 / Spring Boot 4.
 flowable = "8.0.0"
@@ -62,16 +59,12 @@ flyway-sqlserver = { module = "org.flywaydb:flyway-sqlserver" }
 lombok = { module = "org.projectlombok:lombok" }
 
 # --- Named in §3 of the brief as permitted additions ----------------------
-springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
+# springdoc was here (permitted by §3) and was REMOVED by review: with code
+# introspection forbidden (§4b), disabling api-docs also disables its UI, which
+# left a dependency doing nothing. The bundled contract is served statically at
+# /openapi/<service>.yaml instead — §4b's own stated fallback.
 archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
 flowable-spring-boot-starter-process = { module = "org.flowable:flowable-spring-boot-starter-process", version.ref = "flowable" }
-
-# --- Required by the generated OpenAPI sources ----------------------------
-# openapi-generator's `spring` generator emits @Schema/@Parameter annotations from
-# swagger-annotations onto the interfaces and DTOs it produces. This is a compile
-# dependency of generated code, not a new runtime capability: it arrives with
-# springdoc, whose version manages it.
-swagger-annotations-jakarta = { module = "io.swagger.core.v3:swagger-annotations-jakarta" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
