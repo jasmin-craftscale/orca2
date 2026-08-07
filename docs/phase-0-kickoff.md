@@ -1,7 +1,7 @@
 > **ARCHIVED — Phase 0 is built and verified.** This was the entry point for the
 > Phase 0 build session, originally at the repository root. It is kept beside its
 > brief and report for review; delete all three together when the review is done.
-> The brief it references is now the sibling `phase-0-brief.md`.
+> The brief it references is now the sibling `docs/phase-0-brief.md`.
 
 # Kickoff — ORCA Phase 0
 
