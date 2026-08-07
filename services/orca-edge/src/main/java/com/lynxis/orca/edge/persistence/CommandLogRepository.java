@@ -1,6 +1,5 @@
 package com.lynxis.orca.edge.persistence;
 
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -42,7 +41,10 @@ public class CommandLogRepository {
 				.value("status", entry.status())
 				.value("device_response", entry.deviceResponse())
 				.value("detail", truncate(entry.detail()))
-				.value("acked_at", entry.ackedAt() == null ? null : Timestamp.from(entry.ackedAt())));
+				// Utc, not Timestamp.from: received_at is written by the database and
+				// acked_at by Java, so a zone-less conversion makes one of the two
+				// wrong by the machine's UTC offset. See Utc.
+				.value("acked_at", Utc.timestampOf(entry.ackedAt())));
 	}
 
 	public Optional<CommandLogEntry> byCommandId(String commandId) {
@@ -65,8 +67,8 @@ public class CommandLogRepository {
 								rs.getString("status"),
 								rs.getString("device_response"),
 								rs.getString("detail"),
-								instant(rs.getTimestamp("received_at")),
-								instant(rs.getTimestamp("acked_at"))))
+								Utc.instantAt(rs, "received_at"),
+								Utc.instantAt(rs, "acked_at")))
 				.stream().findFirst();
 	}
 
@@ -90,7 +92,4 @@ public class CommandLogRepository {
 		return detail.length() <= 1000 ? detail : detail.substring(0, 1000);
 	}
 
-	private static Instant instant(Timestamp timestamp) {
-		return timestamp == null ? null : timestamp.toInstant();
-	}
 }

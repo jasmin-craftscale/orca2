@@ -122,7 +122,7 @@ public class LaneOwnership {
 	 * operator has taken out of service still has a camera that may connect, and
 	 * refusing to own it would leave that camera talking to nobody.
 	 */
-	private List<String> lanesAtThisSite() {
+	public List<String> lanesAtThisSite() {
 		return seam.select(ScopedSelect.from("core.topology_lane")
 						.columns("lane_external_id")
 						.scopedBy("site_external_id")

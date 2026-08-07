@@ -183,6 +183,22 @@ registered, because nothing on-site consumes `visit.completed` in Phase 1 — th
 cloud tier that would is scoped later (register NEW-1b). The fact is *recorded*,
 which is the guarantee that matters; delivery arrives with a destination.
 
+**The buffer, as an operator sees it** (§C3's diagnostics, added in H3):
+
+```bash
+curl -s http://localhost:18083/internal/buffer/stats \
+  -H 'X-Orca-Internal-Auth: local-dev-internal-credential-not-for-deployment' \
+  -H 'X-Orca-Service: orca-runtime' | python3 -m json.tool
+```
+
+Every lane the site publishes, whether or not it has traffic: `depth`,
+`oldestUndeliveredAgeSeconds`, `dead`, and `ownedByThisInstance`. **The age is
+there because depth alone cannot tell a severed link from a busy morning** — a
+depth of 4 that is nine hours old is an outage; a depth of 400 that is four
+seconds old is traffic. `totalDead` is the number this endpoint exists for: an
+event nobody could deliver used to be visible only to somebody with a database
+login.
+
 **The stubs' own view of it:**
 
 ```bash
@@ -357,8 +373,6 @@ Named here rather than left for a reviewer to discover:
   ORCA does not (register **NEW-4**), and what a `PTZ_PRESET` addresses — the
   extraction has no route for it, so edge refuses the command (**NEW-5**).
 - **A consumer of `visit.completed`.** There is none, deliberately.
-- **`/internal/buffer/stats`.** §C3's diagnostics endpoint is not built, so a
-  `DEAD` event is visible only in the table.
 - **Two edge instances handing a lane over.** That is proven in
   `EdgeIngestPropertiesIT` and needs a second appliance to demonstrate live.
 

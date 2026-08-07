@@ -12,7 +12,9 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestClient;
 
+import com.lynxis.orca.edge.api.BufferStatsController;
 import com.lynxis.orca.edge.api.DeviceCommandController;
+import com.lynxis.orca.edge.domain.BufferStatsService;
 import com.lynxis.orca.edge.domain.DeliveryPump;
 import com.lynxis.orca.edge.domain.DeviceCommandService;
 import com.lynxis.orca.edge.domain.DeviceHostPort;
@@ -169,6 +171,20 @@ public class EdgeIngestConfiguration {
 	public DeviceCommandController deviceCommandController(DeviceCommandService commands,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
 		return new DeviceCommandController(commands, siteExternalId);
+	}
+
+	// --- H3 · §C3's buffer diagnostics ----------------------------------------
+
+	@Bean
+	public BufferStatsService bufferStatsService(EventBufferRepository buffer, LaneOwnership ownership,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new BufferStatsService(buffer, ownership, siteExternalId);
+	}
+
+	@Bean
+	public BufferStatsController bufferStatsController(BufferStatsService stats,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new BufferStatsController(stats, siteExternalId);
 	}
 
 	/**

@@ -36,6 +36,12 @@ tags:
 
       Under `/internal/**`, so the per-installation shared credential authenticates
       it and no token is minted (ADR-011).
+  - name: internalBuffer
+    description: |
+      §C3's capture-buffer diagnostics. What an operator asks when a truck went
+      through and nothing happened.
+
+      Under `/internal/**`, same credential, same reason (ADR-011).
 
 paths:
   /api/v1/health:
@@ -55,6 +61,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /internal/buffer/stats:
+    get:
+      tags: [internalBuffer]
+      operationId: bufferStats
+      summary: Buffer depth, oldest undelivered event and DEAD count, per lane
+      description: |
+        §C3 names this endpoint and Phase 1 did not build it, so a `DEAD` event —
+        one nobody could deliver, which is the single event a site operator most
+        needs to see — was visible only to somebody with a database login. That is
+        the gap `phase-1-report.md` §3 records as operator blindness.
+
+        **Three numbers per lane, and each answers a different question.**
+
+        * `depth` — `PENDING` + `DISPATCHED`. How far behind this lane is *now*.
+        * `oldestUndeliveredAt` / `oldestUndeliveredAgeSeconds` — how far behind it
+          has been. A depth of 4 that is nine hours old is a severed link; a depth
+          of 400 that is four seconds old is a busy morning. **Depth alone cannot
+          tell those apart**, which is why the age is here and not a refinement.
+        * `dead` — retired undelivered. Never zero by accident: §D3 retires records
+          rather than removing them, so a delivery failure stays distinguishable
+          from a capture that never happened.
+
+        **`ownedByThisInstance` is not decoration.** §C3 gives one instance
+        ownership of a lane at a time, so an operator reading this from the
+        instance that does *not* own a lane is reading a depth nothing here is
+        draining. Without this field the same numbers mean two different things
+        depending on which address was called, and nothing on the response says
+        which.
+
+        Site scope comes from this installation's configuration, never from the
+        request — same reason as `/internal/commands/v1`.
+      responses:
+        "200":
+          description: The buffer, as this instance sees it
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BufferStatsEnvelope"
         "401":
           description: No credential, or one that did not verify
           content:
@@ -226,6 +277,72 @@ components:
         ackedAt:
           type: string
           format: date-time
+
+    BufferStatsEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/BufferStats"
+
+    BufferStats:
+      type: object
+      properties:
+        siteExternalId:
+          type: string
+        observedAt:
+          type: string
+          format: date-time
+          description: |
+            This instance's clock, at the moment the numbers were read. The lanes
+            are read one at a time and not in one transaction, so this is a
+            timestamp for a diagnostic view and not a consistent snapshot — said
+            here rather than left to be assumed.
+        totalDepth:
+          type: integer
+          format: int64
+          description: Undelivered across every lane at this site.
+        totalDead:
+          type: integer
+          format: int64
+          description: |
+            Retired undelivered, across every lane. **A non-zero value here is the
+            reason this endpoint exists.**
+        lanes:
+          type: array
+          items:
+            $ref: "#/components/schemas/LaneBufferStats"
+
+    LaneBufferStats:
+      type: object
+      properties:
+        laneExternalId:
+          type: string
+        ownedByThisInstance:
+          type: boolean
+          description: |
+            Whether this instance holds the lane's ingest lease (§C3). `false`
+            means the numbers below are real and something else is draining them.
+        depth:
+          type: integer
+          format: int64
+          description: "`PENDING` + `DISPATCHED` — undelivered right now."
+        dead:
+          type: integer
+          format: int64
+        oldestUndeliveredAt:
+          type: string
+          format: date-time
+          description: |
+            When the oldest still-undelivered capture arrived. Absent when the
+            lane's buffer is empty.
+        oldestUndeliveredAgeSeconds:
+          type: integer
+          format: int64
+          description: |
+            The same fact as a duration, because that is the one an operator reads.
+            Absent when the lane's buffer is empty.
 
     # The envelope comes from platform/web, which DEFINES and IMPLEMENTS it.
     # A cross-module $ref, resolved by the generator — deliberately not a copy.

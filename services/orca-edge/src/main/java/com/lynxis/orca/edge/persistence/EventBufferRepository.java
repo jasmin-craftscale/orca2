@@ -2,6 +2,7 @@ package com.lynxis.orca.edge.persistence;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -102,9 +103,9 @@ public class EventBufferRepository {
 						rs.getString("status"),
 						rs.getInt("attempts"),
 						rs.getString("last_error"),
-						instant(rs.getTimestamp("received_at")),
-						instant(rs.getTimestamp("dispatched_at")),
-						instant(rs.getTimestamp("acked_at"))));
+						Utc.instantAt(rs, "received_at"),
+						Utc.instantAt(rs, "dispatched_at"),
+						Utc.instantAt(rs, "acked_at")));
 	}
 
 	/**
@@ -136,8 +137,13 @@ public class EventBufferRepository {
 				.scopedBy(SCOPE_COLUMN));
 	}
 
+	/**
+	 * ⚠️ {@link Utc}, not {@code Timestamp.from} — see that class. A zone-less
+	 * conversion round-trips for values Java wrote and is wrong by the machine's UTC
+	 * offset for values the database wrote, and this table has both.
+	 */
 	private static java.sql.Timestamp now() {
-		return java.sql.Timestamp.from(Instant.now());
+		return Utc.now();
 	}
 
 	/**
@@ -192,6 +198,40 @@ public class EventBufferRepository {
 				.where("lane_external_id = ? AND status IN ('PENDING', 'DISPATCHED')", laneExternalId));
 	}
 
+	/** One lane's count in one status. For {@code DEAD}, which is per lane in the diagnostics. */
+	public long countByStatusOnLane(String laneExternalId, String status) {
+		return seam.count(ScopedSelect.from(TABLE)
+				.scopedBy(SCOPE_COLUMN)
+				.where("lane_external_id = ? AND status = ?", laneExternalId, status));
+	}
+
+	/**
+	 * When the oldest still-undelivered capture on this lane arrived, if there is one.
+	 *
+	 * <p><strong>Ordered by {@code sequence_no}, not by {@code received_at}</strong> —
+	 * the same reason {@link #undelivered} is. The identity column is the buffer's
+	 * order and two rows inside one millisecond have the same timestamp, so ordering
+	 * by the clock would make "the oldest" ambiguous exactly when the lane is busiest.
+	 *
+	 * <p>A single-row read rather than a {@code MIN(…)}: the seam expresses no
+	 * aggregate, and reaching around it for one would be a hole in the thing that
+	 * makes every read scoped. With the index leading
+	 * {@code (site_external_id, lane_external_id, sequence_no)} this is a seek and a
+	 * single row.
+	 */
+	public Optional<Instant> oldestUndeliveredAt(String laneExternalId) {
+		return seam.select(ScopedSelect.from(TABLE)
+								.columns("received_at")
+								.scopedBy(SCOPE_COLUMN)
+								.where("lane_external_id = ? AND status IN ('PENDING', 'DISPATCHED')",
+										laneExternalId)
+								.orderBy("sequence_no")
+								.limit(1),
+						(rs, row) -> Utc.instantAt(rs, "received_at"))
+				.stream()
+				.findFirst();
+	}
+
 	// ------------------------------------------------------------------------
 
 	private void bumpAttempts(List<Long> sequenceNumbers, int maxAttempts) {
@@ -232,7 +272,4 @@ public class EventBufferRepository {
 		return error.length() <= 1000 ? error : error.substring(0, 1000);
 	}
 
-	private static Instant instant(java.sql.Timestamp timestamp) {
-		return timestamp == null ? null : timestamp.toInstant();
-	}
 }
