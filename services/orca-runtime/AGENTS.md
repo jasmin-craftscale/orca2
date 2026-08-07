@@ -93,3 +93,10 @@ both ways and asserts the tables, columns, indexes and foreign keys are identica
 ⚠️ **Upgrading Flowable does not mean re-extracting those files.** They have
 shipped, and §B7's expand-only discipline means a migration is never edited after
 it does. Extract that version's `upgradestep` scripts as *new* migrations.
+
+**A database that already let the engine self-migrate needs adopting before it can
+start.** `V110` fails on *"There is already an object named 'ACT_GE_PROPERTY'"* —
+`docs/flowable-adoption.md` is the procedure, `deploy/adopt-flowable/` is the
+script, and `FlowableAdoptionIT` runs that script rather than a copy of it. It
+adopts **by rebuild** and **refuses** a schema holding process data; §4 of that
+document says what a data-preserving adoption would need and why it is not built.

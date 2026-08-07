@@ -283,16 +283,17 @@ a fresh attempt with a fresh clock.
 
 **`orca-runtime` fails to migrate: "There is already an object named 'ACT_GE_PROPERTY'".**
 This database ran with `flowable.database-schema-update: true` at some point, so it
-has the engine's tables and no Flyway history for them. There is no migration path
-off that (report §7.4), and on a developer machine the remedy is to let Flyway
-build them:
+has the engine's tables and no Flyway history for them. **There is a procedure for
+this now** — `docs/flowable-adoption.md`, added in H4. Stop runtime, then:
 
 ```bash
-docker exec -i orca-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -No -d orca -b -Q "DECLARE @sql NVARCHAR(MAX) = N''; SELECT @sql = @sql + N'ALTER TABLE [runtime].[' + OBJECT_NAME(parent_object_id) + N'] DROP CONSTRAINT [' + name + N'];' FROM sys.foreign_keys WHERE schema_id = SCHEMA_ID(N'runtime') AND (OBJECT_NAME(parent_object_id) LIKE 'ACT[_]%' OR OBJECT_NAME(parent_object_id) LIKE 'FLW[_]%'); SELECT @sql = @sql + N'DROP TABLE [runtime].[' + name + N'];' FROM sys.tables WHERE schema_id = SCHEMA_ID(N'runtime') AND (name LIKE 'ACT[_]%' OR name LIKE 'FLW[_]%'); IF @sql <> N'' EXEC sp_executesql @sql;"
+cd deploy && ./adopt-flowable/run.sh
 ```
 
-⚠️ **Developer machines only.** An installation with data in those tables needs a
-real migration path, and that path does not exist yet.
+It refuses without changing anything if those tables hold process data, or if they
+were built by a Flowable version other than the one the migrations were extracted
+from. Running it when you are not sure is safe: on a database that needs no
+adoption it says so and does nothing.
 
 **The visit reaches `MANUAL` instead of `COMPLETED`.** That is the platform working
 — every failure has a branch and every branch ends somewhere a human can see. Look

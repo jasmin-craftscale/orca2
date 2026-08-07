@@ -36,6 +36,7 @@ This file is a map. It does not restate the architecture — follow the link.
 | How do I run the slice end to end? | `docs/phase-1-demo.md` |
 | What does the camera actually put on the wire? | `docs/lpr-wire-format-from-1x.md` — DERIVED-FROM-1X, not a vendor spec |
 | What does ORCA send a device host to move a barrier? | `docs/device-host-outbound-from-1x.md` — DERIVED-FROM-1X; **§3 is an open question, not a design** |
+| The engine created its own tables on this database. Now what? | `docs/flowable-adoption.md` — the procedure, and §4 says what it deliberately will not do |
 
 **If something is unspecified, check the register before concluding it was
 forgotten. Never invent a resolution — a gap reported is worth more than a gap
