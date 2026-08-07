@@ -81,7 +81,8 @@ enforcement.
 
 ## Commands
 
-Every command here has been executed in this repository.
+Every command below was executed against this repository while this file was
+written.
 
 ```bash
 ./gradlew build              # compile, unit tests, build checks — the whole tree
@@ -97,10 +98,14 @@ it skips — `OutboxPropertiesIT`, `LeasePropertiesIT`, `ScopeSeamPropertiesIT`,
 `IdempotencyPropertiesIT` — are most of what proves the primitives. **Full
 verification is `./gradlew check integrationTest`.**
 
-The local stack — SQL Server and Keycloak, nothing else (there is no broker):
+The local stack — SQL Server and Keycloak, nothing else (there is no broker). The
+one-time setup, including the `.env` you must create first, is `deploy/README.md`;
+follow it rather than a copy of it. **Do not blind-copy `.env.example` over an
+existing `.env`** — it is gitignored precisely because it holds machine-local
+values. Once it exists:
 
 ```bash
-cd deploy && cp .env.example .env && docker compose up -d && ./bootstrap/run.sh
+cd deploy && docker compose up -d && ./bootstrap/run.sh
 ```
 
 `bootstrap/run.sh` is the privileged half — schemas, logins, grants. It runs once
@@ -109,6 +114,9 @@ against a fresh database and is a no-op afterwards. Run one service:
 ```bash
 ./gradlew bootRun -p services/orca-core --args='--spring.profiles.active=local'
 ```
+
+Add `--server.port=<free port>` when 8081–8086 are already taken. The committed
+ports are the architecture's and are not the thing to change.
 
 ⚠️ **The `local` profile is not optional on a laptop.** The committed
 inter-service credential in `.env.example` is recognised by name, and

@@ -13,7 +13,7 @@ satisfy it.
 
 | # | Deliverable | Lines | What it carries |
 |---|---|---|---|
-| **D1** | `AGENTS.md` (root) | **158** / 200 | The eight required sections in order: what the repository is (with the two laws verbatim) · where the truth lives, closing on the never-invent-a-resolution sentence verbatim · seven hard-rule rows, each naming the check class that fails · two rules enforced outside ArchUnit (database login, ADR-011 `/internal/**`) · how to work (contract-first, properties-not-paths, checks land with the code) · commands, every one executed · decision discipline and current scope · definition of done · the three-line maintenance note |
+| **D1** | `AGENTS.md` (root) | **166** / 200 | The eight required sections in order: what the repository is (with the two laws verbatim) · where the truth lives, closing on the never-invent-a-resolution sentence verbatim · seven hard-rule rows, each naming the check class that fails · two rules enforced outside ArchUnit (database login, ADR-011 `/internal/**`) · how to work (contract-first, properties-not-paths, checks land with the code) · commands, every one executed · decision discipline and current scope · definition of done · the three-line maintenance note |
 | **D2** | `CLAUDE.md` (root) | 5 | Byte-identical to the brief's block. `diff` clean |
 | **D3** | `platform/AGENTS.md` | **56** / 80 | The purity rule and what it inspects; a defect-per-primitive table; changing a primitive means its tests still *prove* the property; the four integration suites `test` skips; where `@PersistentTable`/`@RetentionClass`/`Growth` actually live and why; what `platform/web` carries; why `platform/` is exempt from the scope seam |
 | **D3** | `services/orca-runtime/AGENTS.md` | **59** / 80 | The five modules and what each owns; both module-wall tests including `domain`; cross-module data through `readmodel`; the modules are empty by design and what breaks on the first real class; admission, and that it is **unproven** pending WP0 |
@@ -56,8 +56,7 @@ changes, corpus edits, build or CI changes. No file under `platform/`,
 | `./gradlew test` | **0** | 52 unit tests, 0 failures, 0 errors |
 | `./gradlew check` | **0** | 53 tasks; the seven check classes report 18 tests between them |
 | `./gradlew integrationTest` | **0** | First run reported `UP-TO-DATE` from cache, so it was re-run with `--rerun-tasks`: **55 tasks executed, 44 s, 31 tests, 0 failures** across the four suites (outbox 8, lease 8, scope 8, idempotency 7) against real SQL Server |
-| `docker compose up -d` (in `deploy/`) | **0** | `orca-sqlserver` and `orca-keycloak` both healthy |
-| `./bootstrap/run.sh` | **0** | Re-run against the existing database: `V001` reported "already exists — nothing to do", `V004__verify.sql` printed *"7 schemas, 7 logins, each confined to its own"*. The "re-running is a no-op" claim in its header is therefore executed, not assumed |
+| `cd deploy && docker compose up -d && ./bootstrap/run.sh` | **0** | Executed verbatim as the block in `AGENTS.md` §5 now reads. `orca-sqlserver` and `orca-keycloak` healthy; `V001` reported "already exists — nothing to do"; `V004__verify.sql` printed *"7 schemas, 7 logins, each confined to its own"*. The "re-running is a no-op" claim in the script's header is therefore executed, not assumed |
 | `./gradlew bootRun -p services/orca-core --args='--spring.profiles.active=local'` | started | `Started CoreApplication in 1.949 seconds`; `/actuator/health` → `200 {"status":"UP"}`; `/api/v1/health` → the shared envelope; `/openapi/orca-core.yaml` → 200 |
 | Same, **without** the `local` profile | **1** | `IllegalStateException` from `InternalCredentialValidator.afterPropertiesSet` line 46: *"…is the committed local development fixture, and the `local` profile is not active."* The guard documented in `AGENTS.md` §5 fires exactly as described |
 
@@ -297,6 +296,98 @@ proposed; several of these are open questions, not omissions.
     branch-protection setting. Nothing in the repository enforces that a pull
     request is green, so the rules in `AGENTS.md` are only as binding as the
     person merging.
+
+---
+
+## 9 · Red-team review of this work, and what it changed
+
+A skeptical second pass over the six deliverables before review, on the
+assumption they were wrong somewhere. Four assertions were checked against the
+normative references in the brief's §1 and **held**; two were **defects and were
+fixed**. Both defects were in `AGENTS.md`, and both were of the same kind: a claim
+about a command.
+
+### 9.1 · Four assertions checked and upheld
+
+These were load-bearing design claims taken on the brief's word in the first pass.
+They are now checked against the sources, quoted.
+
+| Assertion | Verdict |
+|---|---|
+| A nested `CLAUDE.md` containing `@AGENTS.md` picks up the **sibling** `AGENTS.md`, not the root one | **Holds.** The memory reference states imports resolve *"relative to the file containing the import, not the working directory."* Had this been CWD-relative, all three nested files would have silently loaded the root file twice and D3 would have been functionally dead |
+| The root `AGENTS.md` is not loaded twice | **Holds.** *"Claude Code reads `CLAUDE.md`, not `AGENTS.md`."* One tool reads each file, so the adapter cannot double-count. This is also why the brief forbids a `.cursor/rules/*.mdc` — that one **would** double-load |
+| The backtick escaping actually defeats the import parser | **Holds.** *"Import parsing skips Markdown code spans and fenced code blocks."* The checker used for §5 check 4 strips exactly those two constructs before scanning, so it models the real parser rather than approximating it with `grep` |
+| `Read(./deploy/.env)` is valid deny syntax | **Holds.** The settings reference gives `Read(./.env)` and `Read(./secrets/**)` as deny examples, so a `./`-relative path is the documented form |
+
+One observation recorded rather than acted on: the settings reference pairs its
+`Read(./.env)` example with `Read(./.env.*)`, whereas D4 specifies a single exact
+path. `.gitignore` ignores `.env` repository-wide and `deploy/.env` is the only one
+that exists, so the rule covers what is there today — but it is an exact-path rule,
+not a pattern, and a second `.env` elsewhere would not be covered. **The brief says
+"exactly this content", so it was not changed.**
+
+### 9.2 · Defect 1 — `AGENTS.md` claimed every command had been executed, and two had not
+
+`AGENTS.md` §5 opened with *"Every command here has been executed in this
+repository."* That was false twice over:
+
+- **`cp .env.example .env` was never executed.** It could not be: `deploy/.env`
+  on this machine differs from `.env.example` **by 25 lines** (the offset ports in
+  §3), so running it would have destroyed a working local configuration.
+- **The `bootRun` line was executed only with additions** — `--server.port=18081`
+  plus two environment overrides — which §3 of this report disclosed while §5 of
+  `AGENTS.md` claimed the plain form had been run.
+
+**The two deliverables contradicted each other**, and the context file was the one
+that overstated. That is precisely the failure the brief's principle 4 exists to
+prevent: *a context file that lies is worse than no context file.*
+
+**Options weighed:** (a) delete the sentence — removes the lie but also the signal
+that these were verified; (b) make the claim precise and add the port hint;
+(c) leave `AGENTS.md` alone and rely on this report's disclosure — rejected
+immediately, since the file an agent reads would still be the one that lies.
+**Chose (b).** The sentence now scopes itself to the commands below it, and a line
+was added telling the reader to pass `--server.port` when 8081–8086 are taken,
+which is a real and recurring collision — `phase-0-report.md` §8 records it too.
+
+### 9.3 · Defect 2 — the local-stack block was a destructive one-liner, and a retelling
+
+`AGENTS.md` §5 carried `cd deploy && cp .env.example .env && docker compose up -d
+&& ./bootstrap/run.sh` as a single chained line. Two problems, not one:
+
+- **It is destructive.** `deploy/README.md` presents these as four separate lines
+  in an explicit fresh-clone context. Compressed into one `&&` chain in the file an
+  agent is most likely to copy from, it silently overwrites an existing `.env`. On
+  this machine that would have broken the stack.
+- **It is a retelling.** It duplicated `deploy/README.md`'s opening block —
+  the exact failure mode principle 2 names, measured at 16 shared words.
+
+**Options weighed:** (a) `cp -n` to make it non-clobbering — safe, but still a
+copy of the README and still diverging from it in wording; (b) drop the `.env`
+step, keep only the two commands actually executed, and link `deploy/README.md`
+for first-run setup; (c) keep the chain and add a warning — rejected, because a
+warning beside a runnable block does not stop a copy-paste. **Chose (b)**, which
+is the only option that satisfies all three of the brief's principles at once: no
+unexecuted command, no destructive command, and no second copy of the README.
+
+The replacement block — `cd deploy && docker compose up -d && ./bootstrap/run.sh`
+— was then **executed verbatim**, exit 0, and `deploy/.env` was confirmed still to
+differ from `.env.example` afterwards. Shared-word overlap with
+`REPOSITORY_GUIDE.md` fell from 16 words to 12, the residue being the `bootRun`
+command itself, which has to be verbatim to be correct.
+
+`AGENTS.md` is **166 lines** after both fixes, still inside the 200-line budget,
+still 0 bare `@`.
+
+### 9.4 · One claim left standing, and flagged rather than fixed
+
+`AGENTS.md` says the foojay resolver means *"a clean clone builds with nothing
+installed but a JDK."* The resolver **is** configured — verified in
+`settings.gradle.kts` — but that end-to-end property was **not exercised here**:
+every build in §3 ran with a warm Gradle user-home cache. `phase-0-report.md` §2
+item 1 records the same caveat for its own item 1, and CI's `build` job is what
+actually exercises it on every run. Recorded, not rewritten, because the statement
+describes the mechanism's purpose and the mechanism is present.
 
 ---
 
