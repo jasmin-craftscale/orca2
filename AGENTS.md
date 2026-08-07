@@ -8,9 +8,12 @@ and the process the site's own administrators designed runs against the customer
 systems until the barrier lifts. It is a ground-up rewrite of a system in
 production today (25 Go microservices, 4 React applications, SQL Server) that
 **this repository does not contain and does not migrate from** — see
-`docs/ORCA_ORCHESTRATOR_HANDOVER.md` §3. Phase 0 is built and verified: twelve
-Gradle modules, six bootable services, five platform primitives with property
-tests, six build checks, and deliberately **zero business logic**.
+`docs/ORCA_ORCHESTRATOR_HANDOVER.md` §3. Phase 0 built the foundations — twelve
+Gradle modules, six bootable services, five platform primitives, seven build
+checks. **Phase 1 built the first vertical slice on top of them and it runs end to
+end**: a plate read in over the camera's wire format, one visit, a connector call,
+a barrier commanded and confirmed, and the visit's fact recorded in one
+transaction. Everything else is still deliberately absent.
 
 Two laws shape everything else:
 
@@ -29,6 +32,9 @@ This file is a map. It does not restate the architecture — follow the link.
 | What are the five primitives, and what pattern is each? | `docs/PLATFORM_PRIMITIVES.md` |
 | Where does anything live in this repository? | `docs/REPOSITORY_GUIDE.md` |
 | What did Phase 0 build, decide, and fail to settle? | `docs/phase-0-report.md` |
+| What did Phase 1 build, and what is still guessed? | `docs/phase-1-report.md` — **§3, §5 and §7** |
+| How do I run the slice end to end? | `docs/phase-1-demo.md` |
+| What does the camera actually put on the wire? | `docs/lpr-wire-format-from-1x.md` — DERIVED-FROM-1X, not a vendor spec |
 
 **If something is unspecified, check the register before concluding it was
 forgotten. Never invent a resolution — a gap reported is worth more than a gap
@@ -89,17 +95,22 @@ written.
 ./gradlew build              # compile, unit tests, build checks — the whole tree
 ./gradlew test               # unit tests only
 ./gradlew check              # unit tests + the seven build checks
-./gradlew integrationTest    # the four platform property suites, real SQL Server
+./gradlew integrationTest    # 113 property tests, real SQL Server, real Flowable
 ```
 
-⚠️ **`test` does not run the four platform property suites.** `integrationTest` is
-a separate source set and a separate task, deliberately **not** wired into
-`check`, so that `build` succeeds on a machine with no Docker daemon. The suites
-it skips — `OutboxPropertiesIT`, `LeasePropertiesIT`, `ScopeSeamPropertiesIT`,
-`IdempotencyPropertiesIT` — are most of what proves the primitives. **Full
-verification is `./gradlew check integrationTest`.**
+⚠️ **`test` runs almost none of what proves this repository.** `integrationTest`
+is a separate source set and a separate task, deliberately **not** wired into
+`check`, so that `build` succeeds on a machine with no Docker daemon. What it
+skips is fifteen suites and every property that matters — the admission race, the
+severed link, the lease handover, the expired command, the outbox's atomicity.
+**Full verification is `./gradlew check integrationTest`.**
 
-The local stack — SQL Server and Keycloak, nothing else (there is no broker). The
+⚠️ **A green `check` does not mean a service starts.** Every suite constructs its
+beans directly rather than refreshing a context, so a broken bean definition
+passes all of them — this is how Phase 1 shipped an `orca-edge` that could not
+boot. See `phase-1-report.md` §7.10. Run the demo.
+
+The local stack — SQL Server, Keycloak and WP7's two stubs. There is no broker. The
 one-time setup, including the `.env` you must create first, is `deploy/README.md`;
 follow it rather than a copy of it. **Do not blind-copy `.env.example` over an
 existing `.env`** — it is gitignored precisely because it holds machine-local
