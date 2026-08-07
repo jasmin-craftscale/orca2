@@ -412,7 +412,7 @@ Within that, three different things need enforcing, and they are genuinely diffe
 | What is being enforced | Where | Nature |
 |---|---|---|
 | An operator entitled to one site must not read another — one customer, several sites | Site appliance | **Authorization**, not tenancy |
-| One customer's data must not reach another | **Hosted tier only** — the only place two customers share infrastructure | **Tenancy**, enforced by the database |
+| One customer's data must not reach another | ~~Hosted tier only — the only place two customers share infrastructure~~ **Narrowed 7 Aug 2026 (NEW-1b): the cloud tier is per-customer**, so no database anywhere holds two customers — except the portal, whose cross-customer principals are the row below | ~~Tenancy, enforced by the database~~ **Largely dissolved by the per-customer ruling**; what remains of it is the portal's ownership model |
 | A driver or carrier sees their own bookings across every terminal they visit, and nobody else's | Driver portal | **Ownership of a principal.** Carriers legitimately span customers, so a tenant rule cannot express it |
 
 **The architectural requirement is the same in all three cases, and it is not negotiable:**
