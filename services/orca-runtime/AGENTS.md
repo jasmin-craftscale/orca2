@@ -49,11 +49,24 @@ starts.** That is the single hardest property in the service and every inbound
 path depends on it. Read §C2's *Admission* subsection before writing anything near
 it — it constrains the shape of the operation, not just its outcome.
 
-**It is unproven against the engine.** Register item #11 folds Spike 1 into Phase 1
-as Work Package 0: the property is proven first, against real Flowable 8 and real
-SQL Server, under a signed halt condition — if WP0 cannot pass, Phase 1 stops and
-reports. See `docs/phase-1-plan.md`. Do not build on the assumption that it holds.
+**It is proven, and the proof is executable.** WP0 ran it against real Flowable 8
+and real SQL Server: 1,000 iterations, two simultaneous events each, exactly 1,000
+visits. `AdmissionPropertiesIT` in `src/integrationTest/` is that proof — an
+UPDLOCK on the lane's `lane_session` row, a filtered unique index as the backstop,
+and the engine start inside the same transaction as the insert. **Change any of
+those three and read the test before deciding it still holds**; the backstop in
+particular is only known to work because the suite removes the lane lock and
+watches it fire.
 
-Phase 0 wrote out Flowable's `database-schema-update: true` visibly rather than
-leaving it invisible, and nobody owns migrating the engine's ~46 tables — an open
-contradiction recorded in `phase-0-report.md` §7.4, not a settled decision.
+That code is WP0 shape, not shipping placement: it uses `JdbcTemplate` directly,
+which `src/main` cannot. WP6 places it in `execution` behind the scope seam.
+
+**The engine does not migrate itself.** `flowable.database-schema-update: false`,
+and its 45 tables are `V110`–`V114` — extracted from the jars on the runtime
+classpath by `./gradlew :services:orca-runtime:extractFlowableSchema`, never
+hand-written and never downloaded. `FlowableSchemaUnderFlywayIT` builds the schema
+both ways and asserts the tables, columns, indexes and foreign keys are identical.
+
+⚠️ **Upgrading Flowable does not mean re-extracting those files.** They have
+shipped, and §B7's expand-only discipline means a migration is never edited after
+it does. Extract that version's `upgradestep` scripts as *new* migrations.

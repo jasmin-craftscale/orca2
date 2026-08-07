@@ -86,19 +86,33 @@ management:
 # --- Flowable ---------------------------------------------------------------
 # The engine is embedded and its tables live in the `runtime` schema (§C2). It is
 # reached behind an interface so the platform is not written against a specific
-# engine's API throughout — nothing in Phase 0 touches it.
+# engine's API throughout.
 #
-# ⚠️ UNRESOLVED, AND STATED RATHER THAN DECIDED HERE. The value below is
-# Flowable's own default, written out so that it is a visible choice rather than
-# an invisible one. It means the ENGINE migrates its own ~46 tables on startup,
-# outside Flyway. That is fine for one instance and unexamined for more than one:
-# §B7 requires rolling upgrades where a schema change is compatible with both
-# versions for the duration, and expand-only discipline across an upgrade pair.
-# The architecture says the engine's tables are in the runtime schema; it does not
-# say who migrates them or how that interacts with a rolling upgrade. Left as
-# found, and reported.
+# RESOLVED IN WP3 — the engine does not migrate itself.
+#
+# Phase 0 left this at Flowable's default of `true` and reported it as an open
+# contradiction: §C2 puts the engine's ~45 tables in the runtime schema and says
+# nothing about who creates them, while §B7 requires a schema change to be
+# compatible with both versions for the duration of a rolling upgrade. Those two
+# cannot both hold while the engine reshapes its own tables on whichever instance
+# happens to start first.
+#
+# So the DDL is versioned migrations like everything else — V110 to V114,
+# EXTRACTED from the Flowable jars on the runtime classpath rather than
+# hand-written or downloaded, by `./gradlew :services:orca-runtime:extractFlowableSchema`.
+#
+# `false` means the engine creates nothing and validates nothing beyond its own
+# recorded schema version. A mismatch surfaces as an engine startup error, which
+# is the loud failure worth having: the alternative is an engine quietly adding a
+# column that no migration records and that the other instance in a rolling
+# upgrade does not have.
+#
+# ⚠️ An installation that already ran with `true` has the tables but no Flyway
+# history for them, so V110 fails on "table already exists". Nothing is deployed
+# yet, so this affects developer machines only — drop the ACT_*/FLW_* tables, or
+# the schema, and let Flyway build them. See docs/phase-1-report.md.
 flowable:
-  database-schema-update: true
+  database-schema-update: false
 
 orca:
   service: orca-runtime
