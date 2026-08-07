@@ -150,24 +150,54 @@ public class EventBufferRepository {
 	 * Records a failed delivery attempt, and retires the event once it has had too
 	 * many.
 	 *
-	 * <p>{@code attempts} is incremented relative to itself, which the seam's
-	 * value-based {@code SET} cannot express — so it is read and written back per
-	 * row rather than as {@code attempts = attempts + 1}. That is slower and it is
-	 * the right trade: a counter is not worth a hole in the seam, and the batch is
-	 * bounded by the pump's batch size. Noted in the report as a small gap in
-	 * {@link ScopedUpdate}, not worked around with raw JDBC.
+	 * <p><strong>Three set-based statements, and it used to be a read-write-back
+	 * loop.</strong> WP5 could not express {@code attempts = attempts + 1} through
+	 * the seam, so it read every row and wrote each one back — which is slower, and
+	 * worse than slower: two deliveries that both read {@code attempts = 3} and both
+	 * write {@code 4} record <em>one</em> failure between them, and an event that has
+	 * failed twice as often as its counter says is one that is retired later than the
+	 * limit promises. H5 gave the seam {@link ScopedUpdate#increment}, so the
+	 * arithmetic now happens in the database and cannot be lost.
+	 *
+	 * <p>The retirement is applied <em>after</em> the increment and reads the value
+	 * the increment produced. That ordering is the whole reason it is three
+	 * statements rather than one: the new status depends on the new count, and a
+	 * {@code CASE} expression over it would be caller-authored SQL in the one place
+	 * the seam exists to keep it out of.
 	 */
 	public int recordFailure(List<Long> sequenceNumbers, int maxAttempts, String error) {
 		if (sequenceNumbers.isEmpty()) {
 			return 0;
 		}
+		String theseRows = "sequence_no IN (" + placeholders(sequenceNumbers.size()) + ")";
+		Object[] ids = sequenceNumbers.toArray();
+
 		int touched = seam.update(ScopedUpdate.table(TABLE)
 				.set("last_error", truncate(error))
+				.increment("attempts", 1)
 				.scopedBy(SCOPE_COLUMN)
-				.where("sequence_no IN (" + placeholders(sequenceNumbers.size()) + ")",
-						sequenceNumbers.toArray()));
-		bumpAttempts(sequenceNumbers, maxAttempts);
+				.where(theseRows, ids));
+
+		// Retired: too many attempts, and the count is now the true one. DEAD rather
+		// than deleted — §D3, and the diagnostics endpoint reports it.
+		seam.update(ScopedUpdate.table(TABLE)
+				.set("status", BufferedEvent.DEAD)
+				.scopedBy(SCOPE_COLUMN)
+				.where(theseRows + " AND attempts >= ?", withMax(ids, maxAttempts)));
+
+		// The rest go back into the queue.
+		seam.update(ScopedUpdate.table(TABLE)
+				.set("status", BufferedEvent.PENDING)
+				.scopedBy(SCOPE_COLUMN)
+				.where(theseRows + " AND attempts < ?", withMax(ids, maxAttempts)));
+
 		return touched;
+	}
+
+	private static Object[] withMax(Object[] ids, int maxAttempts) {
+		Object[] parameters = java.util.Arrays.copyOf(ids, ids.length + 1);
+		parameters[ids.length] = maxAttempts;
+		return parameters;
 	}
 
 	/**
@@ -233,25 +263,6 @@ public class EventBufferRepository {
 	}
 
 	// ------------------------------------------------------------------------
-
-	private void bumpAttempts(List<Long> sequenceNumbers, int maxAttempts) {
-		List<BufferedEvent> touched = seam.select(ScopedSelect.from(TABLE)
-						.columns("sequence_no", "attempts")
-						.scopedBy(SCOPE_COLUMN)
-						.where("sequence_no IN (" + placeholders(sequenceNumbers.size()) + ")",
-								sequenceNumbers.toArray()),
-				(rs, row) -> new BufferedEvent(rs.getLong("sequence_no"), null, null, null, null, null,
-						null, null, null, rs.getInt("attempts"), null, null, null, null));
-
-		for (BufferedEvent event : touched) {
-			int attempts = event.attempts() + 1;
-			seam.update(ScopedUpdate.table(TABLE)
-					.set("attempts", attempts)
-					.set("status", attempts >= maxAttempts ? BufferedEvent.DEAD : BufferedEvent.PENDING)
-					.scopedBy(SCOPE_COLUMN)
-					.where("sequence_no = ?", event.sequenceNo()));
-		}
-	}
 
 	private int update(List<Long> sequenceNumbers, ScopedUpdate update) {
 		if (sequenceNumbers.isEmpty()) {

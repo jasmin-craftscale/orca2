@@ -103,13 +103,21 @@ public class JdbcScopeSeam implements ScopeSeam {
 			throw ScopeViolationException.noScopeFor(update.table(), update.scopeDimension());
 		}
 
-		List<String> assignments = update.assignmentOrder();
+		List<ScopedUpdate.Assignment> assignments = update.assignments();
 		List<Object> parameters = new ArrayList<>();
 
 		StringBuilder sql = new StringBuilder("UPDATE ").append(update.table()).append(" SET ");
 		for (int i = 0; i < assignments.size(); i++) {
-			sql.append(i == 0 ? "" : ", ").append(assignments.get(i)).append(" = ?");
-			parameters.add(update.assignments().get(assignments.get(i)));
+			ScopedUpdate.Assignment assignment = assignments.get(i);
+			sql.append(i == 0 ? "" : ", ").append(assignment.column()).append(" = ");
+			// The ONLY two forms this builds. `column = column + ?` reads the current
+			// value inside the same statement, which is what makes it atomic; the
+			// column name is the allow-listed identifier, never the caller's string.
+			if (assignment.increment()) {
+				sql.append(assignment.column()).append(" + ");
+			}
+			sql.append('?');
+			parameters.add(assignment.value());
 		}
 
 		// Scope first, caller's filter second, and the filter is ANDed — so it can

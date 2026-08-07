@@ -53,6 +53,12 @@ class ScopeWritePropertiesIT {
 					site_id VARCHAR(20) NOT NULL,
 					status VARCHAR(20) NOT NULL)
 				""".formatted(SCHEMA));
+		// H5's counter. Added rather than included above because the table survives
+		// between runs, and a CREATE guarded by IF OBJECT_ID would skip a new column.
+		new JdbcTemplate(dataSource).execute("""
+				IF COL_LENGTH('%s.work_item', 'attempts') IS NULL
+				ALTER TABLE work_item ADD attempts INT NOT NULL CONSTRAINT df_wi_attempts DEFAULT 0
+				""".formatted(SCHEMA));
 	}
 
 	@BeforeEach
@@ -392,6 +398,151 @@ class ScopeWritePropertiesIT {
 			Thread.currentThread().interrupt();
 			throw new IllegalStateException(interrupted);
 		}
+	}
+
+	// ------------------------------------------------------------------------
+	// H5 — the allow-listed atomic increment, and the update it stops losing.
+	// ------------------------------------------------------------------------
+
+	@Test
+	@DisplayName("concurrent increments all land — the read-write-back they replace loses some")
+	void anAtomicIncrementDoesNotLoseUpdates() throws Exception {
+		int threads = 8;
+		int each = 25;
+
+		// --- what the seam does now ---------------------------------------
+		long counted = countUp(threads, each, () -> seam.update(ScopedUpdate.table("work_item")
+				.increment("attempts", 1)
+				.scopedBy("site_id")
+				.where("site_id = ?", "site-1")));
+
+		assertThat(counted)
+				.as("""
+						`attempts = attempts + 1` is evaluated by the database inside the statement, \
+						so two callers cannot both read the same value first. Every failure is \
+						recorded.""")
+				.isEqualTo((long) threads * each);
+
+		// --- what WP5 had to do, in the same conditions --------------------
+		// EventBufferRepository read every row and wrote it back, because the seam
+		// could not express the arithmetic. This is that, and it is here so the
+		// assertion above is a comparison rather than an assertion about nothing.
+		jdbc.update("UPDATE work_item SET attempts = 0");
+		long readWriteBack = countUp(threads, each, () -> {
+			int current = seam.select(ScopedSelect.from("work_item")
+							.columns("attempts")
+							.scopedBy("site_id")
+							.where("site_id = ?", "site-1"),
+					(rs, row) -> rs.getInt("attempts")).getFirst();
+			pause();  // the window every one of these has, widened to make it visible
+			return seam.update(ScopedUpdate.table("work_item")
+					.set("attempts", current + 1)
+					.scopedBy("site_id")
+					.where("site_id = ?", "site-1"));
+		});
+
+		assertThat(readWriteBack)
+				.as("""
+						THE DEFECT, DEMONSTRATED. Two deliveries that both read attempts = 3 and \
+						both write 4 record ONE failure between them — so an event that has failed \
+						twice as often as its counter says is retired later than the limit promises, \
+						and nothing in either transaction could notice.""")
+				.isLessThan((long) threads * each);
+	}
+
+	@Test
+	@DisplayName("an increment outside the caller's scope is refused, and the counter is untouched")
+	void anIncrementCannotReachAnotherSitesCounter() {
+		ScopeContext.runIn(Scope.of("site_id", Set.of("site-1")), () ->
+				seam.update(ScopedUpdate.table("work_item")
+						.increment("attempts", 5)
+						.scopedBy("site_id")));
+
+		assertThat(attemptsOf("site-1")).isEqualTo(5);
+		assertThat(attemptsOf("site-2"))
+				.as("the scope predicate applies to an increment exactly as it does to a set — the "
+						+ "expression is the only thing that changed")
+				.isZero();
+
+		assertThatThrownBy(() -> seam.update(ScopedUpdate.table("work_item")
+				.increment("attempts", 1)
+				.scopedBy("site_id")))
+				.as("no scope established: refused loudly, not applied to nothing")
+				.isInstanceOf(ScopeViolationException.class);
+
+		assertThat(attemptsOf("site-1")).isEqualTo(5);
+	}
+
+	@Test
+	@DisplayName("a set and an increment travel in one statement — which is why the status still moves")
+	void setAndIncrementCombineInOneStatement() {
+		ScopeContext.runIn(Scope.of("site_id", Set.of("site-1")), () ->
+				seam.update(ScopedUpdate.table("work_item")
+						.set("status", "RETRYING")
+						.increment("attempts", 3)
+						.scopedBy("site_id")));
+
+		assertThat(statusOf("site-1")).isEqualTo("RETRYING");
+		assertThat(attemptsOf("site-1")).isEqualTo(3);
+	}
+
+	@Test
+	@DisplayName("setting AND incrementing the same column is refused before any SQL exists")
+	void oneColumnCannotBeBothAssignedAndAdvanced() {
+		assertThatThrownBy(() -> ScopedUpdate.table("work_item")
+				.set("attempts", 5)
+				.increment("attempts", 1))
+				.as("\"assign 5\" and \"add 5\" in one statement is a question, not an instruction, "
+						+ "and the seam will not answer it by ordering")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("both set and incremented");
+	}
+
+	/** Runs `each` operations on `threads` threads at once and returns the counter afterwards. */
+	private long countUp(int threads, int each, java.util.concurrent.Callable<Integer> operation)
+			throws Exception {
+		java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+		java.util.List<Thread> workers = new java.util.ArrayList<>();
+		java.util.List<Throwable> failures = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+		for (int t = 0; t < threads; t++) {
+			Thread worker = new Thread(() -> ScopeContext.runIn(Scope.of("site_id", Set.of("site-1")), () -> {
+				try {
+					start.await();
+					for (int i = 0; i < each; i++) {
+						operation.call();
+					}
+				}
+				catch (Exception thrown) {
+					failures.add(thrown);
+				}
+			}));
+			worker.start();
+			workers.add(worker);
+		}
+
+		start.countDown();
+		for (Thread worker : workers) {
+			worker.join();
+		}
+		assertThat(failures).as("no worker may fail for an unrelated reason").isEmpty();
+
+		return attemptsOf("site-1");
+	}
+
+	private static void pause() {
+		try {
+			Thread.sleep(2);
+		}
+		catch (InterruptedException interrupted) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	private long attemptsOf(String site) {
+		Integer attempts = jdbc.queryForObject(
+				"SELECT attempts FROM work_item WHERE site_id = ?", Integer.class, site);
+		return attempts == null ? 0 : attempts;
 	}
 
 	// ------------------------------------------------------------------------
