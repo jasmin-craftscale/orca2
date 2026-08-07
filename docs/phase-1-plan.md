@@ -338,6 +338,7 @@ unrun command is not a passing one.**
 | Something needs the builder developer's agreement (dialect, profile) | Write your proposal into `docs/BPMN_EXECUTION_PROFILE.md` marked PROPOSED, and list it in the report for their review. Do not block on them |
 | The architecture is silent | Register first; if absent there, report the gap. Same as Phase 0 |
 | The dev machine's ports 8081–8086 / 1433 / 8080 are taken (the 1.x stack runs there) | Use the `.env` port overrides and `ORCA_DB_URL` / offset `--server.port`s, as Phase 0's verification did. Committed defaults stay the brief's ports |
+| A local PostgreSQL exists on this machine (port 5455, other projects') | **Never use it for ORCA — not even for tests.** SQL Server is the only database (ADR-003), and the primitives' SQL is deliberately dialect-specific. Testcontainers and the compose stack cover every database need with full create/recreate rights |
 
 ## 8 · Your report — `docs/phase-1-report.md`
 
