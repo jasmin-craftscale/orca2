@@ -57,6 +57,9 @@ Every rule below is executed, not reviewed. The classes live in
 | Every class annotated `@Entity` declares `@PersistentTable`, whose `growth()` has no default; every table declared `TRAFFIC_GROWING` names a non-blank `@RetentionClass` | `RetentionClassRule` |
 | Every method annotated `@Scheduled` calls `SystemContext.runAs` or `SystemContext.callAs` — no path runs with no identity | `SystemContextRule` |
 | No class outside `services/orca-runtime`'s `execution` package depends on `org.flowable` — the engine is reached behind `ProcessEngineGateway` (§C2, ADR-006) | `EngineConfinementRule` |
+| Every table declaring the scope column `site_external_id` has **some index leading with it** — the key, a unique index or an ordinary one. Every seam read leads with the scope predicate, so a table without one can only be scanned, and a scan under `UPDLOCK` locks every row at the site | `ScopeIndexRule` (reads the migrations, not bytecode) |
+| Every class annotated `@RestController` implements an interface from a generated `*.api.generated` package — the only thing that makes a contract change break the build | `ContractInterfaceRule` |
+| Every operation an OpenAPI document tags `internal*` maps under the ADR-011 filter's own path pattern, and every path under that pattern is tagged internal. No third surface | `InternalSurfaceRule` (reads the contracts; takes the pattern from `InternalCallProperties`) |
 
 Two more rules are real but enforced **outside** ArchUnit, so no build check will
 tell you:
@@ -95,7 +98,7 @@ written.
 ```bash
 ./gradlew build              # compile, unit tests, build checks — the whole tree
 ./gradlew test               # unit tests only
-./gradlew check              # unit tests + the seven build checks
+./gradlew check              # unit tests + the ten build checks
 ./gradlew integrationTest    # 113 property tests, real SQL Server, real Flowable
 ```
 

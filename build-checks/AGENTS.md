@@ -5,9 +5,20 @@ failures.** It is also the reason this is a monorepo: these rules have to see al
 twelve modules at once, and a service reaching into another service's internals is
 invisible from inside either one.
 
-Seven classes, run by `./gradlew check`: `PlatformPurityRule`, `ModuleWallRule`,
+Ten classes, run by `./gradlew check`: `PlatformPurityRule`, `ModuleWallRule`,
 `ScopeSeamRule`, `ErrorEnvelopeRule`, `RetentionClassRule`, `SystemContextRule`,
-and `ImportedSetGuard` — the check on the checks.
+`EngineConfinementRule`, `ScopeIndexRule`, `ContractInterfaceRule`,
+`InternalSurfaceRule`, and `ImportedSetGuard` — the check on the checks.
+
+**Two of them do not read bytecode**, and that is deliberate rather than a
+shortcut. `ScopeIndexRule` reads the Flyway migrations, because an index definition
+leaves no trace in a `.class` file and the trap it guards (a scoped table with no
+index leading with the scope column → a scan → an `UPDLOCK` over every row at the
+site) is invisible from Java. `InternalSurfaceRule` reads the authored OpenAPI
+documents, because contract-first means the document is the surface and a route's
+path is decided there. Both go through `RepositoryFiles`, and **both assert a floor
+on what they read** — a rule that read no files passes exactly like a rule that saw
+no classes.
 
 ## A new rule does not count until it has been watched to fail
 
@@ -39,7 +50,16 @@ gets its first class so the exemption cannot outlive its reason.
 
 Currently empty in Phase 0: both module-wall tests over `orca-runtime`'s five
 modules, `RetentionClassRule`'s `@Entity` test (no JPA entities yet), and
-`SystemContextRule` (no `@Scheduled` methods yet).
+`SystemContextRule` (no `@Scheduled` methods yet). Phase 1 populated
+`execution` and `integration`; `ImportedSetGuard.whatIsStillEmptyIsStated` records
+exactly which three remain.
+
+**The three rules added in H1 were each watched to fail before they were
+committed**, and what each violation was is written in
+`docs/phase-1-hardening-report.md` §H2 rather than left as a claim: a scoped table
+whose only index led with the wrong column; a `@RestController` implementing
+nothing; and an operation tagged internal but authored one level above
+`/internal/`, plus its mirror image.
 
 ## What the rules see
 

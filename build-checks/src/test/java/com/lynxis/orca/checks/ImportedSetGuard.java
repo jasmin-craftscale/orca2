@@ -65,6 +65,40 @@ class ImportedSetGuard {
 		assertThat(controllers)
 				.as("six services, six hand-written controllers implementing six generated interfaces")
 				.isEqualTo(6);
+
+		// H1 added ContractInterfaceRule, which governs EVERY @RestController rather
+		// than the six by name. Counting them here is what says the rule is looking at
+		// a populated set: six health controllers plus edge's commands and buffer
+		// stats and runtime's events.
+		assertThat(annotatedRestControllers())
+				.as("ContractInterfaceRule governs every @RestController. If this ever drops to the "
+						+ "six health controllers, either a controller was deleted or the annotation "
+						+ "is no longer visible to the importer — and the rule is governing less than "
+						+ "it reads as governing")
+				.isGreaterThanOrEqualTo(8);
+	}
+
+	@Test
+	@DisplayName("the two file-reading rules found the repository, not an empty directory")
+	void theFileReadingRulesSeeTheRepository() {
+		// ScopeIndexRule and InternalSurfaceRule read migrations and OpenAPI documents
+		// rather than bytecode, so their vacuity risk is a wrong working directory
+		// rather than a missing module. Each asserts its own floor; this is the same
+		// statement in the one place a reader looks for it.
+		assertThat(RepositoryFiles.serviceContracts())
+				.as("six services, six authored contracts. InternalSurfaceRule reads these")
+				.hasSizeGreaterThanOrEqualTo(6);
+
+		assertThat(RepositoryFiles.migrations())
+				.as("ScopeIndexRule reads these — the services' migrations and the primitives'")
+				.hasSizeGreaterThanOrEqualTo(15);
+	}
+
+	private static long annotatedRestControllers() {
+		return OrcaClasses.production().stream()
+				.filter(javaClass -> javaClass.isAnnotatedWith(
+						"org.springframework.web.bind.annotation.RestController"))
+				.count();
 	}
 
 	@Test
