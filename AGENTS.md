@@ -49,6 +49,7 @@ Every rule below is executed, not reviewed. The classes live in
 | Every public instance method of a class annotated `@RestController` returns the shared envelope — `ApiResponse`, or a generated model carrying an `ApiStatus` field, or `void`. `ResponseEntity<T>` is unwrapped to `T` from the generic signature | `ErrorEnvelopeRule` |
 | Every class annotated `@Entity` declares `@PersistentTable`, whose `growth()` has no default; every table declared `TRAFFIC_GROWING` names a non-blank `@RetentionClass` | `RetentionClassRule` |
 | Every method annotated `@Scheduled` calls `SystemContext.runAs` or `SystemContext.callAs` — no path runs with no identity | `SystemContextRule` |
+| No class outside `services/orca-runtime`'s `execution` package depends on `org.flowable` — the engine is reached behind `ProcessEngineGateway` (§C2, ADR-006) | `EngineConfinementRule` |
 
 Two more rules are real but enforced **outside** ArchUnit, so no build check will
 tell you:
@@ -87,7 +88,7 @@ written.
 ```bash
 ./gradlew build              # compile, unit tests, build checks — the whole tree
 ./gradlew test               # unit tests only
-./gradlew check              # unit tests + the six build checks
+./gradlew check              # unit tests + the seven build checks
 ./gradlew integrationTest    # the four platform property suites, real SQL Server
 ```
 

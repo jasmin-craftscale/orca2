@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WP4 · a probe, not a product process.
+
+  The phase plan asks for "error boundary + timer on each service task". The error
+  boundary is straightforward. The timer is a question about the engine that
+  cannot be answered from a document: does a boundary timer on a SERVICE TASK ever
+  fire, given the task runs to completion inside one transaction?
+
+  This process is the experiment. A one-second boundary timer on a service task
+  whose delegate blocks for four. Whatever the engine does with it is recorded in
+  GateVisitProcessIT and in the phase report — reported, not worked around.
+-->
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://lynxis.com/orca/probe">
+
+  <process id="wp4-timer-probe" name="WP4 boundary-timer probe" isExecutable="true">
+
+    <startEvent id="start"/>
+    <sequenceFlow id="toSlow" sourceRef="start" targetRef="slowStep"/>
+
+    <serviceTask id="slowStep" name="a step that takes longer than its timer"
+                 flowable:delegateExpression="${slowDelegate}"
+                 flowable:async="true"/>
+
+    <boundaryEvent id="slowStepTimedOut" attachedToRef="slowStep" cancelActivity="true">
+      <timerEventDefinition>
+        <timeDuration>PT1S</timeDuration>
+      </timerEventDefinition>
+    </boundaryEvent>
+    <sequenceFlow id="timedOutToTimeout" sourceRef="slowStepTimedOut" targetRef="timedOut"/>
+
+    <sequenceFlow id="toCompleted" sourceRef="slowStep" targetRef="completed"/>
+
+    <endEvent id="completed" name="the step finished"/>
+    <endEvent id="timedOut" name="the timer fired"/>
+
+  </process>
+</definitions>

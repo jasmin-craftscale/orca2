@@ -68,24 +68,39 @@ class ImportedSetGuard {
 	}
 
 	@Test
-	@DisplayName("records exactly which rule sets are still empty in Phase 0, so nothing passes vacuously unnoticed")
+	@DisplayName("records exactly which rule sets are still empty, so nothing passes vacuously unnoticed")
 	void whatIsStillEmptyIsStated() {
-		// Phase 0 builds no business logic, so orca-runtime's five modules hold only
-		// package declarations and the module-wall rule governs nothing yet. That is
-		// expected — and stating it here is what stops it from being mistaken for a
-		// rule that has been checked. When the first class lands in a module, this
-		// test fails and is deleted.
-		for (String module : OrcaClasses.RUNTIME_MODULES) {
-			long classes = OrcaClasses.production().stream()
-					.filter(javaClass -> javaClass.getPackageName()
-							.startsWith("com.lynxis.orca.runtime." + module))
-					.filter(javaClass -> !javaClass.getSimpleName().equals("package-info"))
-					.count();
-			assertThat(classes)
-					.as("runtime module '%s' now has classes — the module-wall rule is no longer empty, "
-							+ "so remove allowEmptyShould(true) from ModuleWallRule and delete this test",
+		// WP4 put the first classes into `execution`, so the module wall is no longer
+		// governing nothing — for that module. The other four are still empty and
+		// still carry allowEmptyShould(true), so the statement has to be kept exact
+		// rather than deleted wholesale.
+		//
+		// orca-runtime/AGENTS.md said to delete this test outright when the first
+		// class landed. That instruction assumed all five modules would populate at
+		// once. Deleting it now would remove the record of four rule sets that really
+		// are still empty — which is the one thing this test exists to prevent — so
+		// it is narrowed instead, and made to assert BOTH halves: what is populated,
+		// and what is not.
+		assertThat(classesIn("execution"))
+				.as("execution holds WP4's delegates and the engine gateway. If this is ever zero "
+						+ "again, ModuleWallRule and EngineConfinementRule are both passing over "
+						+ "nothing and the allowEmptyShould below has become a blanket exemption")
+				.isPositive();
+
+		for (String module : List.of("workitem", "integration", "notify", "readmodel")) {
+			assertThat(classesIn(module))
+					.as("runtime module '%s' now has classes — remove it from this list, and remove "
+							+ "allowEmptyShould(true) from ModuleWallRule once every module is populated",
 							module)
 					.isZero();
 		}
+	}
+
+	private static long classesIn(String module) {
+		return OrcaClasses.production().stream()
+				.filter(javaClass -> javaClass.getPackageName()
+						.startsWith("com.lynxis.orca.runtime." + module))
+				.filter(javaClass -> !javaClass.getSimpleName().equals("package-info"))
+				.count();
 	}
 }

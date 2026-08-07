@@ -188,7 +188,7 @@ The Spring Boot plugin is declared at the root with `apply false` and applied in
 ./gradlew build              everything
 ./gradlew test               unit tests
 ./gradlew integrationTest    Testcontainers, real SQL Server
-./gradlew check              the six build checks
+./gradlew check              the seven build checks
 ./gradlew bootRun -p services/orca-core --args='--spring.profiles.active=local'
 ```
 

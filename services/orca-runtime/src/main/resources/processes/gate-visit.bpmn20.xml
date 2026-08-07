@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  gate-visit — one truck through one lane (§B9).
+
+  ⚠️ THIS FILE IS WRITTEN AS IF IT WERE A COMPILER'S OUTPUT.
+
+  A separate developer is building the ORCA visual builder, which compiles an
+  administrator's design to BPMN 2.0 (ADR-006). Everything here is something that
+  compiler must be able to emit, and nothing here is something a person would
+  write by hand and a compiler could not reproduce. It is named in
+  docs/BPMN_EXECUTION_PROFILE.md as the conformance harness's first fixture.
+
+  Plain BPMN 2.0 constructs only — start event, service task, exclusive gateway,
+  boundary error event, end event. The one Flowable-namespaced attribute is
+  `delegateExpression`, and BPMN 2.0 has no vendor-neutral way to bind a service
+  task to code, so a compiler emitting for any engine has to emit something
+  equivalent. The bean names it points at are an API: stable, generic, and never
+  renamed casually, because they are the compiler's link targets.
+
+  Process variables carry CORRELATION KEYS and BRANCH DISCRIMINATORS only — never
+  business data (§C2). See the profile document; that is a refinement of §C2's
+  "correlation keys only", written down rather than assumed, because a gateway has
+  to branch on something.
+-->
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://lynxis.com/orca/processes">
+
+  <process id="gate-visit" name="Gate visit" isExecutable="true">
+
+    <!-- Admission has already committed. The visit row and this instance were
+         created in one transaction (WP0); nothing here re-checks that. -->
+    <startEvent id="visitAdmitted" name="visit admitted"/>
+
+    <sequenceFlow id="admittedToConnector" sourceRef="visitAdmitted" targetRef="connectorCall"/>
+
+    <!--
+      §B9: "the lane lock is released at commit — no outbound call happens while
+      holding it". `flowable:async="true"` is what makes that true rather than
+      hoped for: without it this delegate would run inside admission's own
+      transaction, with the lane row still locked, and a slow customer system
+      would hold a lane shut for as long as it took to answer.
+    -->
+    <serviceTask id="connectorCall" name="call the customer system"
+                 flowable:delegateExpression="${connectorCallDelegate}"
+                 flowable:async="true"/>
+
+    <!-- Every step that can fail has a failure branch. §C1's publish-time
+         validation requires one on every device-output step; this process has one
+         on both service tasks, because a customer system that answers with an
+         error is no more acceptable a dead end than a barrier that does. -->
+    <boundaryEvent id="connectorCallFailed" attachedToRef="connectorCall" cancelActivity="true">
+      <errorEventDefinition/>
+    </boundaryEvent>
+    <sequenceFlow id="connectorFailedToManual" sourceRef="connectorCallFailed"
+                  targetRef="manualHandlingRequired"/>
+
+    <sequenceFlow id="connectorToOutcome" sourceRef="connectorCall" targetRef="connectorOutcome"/>
+
+    <exclusiveGateway id="connectorOutcome" name="outcome" default="outcomeNotApproved"/>
+
+    <sequenceFlow id="outcomeApproved" sourceRef="connectorOutcome" targetRef="deviceCommand">
+      <conditionExpression xsi:type="tFormalExpression">${connectorOutcome == 'APPROVED'}</conditionExpression>
+    </sequenceFlow>
+
+    <!-- The default flow. A response nobody wrote a branch for goes to a human,
+         never to an implicit success — WP7 wires the per-connector status routing
+         behind the same discriminator. -->
+    <sequenceFlow id="outcomeNotApproved" sourceRef="connectorOutcome"
+                  targetRef="manualHandlingRequired"/>
+
+    <serviceTask id="deviceCommand" name="command the barrier"
+                 flowable:delegateExpression="${deviceCommandDelegate}"
+                 flowable:async="true"/>
+
+    <boundaryEvent id="deviceCommandFailed" attachedToRef="deviceCommand" cancelActivity="true">
+      <errorEventDefinition/>
+    </boundaryEvent>
+    <sequenceFlow id="deviceFailedToManual" sourceRef="deviceCommandFailed"
+                  targetRef="manualHandlingRequired"/>
+
+    <sequenceFlow id="deviceToReleased" sourceRef="deviceCommand" targetRef="visitReleased"/>
+
+    <endEvent id="visitReleased" name="visit released"/>
+
+    <!-- The terminal state for anything that could not be completed automatically.
+         The clerk workflow that would receive it is Phase 2; ending here is the
+         correct shape for the slice, and it is a NAMED end state rather than an
+         error, so a visit that needed a human is distinguishable from one that
+         crashed. -->
+    <endEvent id="manualHandlingRequired" name="manual handling required"/>
+
+  </process>
+</definitions>
