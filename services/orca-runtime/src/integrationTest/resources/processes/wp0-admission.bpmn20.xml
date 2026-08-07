@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WP0 · the minimal process the admission proof starts.
+
+  Plain BPMN 2.0 and nothing else — no Flowable extension attribute, no listener,
+  no delegate expression. WP4's `gate-visit` is the process with real steps; this
+  one exists so that "start a process instance in the same transaction as the
+  insert" is exercised against the real engine rather than described.
+
+  The wait state is a `receiveTask` on purpose. A pass-through process would
+  complete inside the same transaction and leave nothing in ACT_RU_EXECUTION, so
+  "exactly one visit is running" would be unprovable — the assertion would be
+  about history rather than about a live instance holding a lane.
+-->
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL BPMN20.xsd"
+             targetNamespace="http://lynxis.com/orca/spike">
+
+  <process id="wp0-admission" name="WP0 admission spike" isExecutable="true">
+
+    <startEvent id="visitStarted" name="visit started"/>
+
+    <sequenceFlow id="toAtTheLane" sourceRef="visitStarted" targetRef="atTheLane"/>
+
+    <!-- The truck is at the lane. The visit is running until something releases it. -->
+    <receiveTask id="atTheLane" name="at the lane"/>
+
+    <sequenceFlow id="toVisitComplete" sourceRef="atTheLane" targetRef="visitComplete"/>
+
+    <endEvent id="visitComplete" name="visit complete"/>
+
+  </process>
+</definitions>
