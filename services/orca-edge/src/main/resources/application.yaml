@@ -156,9 +156,14 @@ orca:
       max-attempts: ${ORCA_EDGE_PUMP_MAX_ATTEMPTS:10}
 
     lpr:
-      # ⚠️ The port and the WIRE FORMAT are both provisional — see LprFraming.
-      # Nothing in this repository records the camera vendor's actual protocol, and
-      # no capture samples from the existing estate were provided.
+      # The wire format is STX/ETX-delimited ZapPacket XML, DERIVED-FROM-1X — see
+      # LprFraming and docs/lpr-wire-format-from-1x.md. That document was extracted
+      # from the fielded 1.x listener, so it is what real cameras speak today; it is
+      # NOT a vendor specification, and §6 of it lists what neither it nor this
+      # service can answer.
+      #
+      # ⚠️ The PORT is still ours to pick and is not recorded anywhere: 1.x's
+      # listening port is deployment configuration, not protocol.
       port: ${ORCA_EDGE_LPR_PORT:9100}
 
 ---

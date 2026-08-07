@@ -1,0 +1,25 @@
+-- orca-edge · the normalised half of a buffered device event.
+--
+-- WHY THIS IS A SECOND COLUMN AND NOT A REPLACEMENT FOR `payload`.
+--
+-- `payload` holds the bytes that arrived — the ZapPacket the camera sent, between
+-- its STX and ETX delimiters. A durable buffer that stored a paraphrase of its
+-- input would be worth less than one that did not: when a plate is disputed, the
+-- question is what the camera said, not what edge understood.
+--
+-- But §C3 makes edge the hardware boundary, and a boundary that forwarded the
+-- vendor's dialect would put a `<LP><AutoLPR>` element inside orca-runtime — which
+-- is the opposite of a boundary. So the vendor's schema is decoded ONCE, here, at
+-- ingest, and what crosses to runtime is this small JSON map. Runtime never learns
+-- what a ZapPacket is.
+--
+-- Decoded at ingest rather than at dispatch, deliberately: the pump retries, and a
+-- parser change between the buffering and the eventual delivery must not change
+-- what a row means. The row is settled when it is written.
+--
+-- NULLable, and stays that way: rows buffered before this migration have no
+-- normalised half, and §B7's expand-only discipline means they are not rewritten.
+-- A NOT NULL with a default would claim they had attributes and that those
+-- attributes were empty, which is a different and false statement.
+
+ALTER TABLE event_buffer ADD attributes NVARCHAR(MAX) NULL;

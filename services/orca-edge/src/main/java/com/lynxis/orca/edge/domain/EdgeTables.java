@@ -36,6 +36,13 @@ public final class EdgeTables {
 	 * @param eventUuid  the producer's dedup key. A camera retrying after a lost
 	 *                   acknowledgement sends the same one, and it must not become
 	 *                   two events
+	 * @param payload    the bytes that arrived, verbatim. For a plate read that is
+	 *                   the vendor's {@code ZapPacket} XML — see
+	 *                   {@code docs/lpr-wire-format-from-1x.md}
+	 * @param attributes the normalised half, as JSON, decoded once at ingest.
+	 *                   §C3 makes edge the hardware boundary, so the vendor's dialect
+	 *                   stops here and this is what crosses to runtime. Null for a
+	 *                   row buffered before {@code V102}
 	 * @param status     {@code PENDING · DISPATCHED · ACKED · DEAD}
 	 */
 	@PersistentTable(name = "event_buffer", growth = Growth.TRAFFIC_GROWING)
@@ -48,6 +55,7 @@ public final class EdgeTables {
 			String deviceExternalId,
 			String eventType,
 			String payload,
+			String attributes,
 			String status,
 			int attempts,
 			String lastError,

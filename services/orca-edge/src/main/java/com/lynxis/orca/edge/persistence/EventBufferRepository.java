@@ -58,6 +58,7 @@ public class EventBufferRepository {
 				.value("device_external_id", event.deviceExternalId())
 				.value("event_type", event.eventType())
 				.value("payload", event.payload())
+				.value("attributes", event.attributes())
 				.value("status", BufferedEvent.PENDING)
 				.value("attempts", 0));
 	}
@@ -83,8 +84,8 @@ public class EventBufferRepository {
 	public List<BufferedEvent> undelivered(String siteExternalId, String laneExternalId, int batchSize) {
 		return seam.select(ScopedSelect.from(TABLE)
 						.columns("sequence_no", "event_uuid", "site_external_id", "lane_external_id",
-								"device_external_id", "event_type", "payload", "status", "attempts",
-								"last_error", "received_at", "dispatched_at", "acked_at")
+								"device_external_id", "event_type", "payload", "attributes", "status",
+								"attempts", "last_error", "received_at", "dispatched_at", "acked_at")
 						.scopedBy(SCOPE_COLUMN)
 						.where("lane_external_id = ? AND status IN ('PENDING', 'DISPATCHED')", laneExternalId)
 						.orderBy("sequence_no")
@@ -97,6 +98,7 @@ public class EventBufferRepository {
 						rs.getString("device_external_id"),
 						rs.getString("event_type"),
 						rs.getString("payload"),
+						rs.getString("attributes"),
 						rs.getString("status"),
 						rs.getInt("attempts"),
 						rs.getString("last_error"),
@@ -199,7 +201,7 @@ public class EventBufferRepository {
 						.where("sequence_no IN (" + placeholders(sequenceNumbers.size()) + ")",
 								sequenceNumbers.toArray()),
 				(rs, row) -> new BufferedEvent(rs.getLong("sequence_no"), null, null, null, null, null,
-						null, null, rs.getInt("attempts"), null, null, null, null));
+						null, null, null, rs.getInt("attempts"), null, null, null, null));
 
 		for (BufferedEvent event : touched) {
 			int attempts = event.attempts() + 1;

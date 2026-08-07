@@ -3,6 +3,9 @@ package com.lynxis.orca.edge;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -31,6 +34,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.lynxis.orca.edge.domain.DeliveryPump;
 import com.lynxis.orca.edge.domain.EdgeTables.BufferedEvent;
 import com.lynxis.orca.edge.domain.LaneOwnership;
+import com.lynxis.orca.edge.domain.LprFraming;
+import com.lynxis.orca.edge.domain.LprListener;
 import com.lynxis.orca.edge.persistence.EventBufferRepository;
 import com.lynxis.orca.platform.lease.FencedWrite;
 import com.lynxis.orca.platform.lease.JdbcLeaseManager;
@@ -274,7 +279,8 @@ class EdgeIngestPropertiesIT {
 	}
 
 	// ------------------------------------------------------------------------
-	// Property 3 — the listener stores before it acknowledges.
+	// Property 3 — the listener stores before it acknowledges, and speaks the
+	// framing the fielded estate speaks (DERIVED-FROM-1X).
 	// ------------------------------------------------------------------------
 
 	@Test
@@ -284,29 +290,210 @@ class EdgeIngestPropertiesIT {
 		LaneOwnership ownership = ownershipFor("instance-a");
 		inScope(ownership::reconcile);
 
-		try (com.lynxis.orca.edge.domain.LprListener listener = new com.lynxis.orca.edge.domain.LprListener(
-				0, SITE, new com.lynxis.orca.edge.domain.LprFraming.LengthPrefixedXml(),
-				buffer, ownership, fencedWrite)) {
+		try (LprListener listener = listenerOwnedBy(ownership)) {
 			listener.start();
 
 			String uuid = "evt-" + UUID.randomUUID();
-			String ack = sendCapture(listener.boundPort(), LANE, uuid);
+			List<String> answers = exchange(listener.boundPort(),
+					framed(zapPacket(LANE, uuid, "T-1234", "0.91")));
 
 			// The acknowledgement is a DURABILITY RECEIPT. A camera that has been
 			// told "received" does not send that capture again, so if the row can be
 			// absent at this point, a restart in the gap is permanent data loss with
 			// nothing to show for it.
-			assertThat(ack).contains("STORED").contains(uuid);
+			assertThat(answers).singleElement().satisfies(ack -> assertThat(ack)
+					.as("the exact bytes 1.x sends, Id echoed from the inbound packet")
+					.isEqualTo("<ZapPacket Type=\"ACK\" Id=\"pkt-" + uuid
+							+ "\" Version=\"4.4\" SenderId=\"999\"></ZapPacket>"));
 			assertThat(bufferCount())
 					.as("the row exists BY THE TIME the acknowledgement arrives — that ordering is "
 							+ "the whole guarantee")
 					.isEqualTo(1);
+
+			// Edge is the hardware boundary (§C3): the vendor's dialect is decoded
+			// once, here, and what crosses to runtime carries no ZapPacket in it.
+			assertThat(attributesOf(uuid))
+					.as("the winning plate, by highest Confidence, 1-based index — §4 of the "
+							+ "wire-format document")
+					.contains("\"plate\":\"T-1234\"")
+					.contains("\"resultIndex\":1");
 		}
 	}
 
 	@Test
 	@Timeout(value = 5, unit = TimeUnit.MINUTES)
-	@DisplayName("a lane this instance does not own is neither stored nor acknowledged")
+	@DisplayName("the highest-confidence plate wins, not the first one the camera listed")
+	void theWinningPlateIsTheMostConfidentOne() throws Exception {
+		LaneOwnership ownership = ownershipFor("instance-a");
+		inScope(ownership::reconcile);
+
+		try (LprListener listener = listenerOwnedBy(ownership)) {
+			listener.start();
+
+			String uuid = "evt-" + UUID.randomUUID();
+			// Three hypotheses, the best one third. A reader that took the first would
+			// pass every single-plate test and put the wrong truck through the gate.
+			String packet = "<ZapPacket Type=\"MSG\" Id=\"pkt-" + uuid + "\" Version=\"4.4\" "
+					+ "SenderId=\"DEV-IT-CAMERA\"><Event><EventGuid>" + uuid + "</EventGuid>"
+					+ "<LaneId>" + LANE + "</LaneId>"
+					+ "<LP><AutoLPR>WRONG-1</AutoLPR><Confidence>0.42</Confidence></LP>"
+					+ "<LP><AutoLPR>WRONG-2</AutoLPR><Confidence>not-a-number</Confidence></LP>"
+					+ "<LP><AutoLPR>RIGHT</AutoLPR><Confidence>0.97</Confidence>"
+					+ "<CharConfidence>0.95</CharConfidence></LP>"
+					+ "</Event></ZapPacket>";
+
+			assertThat(exchange(listener.boundPort(), framed(packet))).singleElement()
+					.asString().contains("Type=\"ACK\"");
+
+			assertThat(attributesOf(uuid))
+					.contains("\"plate\":\"RIGHT\"")
+					.as("1-based, because that is the numbering 1.x records and an operator "
+							+ "comparing the two systems will see")
+					.contains("\"resultIndex\":3");
+		}
+	}
+
+	@Test
+	@Timeout(value = 5, unit = TimeUnit.MINUTES)
+	@DisplayName("two packets in one TCP write, and one packet split across two — both are normal")
+	void theFramingSurvivesCoalescedAndSplitPackets() throws Exception {
+		LaneOwnership ownership = ownershipFor("instance-a");
+		inScope(ownership::reconcile);
+
+		try (LprListener listener = listenerOwnedBy(ownership)) {
+			listener.start();
+
+			// There is no length prefix, so a reader that assumed one packet per read
+			// would lose the second — and one that assumed a whole packet per read
+			// would corrupt the third.
+			String first = "evt-" + UUID.randomUUID();
+			String second = "evt-" + UUID.randomUUID();
+			String third = "evt-" + UUID.randomUUID();
+
+			byte[] coalesced = concat(framed(zapPacket(LANE, first, "AAA-111", "0.9")),
+					framed(zapPacket(LANE, second, "BBB-222", "0.9")));
+			byte[] whole = framed(zapPacket(LANE, third, "CCC-333", "0.9"));
+
+			try (java.net.Socket camera = new java.net.Socket("localhost", listener.boundPort())) {
+				camera.setSoTimeout(10_000);
+				OutputStream out = camera.getOutputStream();
+				InputStream in = camera.getInputStream();
+
+				out.write(coalesced);
+				out.flush();
+				assertThat(readFrame(in)).as("first of two in one write").contains("Id=\"pkt-" + first);
+				assertThat(readFrame(in)).as("second of two in one write").contains("Id=\"pkt-" + second);
+
+				// Split mid-XML, then flushed — a real TCP stream does this whenever
+				// the packet is larger than a segment.
+				int cut = whole.length / 2;
+				out.write(whole, 0, cut);
+				out.flush();
+				Thread.sleep(200);
+				out.write(whole, cut, whole.length - cut);
+				out.flush();
+				assertThat(readFrame(in)).as("one packet across two writes").contains("Id=\"pkt-" + third);
+			}
+
+			assertThat(bufferCount()).isEqualTo(3);
+		}
+	}
+
+	@Test
+	@Timeout(value = 5, unit = TimeUnit.MINUTES)
+	@DisplayName("a packet that does not decode is NAKed and the CONNECTION SURVIVES — 1.x kills it")
+	void aMalformedPacketFailsThePacketAndNotTheConnection() throws Exception {
+		LaneOwnership ownership = ownershipFor("instance-a");
+		inScope(ownership::reconcile);
+
+		try (LprListener listener = listenerOwnedBy(ownership)) {
+			listener.start();
+
+			String good = "evt-" + UUID.randomUUID();
+			try (java.net.Socket camera = new java.net.Socket("localhost", listener.boundPort())) {
+				camera.setSoTimeout(10_000);
+				OutputStream out = camera.getOutputStream();
+				InputStream in = camera.getInputStream();
+
+				out.write(framed("<ZapPacket Type=\"MSG\" Id=\"pkt-broken\"><Event><EventGuid>"));
+				out.flush();
+
+				// §5 defect 2: 1.x `return`s out of its read loop here, so a per-packet
+				// fault becomes a connection fault and every LATER capture on that
+				// connection is lost with it.
+				assertThat(readFrame(in))
+						.as("the Id is empty because it lives in the packet that failed to parse — "
+								+ "1.x's own quirk, reproduced rather than papered over")
+						.isEqualTo("<ZapPacket Type=\"NAK\" Id=\"\" Version=\"4.4\" "
+								+ "SenderId=\"999\"></ZapPacket>");
+
+				out.write(framed(zapPacket(LANE, good, "T-9999", "0.9")));
+				out.flush();
+				assertThat(readFrame(in))
+						.as("THE POINT OF THIS TEST: the next capture on the same connection is "
+								+ "still served")
+						.contains("Type=\"ACK\"");
+			}
+
+			assertThat(bufferCount()).isEqualTo(1);
+		}
+	}
+
+	@Test
+	@Timeout(value = 5, unit = TimeUnit.MINUTES)
+	@DisplayName("a capture that could not be stored is NAKed, never ACKed — 1.x acks regardless")
+	void aCaptureThatCouldNotBeStoredIsNotAcknowledged() throws Exception {
+		LaneOwnership ownership = ownershipFor("instance-a");
+		inScope(ownership::reconcile);
+
+		try (LprListener listener = listenerOwnedBy(ownership)) {
+			listener.start();
+
+			// The instance still believes it owns the lane; the database says the lease
+			// has expired. FencedWrite refuses the write and rolls it back.
+			expireLease(LANE);
+
+			List<String> answers = exchange(listener.boundPort(),
+					framed(zapPacket(LANE, "evt-" + UUID.randomUUID(), "T-0000", "0.9")));
+
+			// §5 defect 1: 1.x writes its ACK after the publish ATTEMPT, so a failed
+			// publish and a successful one are indistinguishable to the camera — and
+			// the camera never sends that capture again.
+			assertThat(answers).singleElement().asString()
+					.as("the acknowledgement is a durability receipt. There is no durable row")
+					.contains("Type=\"NAK\"");
+			assertThat(bufferCount()).isZero();
+		}
+	}
+
+	@Test
+	@Timeout(value = 5, unit = TimeUnit.MINUTES)
+	@DisplayName("a capture with no EventGuid is refused — there is no dedup key to store it under")
+	void aCaptureWithNoDedupKeyIsRefused() throws Exception {
+		LaneOwnership ownership = ownershipFor("instance-a");
+		inScope(ownership::reconcile);
+
+		try (LprListener listener = listenerOwnedBy(ownership)) {
+			listener.start();
+
+			String packet = "<ZapPacket Type=\"MSG\" Id=\"pkt-nokey\" Version=\"4.4\" SenderId=\"DEV\">"
+					+ "<Event><LaneId>" + LANE + "</LaneId>"
+					+ "<LP><AutoLPR>T-1234</AutoLPR><Confidence>0.9</Confidence></LP>"
+					+ "</Event></ZapPacket>";
+
+			// A DECLARED DEVIATION from 1.x, not an oversight: 1.x would have stored
+			// nothing and acknowledged anyway. Synthesising a key here would turn one
+			// camera retry into two captures, which is the defect the dedup key exists
+			// to prevent.
+			assertThat(exchange(listener.boundPort(), framed(packet))).singleElement()
+					.asString().contains("Type=\"NAK\"").contains("Id=\"pkt-nokey\"");
+			assertThat(bufferCount()).isZero();
+		}
+	}
+
+	@Test
+	@Timeout(value = 5, unit = TimeUnit.MINUTES)
+	@DisplayName("a lane this instance does not own is neither stored nor answered at all")
 	void aLaneThisInstanceDoesNotOwnIsNotAcknowledged() throws Exception {
 		LaneOwnership a = ownershipFor("instance-a");
 		LaneOwnership b = ownershipFor("instance-b");
@@ -314,47 +501,107 @@ class EdgeIngestPropertiesIT {
 		inScope(b::reconcile);
 		assertThat(b.owns(LANE)).isFalse();
 
-		// B is running and listening, but does not own the lane. If it answered, one
-		// capture would be acknowledged by two instances — and the camera would
-		// consider it delivered twice over.
-		try (com.lynxis.orca.edge.domain.LprListener listener = new com.lynxis.orca.edge.domain.LprListener(
-				0, SITE, new com.lynxis.orca.edge.domain.LprFraming.LengthPrefixedXml(),
-				buffer, b, fencedWrite)) {
+		// B is running and listening, but does not own the lane. If it answered — with
+		// an ACK or a NAK — it would be answering for a peer that is about to accept.
+		try (LprListener listener = listenerOwnedBy(b)) {
 			listener.start();
 
-			String ack = sendCapture(listener.boundPort(), LANE, "evt-" + UUID.randomUUID());
-
-			assertThat(ack).as("silence, not an acknowledgement").isNull();
+			assertThat(exchange(listener.boundPort(),
+					framed(zapPacket(LANE, "evt-" + UUID.randomUUID(), "T-1234", "0.9"))))
+					.as("silence, not an acknowledgement and not a refusal")
+					.isEmpty();
 			assertThat(bufferCount()).isZero();
 		}
 	}
 
-	/** Speaks the ⚠️ PROVISIONAL dialect — length-prefixed UTF-8 XML. See LprFraming. */
-	private static String sendCapture(int port, String lane, String eventUuid) throws Exception {
-		String frame = "<capture><eventUuid>" + eventUuid + "</eventUuid>"
-				+ "<laneExternalId>" + lane + "</laneExternalId>"
-				+ "<deviceExternalId>DEV-IT-CAMERA</deviceExternalId>"
-				+ "<plate>T-1234</plate><imagePath>/var/lpr/1.jpg</imagePath></capture>";
-		byte[] body = frame.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+	// ------------------------------------------------------------------------
+	// The camera's side of the wire, DERIVED-FROM-1X.
+	// docs/lpr-wire-format-from-1x.md §1-§3.
+	// ------------------------------------------------------------------------
 
+	private static final byte STX = 0x02;
+	private static final byte ETX = 0x03;
+
+	private LprListener listenerOwnedBy(LaneOwnership ownership) {
+		return new LprListener(0, SITE, new LprFraming.ZapPacketStxEtx(), buffer, ownership,
+				fencedWrite, new com.fasterxml.jackson.databind.ObjectMapper());
+	}
+
+	private static String zapPacket(String lane, String eventGuid, String plate, String confidence) {
+		return "<ZapPacket Type=\"MSG\" Id=\"pkt-" + eventGuid + "\" Version=\"4.4\" "
+				+ "SenderId=\"DEV-IT-CAMERA\" SenderName=\"IT camera\">"
+				+ "<Event>"
+				+ "<EventId>1</EventId><EventGuid>" + eventGuid + "</EventGuid>"
+				+ "<Online>true</Online><TimeStamp>2026-08-07T09:00:00</TimeStamp>"
+				+ "<LaneId>" + lane + "</LaneId><LaneName>" + lane + "</LaneName>"
+				+ "<LP><AutoLPR>" + plate + "</AutoLPR><Confidence>" + confidence + "</Confidence>"
+				+ "<CharConfidence>0.88</CharConfidence>"
+				// Images travel as PATHS, never as bytes (§D2, and §2 of the document).
+				+ "<LPRImage TIN=\"1\" CameraId=\"CAM-1\"><Path>/var/lpr/1.jpg</Path></LPRImage>"
+				+ "</LP>"
+				+ "</Event></ZapPacket>";
+	}
+
+	private static byte[] framed(String packet) {
+		byte[] body = packet.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+		byte[] framed = new byte[body.length + 2];
+		framed[0] = STX;
+		System.arraycopy(body, 0, framed, 1, body.length);
+		framed[framed.length - 1] = ETX;
+		return framed;
+	}
+
+	private static byte[] concat(byte[] first, byte[] second) {
+		byte[] both = new byte[first.length + second.length];
+		System.arraycopy(first, 0, both, 0, first.length);
+		System.arraycopy(second, 0, both, first.length, second.length);
+		return both;
+	}
+
+	/** Sends the bytes, then collects whatever the listener answers before it goes quiet. */
+	private static List<String> exchange(int port, byte[] bytes) throws Exception {
 		try (java.net.Socket camera = new java.net.Socket("localhost", port)) {
-			camera.setSoTimeout(10_000);
-			java.io.DataOutputStream out = new java.io.DataOutputStream(camera.getOutputStream());
-			out.writeInt(body.length);
-			out.write(body);
-			out.flush();
+			// Short, because "no answer" is an EXPECTED outcome in two of the tests
+			// above and a long timeout would make each of them cost a minute.
+			camera.setSoTimeout(3_000);
+			camera.getOutputStream().write(bytes);
+			camera.getOutputStream().flush();
 
-			java.io.DataInputStream in = new java.io.DataInputStream(camera.getInputStream());
-			try {
-				int length = in.readInt();
-				byte[] ack = new byte[length];
-				in.readFully(ack);
-				return new String(ack, java.nio.charset.StandardCharsets.UTF_8);
+			List<String> answers = new ArrayList<>();
+			InputStream in = camera.getInputStream();
+			for (String answer = readFrame(in); answer != null; answer = readFrame(in)) {
+				answers.add(answer);
 			}
-			catch (java.io.EOFException | java.net.SocketTimeoutException noAnswer) {
-				return null;
+			return answers;
+		}
+	}
+
+	/** Reads one STX/ETX-delimited frame, or null when none arrives. */
+	private static String readFrame(InputStream in) throws IOException {
+		java.io.ByteArrayOutputStream body = new java.io.ByteArrayOutputStream();
+		try {
+			int b;
+			while ((b = in.read()) != STX) {
+				if (b < 0) {
+					return null;
+				}
+			}
+			while ((b = in.read()) != ETX) {
+				if (b < 0) {
+					return null;
+				}
+				body.write(b);
 			}
 		}
+		catch (java.net.SocketTimeoutException noAnswer) {
+			return null;
+		}
+		return body.toString(java.nio.charset.StandardCharsets.UTF_8);
+	}
+
+	private String attributesOf(String eventUuid) {
+		return jdbc.queryForObject("SELECT attributes FROM event_buffer WHERE event_uuid = ?",
+				String.class, eventUuid);
 	}
 
 	// ------------------------------------------------------------------------
@@ -369,7 +616,7 @@ class EdgeIngestPropertiesIT {
 
 	private static BufferedEvent capture(String eventUuid) {
 		return new BufferedEvent(0, eventUuid, SITE, LANE, "DEV-IT-CAMERA", "lpr.capture",
-				"<capture><eventUuid>" + eventUuid + "</eventUuid></capture>",
+				zapPacket(LANE, eventUuid, "T-1234", "0.91"), "{\"plate\":\"T-1234\"}",
 				BufferedEvent.PENDING, 0, null, null, null, null);
 	}
 

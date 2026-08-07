@@ -12,6 +12,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestClient;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynxis.orca.edge.domain.DeliveryPump;
 import com.lynxis.orca.edge.domain.IngestTasks;
 import com.lynxis.orca.edge.domain.LaneOwnership;
@@ -91,18 +92,25 @@ public class EdgeIngestConfiguration {
 		return new IngestTasks(ownership, pump, siteExternalId);
 	}
 
-	/** ⚠️ Provisional wire format — see {@link LprFraming}. */
+	/**
+	 * The camera's framing — DERIVED-FROM-1X, see {@link LprFraming}.
+	 *
+	 * <p>A bean rather than a constant because it is the one thing here that a
+	 * vendor specification or a capture from a fielded unit could still correct, and
+	 * replacing it should be replacing one bean rather than unpicking assumptions
+	 * from five classes.
+	 */
 	@Bean
 	public LprFraming lprFraming() {
-		return new LprFraming.LengthPrefixedXml();
+		return new LprFraming.ZapPacketStxEtx();
 	}
 
 	@Bean(destroyMethod = "close")
 	public LprListener lprListener(LprFraming framing, EventBufferRepository buffer,
-			LaneOwnership ownership, FencedWrite fencedWrite,
+			LaneOwnership ownership, FencedWrite fencedWrite, ObjectMapper json,
 			@Value("${orca.edge.lpr.port:9100}") int port,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
-		return new LprListener(port, siteExternalId, framing, buffer, ownership, fencedWrite);
+		return new LprListener(port, siteExternalId, framing, buffer, ownership, fencedWrite, json);
 	}
 
 	/**

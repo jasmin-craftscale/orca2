@@ -227,7 +227,12 @@ In rough order of consequence.
 6. **The LPR transport is the JDK on virtual threads, not Netty or Spring
    Integration.** The plan offered those two; the plan's own rule is that every
    dependency addition is recorded with a why, and there is no why. A site has a
-   handful of cameras and the framing is length-prefixed bytes.
+   handful of cameras and the framing is a delimiter scan.
+   ⚠️ **This item originally read "length-prefixed bytes", and that was wrong.**
+   `docs/lpr-wire-format-from-1x.md` — extracted from the fielded 1.x listener
+   after this report was first written — records the framing as STX/ETX-delimited
+   `ZapPacket` XML. The transport decision above is unaffected; the framing was
+   corrected in the code. See §7.3.
 7. **The scope dimension for edge is the site's *external* id, from
    configuration.** `orca.installation.site-external-id`. §C1 says exactly one site
    is primary and it is the one the licence binds to, so which site an appliance is
@@ -311,15 +316,32 @@ Reported, not silently corrected.
    `ScopeSeamRule` fails, correctly) or mirroring another service's view into every
    consumer's schema. `Identifiers.requireTable` now accepts exactly one schema
    qualifier, each half the same narrow shape, still refusing rather than quoting.
-3. **§D2's LPR contract is one sentence, and there are no fixtures.** *"Framed XML
-   over TCP, with acknowledgement back to the camera; images referenced by
-   filesystem path"* is the entire specification in this repository — no framing,
-   no schema, no acknowledgement format — and **no capture samples from the fielded
-   estate were provided.** `LprFraming` is therefore an interface with one
-   implementation marked PROVISIONAL in every place it appears, rather than a
-   parser written as though the format were known. **A green suite proves the
-   plumbing and nothing about the vendor.** Before this reaches a camera, someone
-   must capture real traffic or obtain the vendor's specification.
+3. **§D2's LPR contract is one sentence, and the provisional reading of it was
+   wrong.** *"Framed XML over TCP, with acknowledgement back to the camera; images
+   referenced by filesystem path"* is the entire specification in this repository —
+   no framing, no schema, no acknowledgement format. WP5 therefore shipped
+   `LprFraming` as an interface with one implementation marked PROVISIONAL, reading
+   "framed" as a four-byte length prefix.
+
+   **It is not.** `docs/lpr-wire-format-from-1x.md`, extracted from the fielded 1.x
+   Go listener after WP5 landed, records the framing as **STX/ETX-delimited**
+   (`0x02` … `0x03`, no length anywhere), the payload as a `ZapPacket` v4.4
+   document, and the acknowledgement as a `ZapPacket Type="ACK"` echoing the
+   inbound `Id`. `LprFraming.ZapPacketStxEtx` is that framing, marked
+   **DERIVED-FROM-1X** everywhere it appears — and the three 1.x behaviours the
+   document names as defects are deliberately *not* reproduced: the ack now follows
+   the durable row, a packet fault no longer kills the connection, and `EventGuid`
+   is a dedup key 1.x does not have. Each of those three is a property test.
+
+   ⚠️ **Still not vendor-confirmed.** A listener extracted from another
+   implementation is evidence about the estate, not a specification: §6 of that
+   document lists what it cannot answer — whether the camera retries on NAK or on
+   ack timeout and with what backoff, whether fields beyond the 1.x DTOs exist on
+   the wire, and charset corner cases. **A capture from a fielded unit or the
+   vendor's document is still worth obtaining**, and two mappings remain open (see
+   the new-decisions list): whether the camera's `LaneId` and core's lane external
+   ids are one namespace, and whether `SenderId` or `LPRImage@CameraId` is the
+   device.
 4. **There is no migration path off `database-schema-update: true`.** An
    installation that already let the engine self-migrate has the tables and no
    Flyway history for them, so `V110` fails on "table already exists". Nothing is
