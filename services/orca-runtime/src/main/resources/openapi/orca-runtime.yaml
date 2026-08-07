@@ -12,9 +12,9 @@ openapi: 3.0.3
 # Generated sources are never committed. In version control they drift from the
 # spec and nobody notices.
 #
-# ⚠️ Phase 0 authors ONE route. The routes in §C2's interface table arrive with
-# the behaviour behind them; writing them here now would be publishing a surface
-# nothing implements.
+# A route is authored here when the behaviour behind it exists, and not before —
+# publishing a surface nothing implements is how a contract stops being true.
+# WP6 adds the second one: /internal/events/v1.
 # =============================================================================
 
 info:
@@ -30,6 +30,14 @@ servers:
 tags:
   - name: health
     description: The service's own contracted health route.
+  - name: internalEvents
+    description: |
+      Device events arriving from orca-edge (§C2, §B9).
+
+      Under `/internal/**`, so the per-installation shared credential authenticates
+      it and no token is minted (ADR-011). The identity provider authenticates
+      people; putting it on the gate path would make a truck's admission depend on
+      it being reachable.
 
 paths:
   /api/v1/health:
@@ -56,8 +64,150 @@ paths:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 
+  /internal/events/v1:
+    post:
+      tags: [internalEvents]
+      operationId: acceptDeviceEvents
+      summary: Accept a batch of device events from the site's edge instance
+      description: |
+        One batch, one lane's worth of events, oldest first (§D3: ordered per key,
+        never globally).
+
+        **At least once, and that is deliberate.** Edge resends a batch it never
+        saw acknowledged, so the same `eventUuid` may arrive twice — §B4 mechanism
+        4 takes that trade knowingly, because a lost event is unrecoverable and a
+        repeated one is not. Every event is claimed through the idempotency store
+        before it is admitted, so a redelivered batch has one effect and the second
+        delivery is told what the first produced rather than being refused.
+
+        The response is per event: an outcome for each, in the order sent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceEventBatch"
+      responses:
+        "200":
+          description: Every event in the batch reached a recorded outcome
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceEventBatchEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: |
+            An event names a lane this installation does not have.
+
+            The batch is refused whole, so edge keeps it buffered and in order.
+            §C2 says an unmatched event is made visible rather than dropped; the
+            operator surface that shows one is Phase 2, so until then the event
+            stays in edge's buffer, is retried, and becomes `DEAD` there — which
+            is visible through the buffer's own diagnostics.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
 components:
   schemas:
+
+    DeviceEventBatch:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/DeviceEvent"
+
+    DeviceEvent:
+      type: object
+      required: [eventUuid, laneExternalId, eventType]
+      properties:
+        eventUuid:
+          type: string
+          maxLength: 64
+          description: |
+            The producer's dedup key — the camera's own `EventGuid` for a plate
+            read. The idempotency key, and the reason a redelivery has one effect.
+        laneExternalId:
+          type: string
+          maxLength: 64
+          description: The lane, in core's published vocabulary (`core.topology_lane`).
+        deviceExternalId:
+          type: string
+          maxLength: 64
+        eventType:
+          type: string
+          maxLength: 32
+          description: "`lpr.capture`, … ⚠️ PROVISIONAL: nothing in the architecture enumerates these."
+        occurredAt:
+          type: string
+          format: date-time
+          description: When the device observed it. The device's clock, not this service's.
+        attributes:
+          type: string
+          description: |
+            The normalised half of the event, as a JSON object.
+
+            Edge is the hardware boundary (§C3), so the vendor's dialect stops
+            there: this carries `plate`, `confidence` and so on, and never a
+            `ZapPacket`. A string rather than a free-form object because it is
+            stored verbatim and this contract takes no position on its keys.
+
+    DeviceEventBatchEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/DeviceEventBatchResult"
+
+    DeviceEventBatchResult:
+      type: object
+      properties:
+        accepted:
+          type: integer
+          format: int32
+          description: Events this delivery admitted — started or correlated.
+        duplicates:
+          type: integer
+          format: int32
+          description: Events a previous delivery had already admitted.
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeviceEventResult"
+
+    DeviceEventResult:
+      type: object
+      properties:
+        eventUuid:
+          type: string
+        status:
+          type: string
+          enum: [STARTED, CORRELATED, DUPLICATE, IN_PROGRESS]
+          description: |
+            * `STARTED` — this event began the visit. Exactly one of two
+              simultaneous events for a lane gets it.
+            * `CORRELATED` — a visit was already running on the lane and this
+              event joined it. Also a success: the two are not "ok" and "not ok".
+            * `DUPLICATE` — a previous delivery already admitted this
+              `eventUuid`, and `visitExternalId` is what it produced. Not an
+              error: the caller retried because it never saw the first answer,
+              so an error is the one response it cannot use.
+            * `IN_PROGRESS` — another delivery of this same event is in flight
+              and will complete. Not terminal and not a failure.
+        visitExternalId:
+          type: string
+          description: The visit this event belongs to, whichever way it got there.
 
     # The envelope comes from platform/web, which DEFINES and IMPLEMENTS it.
     # A cross-module $ref, resolved by the generator — deliberately not a copy.

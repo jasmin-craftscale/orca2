@@ -152,6 +152,39 @@ orca:
   # and failing on its first lane lookup, which is far harder to diagnose.
   required-views: ${ORCA_REQUIRED_VIEWS:core.topology_lane,core.topology_device}
 
+  # --- Which installation this is (WP6) ---------------------------------------
+  # The site this installation serves, in core's published vocabulary. It is the
+  # SCOPE the /internal/events/v1 path establishes before it reads or writes
+  # anything, and it is CONFIGURATION rather than something the request carries.
+  #
+  # A site identifier on the wire would be a value the caller chooses, and the
+  # credential on /internal/** is a per-installation shared secret (ADR-011) that
+  # cannot prove WHICH peer is calling — so trusting it to name a site would be
+  # reading far more into it than it can carry. §C1: exactly one site is primary,
+  # and it is the one the licence binds to.
+  installation:
+    site-external-id: ${ORCA_SITE_EXTERNAL_ID:SITE-DEMO}
+
+  runtime:
+    # This instance's identity in `idempotency_record`. An operator reading that
+    # table needs to know WHICH MACHINE is mid-way through an event, so it defaults
+    # to the hostname rather than to a uuid.
+    holder-id: ${ORCA_RUNTIME_HOLDER_ID:${HOSTNAME:runtime-local}}
+
+    # ⚠️ SLICE SHAPE, NOT TARGET SHAPE. In the product these come from the process
+    # definition itself — the visual builder's compiler emits a connector step
+    # naming its connector and a device step naming its action, and §C2 assigns
+    # definitions to lanes. There is one process and one lane here, so carrying
+    # them as configuration keeps admission from inventing a definition-to-lane
+    # binding that Phase 2 will design properly.
+    gate-visit:
+      connector-name: ${ORCA_GATE_VISIT_CONNECTOR:tos}
+      command-action: ${ORCA_GATE_VISIT_ACTION:RAISE_GATE}
+      # §B8: every external call has a deadline and a defined outcome when it is
+      # exceeded. This one's defined outcome is UNKNOWN, which routes to
+      # verify-the-device rather than to a retry (§B10).
+      command-deadline-ms: ${ORCA_GATE_VISIT_DEADLINE_MS:5000}
+
 ---
 # --- The `local` profile ------------------------------------------------------
 # Activate with --spring.profiles.active=local. Nothing here is for a deployment.

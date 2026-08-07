@@ -86,6 +86,25 @@ public interface ScopeSeam {
 	int insert(ScopedInsert insert);
 
 	/**
+	 * Writes one row and returns the key the database assigned it.
+	 *
+	 * <p>Same scope check as {@link #insert}, and the same refusal. It exists
+	 * separately because the identity of a row a caller has just created is not
+	 * recoverable afterwards without a second read — and a second read against a
+	 * unique column is a correctness bug the moment two callers insert equal-looking
+	 * rows at the same instant.
+	 *
+	 * <p>The key comes back from the insert itself, in one statement, so there is no
+	 * window between creating the row and learning what it is called.
+	 *
+	 * @param keyColumn the column whose assigned value to return — an identity
+	 *                  column, or any column the insert's own statement can output.
+	 *                  Allow-listed as an identifier like every other name here
+	 * @throws ScopeViolationException as {@link #insert} does
+	 */
+	long insertReturningKey(ScopedInsert insert, String keyColumn);
+
+	/**
 	 * Changes existing rows, never more than the scope permits.
 	 *
 	 * <p>The scope predicate is applied first and the caller's filter is ANDed

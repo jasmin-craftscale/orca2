@@ -62,6 +62,13 @@ import com.lynxis.orca.runtime.execution.domain.ProcessVariables;
 				// means nothing runs at all without a worker to run it.
 				"flowable.async-executor-activate=true",
 		})
+// This suite is the only one that runs the async executor, and AdmissionThroughHttpIT
+// migrates the SAME `runtime` schema — V100 stamps that name explicitly, so neither
+// can move. Spring caches a context across test classes, so without this the executor
+// would still be polling for jobs while the other suite dropped and rebuilt the tables
+// underneath it. Closing the context when this class ends is what stops it.
+@org.springframework.test.annotation.DirtiesContext(
+		classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 class GateVisitProcessIT {
 
 	/** The production migration set stamps extended properties on a schema called `runtime` by name. */

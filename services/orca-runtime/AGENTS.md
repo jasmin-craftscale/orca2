@@ -31,8 +31,10 @@ rather than inventing an exception.
 ## One module has code. Four do not, and the checks say which
 
 WP4 put the first classes into **`execution`** — the two delegates, the engine
-gateway and its Flowable adapter. `workitem`, `integration`, `notify` and
-`readmodel` still hold nothing but `package-info`.
+gateway and its Flowable adapter — and WP6 added admission there: `AdmissionService`,
+`AdmissionRepository`, `DeviceEventController` and the `V101` tables they use.
+`workitem`, `integration`, `notify` and `readmodel` still hold nothing but
+`package-info`.
 
 - Both module-wall tests still carry `allowEmptyShould(true)`, because four of the
   five sets are still empty and ArchUnit fails a rule that checked nothing.
@@ -65,7 +67,22 @@ particular is only known to work because the suite removes the lane lock and
 watches it fire.
 
 That code is WP0 shape, not shipping placement: it uses `JdbcTemplate` directly,
-which `src/main` cannot. WP6 places it in `execution` behind the scope seam.
+which `src/main` cannot. **WP6 placed the shipping operation in `execution` behind
+the scope seam** — `AdmissionService`, proven through HTTP by
+`AdmissionThroughHttpIT` in both lane shapes (8 lanes × 125, and 1,000 consecutive
+trucks through one lane). WP0's suite stays: it carries the deliberate lock bypass
+that makes the backstop observable, and that is not a mode the shipping operation
+has. Two shapes of the same tables is a real cost, recorded in `phase-1-report.md`.
+
+⚠️ **Two ordering facts admission depends on, both found by measurement:**
+
+- `lane_session` is keyed **`(site_external_id, lane_id)`**, in that order. Every
+  seam read leads with the scope predicate, and a key that does not lead with the
+  scope column makes SQL Server scan — which under `UPDLOCK` locks *every lane at
+  the site*.
+- The lane lock is taken **before** the idempotency claim. The other order
+  deadlocks: two events for one truck each hold their own claim while contending
+  for the lane. Coarse resource before fine, on every path.
 
 **The engine does not migrate itself.** `flowable.database-schema-update: false`,
 and its 45 tables are `V110`–`V114` — extracted from the jars on the runtime

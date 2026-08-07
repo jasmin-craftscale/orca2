@@ -34,6 +34,7 @@ public final class ScopedSelect {
 	private final List<Object> filterParameters = new ArrayList<>();
 	private String orderBy;
 	private Integer limit;
+	private boolean lockRows;
 
 	private ScopedSelect(String table) {
 		this.table = Identifiers.requireTable(table);
@@ -86,6 +87,34 @@ public final class ScopedSelect {
 		}
 		this.limit = limit;
 		return this;
+	}
+
+	/**
+	 * Takes an exclusive row lock on what this read matches, held to the end of the
+	 * caller's transaction.
+	 *
+	 * <p>For the read half of a <em>read, decide, then write</em> that two instances
+	 * may run at the same instant. Without it both read, both find nothing, and both
+	 * write — and the window between the read and the write is not narrow enough to
+	 * argue about, because it contains a network round trip and a scheduler.
+	 *
+	 * <p>An exclusive lock, not a shared one: a shared lock lets both readers in,
+	 * which is the case this exists to prevent. It is taken per row rather than
+	 * escalating to the table, so one busy key cannot stall an unrelated one.
+	 *
+	 * <p><strong>Only meaningful inside a transaction.</strong> Outside one the lock
+	 * is released when the statement ends, which is before the caller has decided
+	 * anything. The seam cannot check that for the caller — a connection-level fact
+	 * is not visible to a query builder — so it is stated here and the caller is
+	 * responsible for it.
+	 */
+	public ScopedSelect lockMatchedRows() {
+		this.lockRows = true;
+		return this;
+	}
+
+	boolean locksMatchedRows() {
+		return lockRows;
 	}
 
 	String table() {

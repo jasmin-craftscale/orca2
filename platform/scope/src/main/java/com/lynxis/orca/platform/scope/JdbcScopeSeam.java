@@ -48,17 +48,49 @@ public class JdbcScopeSeam implements ScopeSeam {
 		// no predicate to get wrong, and no path where an unpermitted row reaches the
 		// database and is then cleaned up.
 		requirePermitted(insert.table(), insert.scopeDimension(), insert.scopeValue());
+		Statement statement = buildInsert(insert, null);
+		return jdbc.update(statement.sql(), statement.parameters().toArray());
+	}
 
+	@Override
+	public long insertReturningKey(ScopedInsert insert, String keyColumn) {
+		requirePermitted(insert.table(), insert.scopeDimension(), insert.scopeValue());
+		Statement statement = buildInsert(insert, Identifiers.require(keyColumn, "key column"));
+		Long key = jdbc.queryForObject(statement.sql(), Long.class, statement.parameters().toArray());
+		if (key == null) {
+			// An INSERT ... OUTPUT that returned no row is a database that accepted the
+			// write and told us nothing about it. Nothing downstream can proceed on
+			// that, and guessing the key is how a row gets attached to the wrong parent.
+			throw new IllegalStateException("The insert into " + insert.table()
+					+ " returned no value for '" + keyColumn + "'.");
+		}
+		return key;
+	}
+
+	/**
+	 * @param outputColumn the column to OUTPUT, or {@code null} for a plain insert.
+	 *                     {@code OUTPUT INSERTED.<col>} rather than a separate
+	 *                     identity read: {@code SCOPE_IDENTITY()} is per session and
+	 *                     silently wrong under a connection pool that hands the next
+	 *                     statement a different connection
+	 */
+	private Statement buildInsert(ScopedInsert insert, String outputColumn) {
 		List<String> columns = insert.columnOrder();
 		StringBuilder sql = new StringBuilder("INSERT INTO ").append(insert.table()).append(" (");
-		sql.append(String.join(", ", columns)).append(") VALUES (");
+		sql.append(String.join(", ", columns)).append(valuesClause(outputColumn));
 		for (int i = 0; i < columns.size(); i++) {
 			sql.append(i == 0 ? "?" : ", ?");
 		}
 		sql.append(')');
 
-		Object[] values = columns.stream().map(insert.columns()::get).toArray();
-		return jdbc.update(sql.toString(), values);
+		return new Statement(sql.toString(),
+				columns.stream().map(insert.columns()::get).collect(java.util.stream.Collectors.toList()));
+	}
+
+	private static String valuesClause(String outputColumn) {
+		return outputColumn == null
+				? ") VALUES ("
+				: ") OUTPUT INSERTED." + outputColumn + " VALUES (";
 	}
 
 	@Override
@@ -124,7 +156,14 @@ public class JdbcScopeSeam implements ScopeSeam {
 		if (allowOrderAndLimit && select.limit() != null) {
 			sql.append("TOP (").append(select.limit()).append(") ");
 		}
-		sql.append(projection).append(" FROM ").append(select.table()).append(" WHERE ");
+		sql.append(projection).append(" FROM ").append(select.table());
+		if (select.locksMatchedRows()) {
+			// UPDLOCK, not a shared lock: a shared lock lets both readers in, which is
+			// the case lockMatchedRows() exists to prevent. ROWLOCK keeps the engine
+			// from escalating to the table, so one contended key cannot stall the rest.
+			sql.append(" WITH (UPDLOCK, ROWLOCK)");
+		}
+		sql.append(" WHERE ");
 
 		sql.append(scopePredicate(select, scope, parameters));
 

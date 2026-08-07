@@ -2,14 +2,22 @@ package com.lynxis.orca.runtime.execution;
 
 import org.flowable.engine.RuntimeService;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import com.lynxis.orca.platform.idempotency.IdempotencyStore;
+import com.lynxis.orca.platform.scope.ScopeSeam;
+import com.lynxis.orca.runtime.execution.api.DeviceEventController;
+import com.lynxis.orca.runtime.execution.domain.AdmissionService;
 import com.lynxis.orca.runtime.execution.domain.ConnectorCallDelegate;
 import com.lynxis.orca.runtime.execution.domain.ConnectorPort;
 import com.lynxis.orca.runtime.execution.domain.DeviceCommandDelegate;
 import com.lynxis.orca.runtime.execution.domain.DeviceCommandPort;
 import com.lynxis.orca.runtime.execution.domain.ProcessEngineGateway;
+import com.lynxis.orca.runtime.execution.persistence.AdmissionRepository;
 import com.lynxis.orca.runtime.execution.persistence.FlowableProcessEngineGateway;
 
 /**
@@ -29,6 +37,43 @@ public class ExecutionConfiguration {
 	@Bean
 	public ProcessEngineGateway processEngineGateway(RuntimeService runtimeService) {
 		return new FlowableProcessEngineGateway(runtimeService);
+	}
+
+	@Bean
+	public AdmissionRepository admissionRepository(ScopeSeam seam) {
+		return new AdmissionRepository(seam);
+	}
+
+	/**
+	 * Admission — the property the whole design turns on.
+	 *
+	 * <p>The transaction template is built here rather than injected as a bean so
+	 * that its settings belong to admission: the engine start, the visit insert and
+	 * the idempotency claim share one commit, and a template shared with anything
+	 * else would eventually be tuned for that other thing.
+	 *
+	 * @param holderId this instance's identity in {@code idempotency_record}.
+	 *                 Defaults to the hostname, because an operator reading that
+	 *                 table needs to know which machine is mid-way through an event
+	 */
+	@Bean
+	public AdmissionService admissionService(AdmissionRepository repository, ProcessEngineGateway engine,
+			IdempotencyStore idempotency, PlatformTransactionManager transactionManager,
+			@Value("${orca.installation.site-external-id}") String siteExternalId,
+			@Value("${orca.runtime.holder-id:${HOSTNAME:runtime-local}}") String holderId,
+			@Value("${orca.runtime.gate-visit.connector-name}") String connectorName,
+			@Value("${orca.runtime.gate-visit.command-action}") String commandAction,
+			@Value("${orca.runtime.gate-visit.command-deadline-ms}") long commandDeadlineMillis) {
+
+		return new AdmissionService(repository, engine, idempotency,
+				new TransactionTemplate(transactionManager), siteExternalId, holderId,
+				new AdmissionService.ProcessStartVariables(connectorName, commandAction, commandDeadlineMillis));
+	}
+
+	@Bean
+	public DeviceEventController deviceEventController(AdmissionService admission,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new DeviceEventController(admission, siteExternalId);
 	}
 
 	/**

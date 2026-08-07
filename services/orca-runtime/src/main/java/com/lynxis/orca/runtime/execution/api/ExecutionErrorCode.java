@@ -1,0 +1,47 @@
+package com.lynxis.orca.runtime.execution.api;
+
+import com.lynxis.orca.platform.web.ErrorCode;
+
+/**
+ * The failures this module has that the platform's list does not cover.
+ *
+ * <p>{@code PlatformErrorCode} is deliberately framework-shaped and says so: it
+ * contains nothing about visits, lanes, tickets, drivers or trucks, and a business
+ * failure belongs in a service's own enum. This is that enum for
+ * {@code execution}.
+ */
+public enum ExecutionErrorCode implements ErrorCode {
+
+	/**
+	 * An event named a lane this installation's site does not publish.
+	 *
+	 * <p>422 rather than 404: the request is well-formed and the route is right, and
+	 * what is wrong is that this installation cannot act on it. A 404 would read as
+	 * "no such endpoint" to a caller that is retrying a batch.
+	 *
+	 * <p>The batch is refused whole, so edge keeps it buffered and in order. §C2
+	 * says an unmatched event is <em>made visible</em> rather than dropped; the
+	 * operator surface that shows one is Phase 2, so until then it stays in edge's
+	 * buffer, is retried, and becomes {@code DEAD} there — bounded, and visible
+	 * through the buffer's own diagnostics rather than nowhere.
+	 */
+	LANE_NOT_AT_THIS_INSTALLATION("LANE_NOT_AT_THIS_INSTALLATION", 422);
+
+	private final String code;
+	private final int httpStatus;
+
+	ExecutionErrorCode(String code, int httpStatus) {
+		this.code = code;
+		this.httpStatus = httpStatus;
+	}
+
+	@Override
+	public String code() {
+		return code;
+	}
+
+	@Override
+	public int httpStatus() {
+		return httpStatus;
+	}
+}

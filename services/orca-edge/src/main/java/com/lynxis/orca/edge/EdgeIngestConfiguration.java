@@ -1,7 +1,6 @@
 package com.lynxis.orca.edge;
 
 import java.time.Duration;
-import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -18,6 +17,7 @@ import com.lynxis.orca.edge.domain.IngestTasks;
 import com.lynxis.orca.edge.domain.LaneOwnership;
 import com.lynxis.orca.edge.domain.LprFraming;
 import com.lynxis.orca.edge.domain.LprListener;
+import com.lynxis.orca.edge.domain.RuntimeEventWire;
 import com.lynxis.orca.edge.persistence.EventBufferRepository;
 import com.lynxis.orca.platform.lease.FencedWrite;
 import com.lynxis.orca.platform.lease.LeaseManager;
@@ -73,8 +73,13 @@ public class EdgeIngestConfiguration {
 
 		return (lane, batch) -> runtime.post()
 				.uri("/internal/events/v1")
-				.body(List.of(batch))
+				.body(RuntimeEventWire.Batch.of(batch))
 				.retrieve()
+				// Any non-2xx throws, and the pump treats every failure identically:
+				// nothing dropped, nothing skipped, the batch stays buffered in order.
+				// That includes the 422 runtime answers for a lane this installation
+				// does not have — bounded by the pump's attempt limit, after which the
+				// event is DEAD and visible rather than silently gone.
 				.toBodilessEntity();
 	}
 

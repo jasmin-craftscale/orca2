@@ -271,6 +271,105 @@ class ScopeWritePropertiesIT {
 	}
 
 	// ------------------------------------------------------------------------
+	// WP6 · the two things the seam had to learn for admission.
+	// ------------------------------------------------------------------------
+
+	@Test
+	@DisplayName("insertReturningKey gives back the assigned key — and is refused by scope exactly as insert is")
+	void theAssignedKeyComesBackFromTheInsertItself() {
+		long key = ScopeContext.callIn(Scope.of("site_id", Set.of("site-1")),
+				() -> seam.insertReturningKey(insertFor("site-1"), "id"));
+
+		assertThat(key)
+				.as("the identity of the row this caller just created, from the insert's own "
+						+ "statement — reading it back afterwards against a non-unique column is a "
+						+ "correctness bug the moment two callers insert equal-looking rows")
+				.isEqualTo(jdbc.queryForObject(
+						"SELECT MAX(id) FROM work_item WHERE site_id = 'site-1'", Long.class));
+
+		// The scope check is the same one, in the same place. A second write surface
+		// with a weaker check is how the seam acquires a hole.
+		assertThatThrownBy(() -> ScopeContext.runIn(Scope.of("site_id", Set.of("site-1")),
+				() -> seam.insertReturningKey(insertFor("site-2"), "id")))
+				.isInstanceOf(ScopeViolationException.class);
+		assertThatThrownBy(() -> seam.insertReturningKey(insertFor("site-1"), "id"))
+				.as("and with no scope at all it is refused, not applied")
+				.isInstanceOf(ScopeViolationException.class);
+
+		assertThat(rowCount()).isEqualTo(4);
+	}
+
+	@Test
+	@DisplayName("lockMatchedRows actually serialises two readers — a shared lock would let both in")
+	void aLockedReadHoldsOffTheSecondReaderUntilCommit() throws Exception {
+		// The property the lane lock rests on, asserted on the seam rather than on
+		// the caller: two threads read-decide-write the same row, and if BOTH reads
+		// can proceed the decision is made twice. A plain read passes that test; only
+		// an exclusive one does not.
+		java.util.concurrent.CountDownLatch firstHasTheLock = new java.util.concurrent.CountDownLatch(1);
+		java.util.concurrent.CountDownLatch firstMayCommit = new java.util.concurrent.CountDownLatch(1);
+		java.util.List<String> order = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+		org.springframework.transaction.support.TransactionTemplate transactions =
+				new org.springframework.transaction.support.TransactionTemplate(
+						new org.springframework.jdbc.datasource.DataSourceTransactionManager(dataSource));
+
+		try (java.util.concurrent.ExecutorService both =
+				java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+
+			both.submit(() -> ScopeContext.runIn(Scope.of("site_id", Set.of("site-1")), () ->
+					transactions.executeWithoutResult(status -> {
+						seam.select(lockedRead(), (rs, row) -> rs.getInt("id"));
+						order.add("first-read");
+						firstHasTheLock.countDown();
+						await(firstMayCommit);
+						order.add("first-commit");
+					})));
+
+			assertThat(firstHasTheLock.await(2, java.util.concurrent.TimeUnit.MINUTES)).isTrue();
+
+			java.util.concurrent.Future<?> second = both.submit(() ->
+					ScopeContext.runIn(Scope.of("site_id", Set.of("site-1")), () ->
+							transactions.executeWithoutResult(status -> {
+								seam.select(lockedRead(), (rs, row) -> rs.getInt("id"));
+								order.add("second-read");
+							})));
+
+			// Long enough that a second read which was going to proceed has done so.
+			Thread.sleep(1_000);
+			assertThat(order)
+					.as("if 'second-read' is here, the lock is shared and two instances are both "
+							+ "about to decide that no visit is running on this lane")
+					.containsExactly("first-read");
+
+			firstMayCommit.countDown();
+			second.get(2, java.util.concurrent.TimeUnit.MINUTES);
+		}
+
+		assertThat(order).containsExactly("first-read", "first-commit", "second-read");
+	}
+
+	private static ScopedSelect lockedRead() {
+		return ScopedSelect.from("work_item")
+				.columns("id")
+				.scopedBy("site_id")
+				.where("status = ?", "QUEUED")
+				.lockMatchedRows();
+	}
+
+	private static void await(java.util.concurrent.CountDownLatch latch) {
+		try {
+			if (!latch.await(2, java.util.concurrent.TimeUnit.MINUTES)) {
+				throw new IllegalStateException("the other thread never arrived");
+			}
+		}
+		catch (InterruptedException interrupted) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException(interrupted);
+		}
+	}
+
+	// ------------------------------------------------------------------------
 
 	private static ScopedInsert insertFor(String site) {
 		return ScopedInsert.into("work_item")
