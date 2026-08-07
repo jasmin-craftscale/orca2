@@ -1,0 +1,18 @@
+{
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/api/io/[^/]+/[^/]+/(true|false)"
+  },
+  "response": {
+    "status": 503,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "status": "ERROR",
+      "code": 503,
+      "message": "STUB. A host that is there and says no — FAILED, which is knowable, quite unlike a silence.",
+      "request_id": "stub-io",
+      "timestamp": "2026-08-07T00:00:00Z"
+    }
+  }
+}

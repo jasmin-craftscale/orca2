@@ -151,7 +151,7 @@ public class EdgeIngestConfiguration {
 		return new CommandLogRepository(seam);
 	}
 
-	/** ⚠️ The outbound device-host shape is PROVISIONAL — see {@link DeviceHostPort}. */
+	/** The outbound device-host shape is DERIVED-FROM-1X — see {@link RestDeviceHost}. */
 	@Bean
 	public DeviceHostPort deviceHostPort() {
 		return new RestDeviceHost();

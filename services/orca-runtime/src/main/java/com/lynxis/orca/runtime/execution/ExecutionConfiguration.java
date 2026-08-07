@@ -71,11 +71,13 @@ public class ExecutionConfiguration {
 			@Value("${orca.runtime.holder-id:${HOSTNAME:runtime-local}}") String holderId,
 			@Value("${orca.runtime.gate-visit.connector-name}") String connectorName,
 			@Value("${orca.runtime.gate-visit.command-action}") String commandAction,
+			@Value("${orca.runtime.gate-visit.command-device}") String commandDeviceExternalId,
 			@Value("${orca.runtime.gate-visit.command-deadline-ms}") long commandDeadlineMillis) {
 
 		return new AdmissionService(repository, engine, idempotency,
 				new TransactionTemplate(transactionManager), siteExternalId, holderId,
-				new AdmissionService.ProcessStartVariables(connectorName, commandAction, commandDeadlineMillis));
+				new AdmissionService.ProcessStartVariables(connectorName, commandAction,
+						commandDeviceExternalId, commandDeadlineMillis));
 	}
 
 	@Bean

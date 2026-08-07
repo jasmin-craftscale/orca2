@@ -268,6 +268,7 @@ public class AdmissionService {
 		keys.put(ProcessVariables.LANE_EXTERNAL_ID, laneExternalId);
 		keys.put(ProcessVariables.CONNECTOR_NAME, startVariables.connectorName());
 		keys.put(ProcessVariables.COMMAND_ACTION, startVariables.commandAction());
+		keys.put(ProcessVariables.COMMAND_DEVICE_EXTERNAL_ID, startVariables.commandDeviceExternalId());
 		keys.put(ProcessVariables.COMMAND_DEADLINE_MILLIS, startVariables.commandDeadlineMillis());
 		return keys;
 	}
@@ -349,7 +350,8 @@ public class AdmissionService {
 	 * carrying them as configuration keeps admission from inventing a
 	 * definition-to-lane binding that Phase 2 will design properly. Reported.
 	 */
-	public record ProcessStartVariables(String connectorName, String commandAction, long commandDeadlineMillis) {
+	public record ProcessStartVariables(String connectorName, String commandAction,
+			String commandDeviceExternalId, long commandDeadlineMillis) {
 	}
 
 	/** The lane is not one this installation's site publishes. */

@@ -91,9 +91,10 @@ services:
   # and both are deliberately dumb: a stub that reasoned about the request would
   # start encoding assumptions about the real component.
   #
-  # ⚠️ The device-host mappings speak a PROVISIONAL dialect. §D2 freezes that
-  # contract and §C3 specifies its INBOUND half; the outbound command shape is one
-  # sentence and is recorded nowhere. See deploy/stubs/README.md.
+  # The device-host mappings are DERIVED-FROM-1X: the gate, print and IO routes
+  # extracted from the ORCA 1.x production caller, including the /api/io/ asymmetry
+  # and the 200-AND-a-decodable-body success rule. Evidence about the fielded
+  # estate, not a vendor specification — see deploy/stubs/README.md.
   # ---------------------------------------------------------------------------
   tos-stub:
     image: wiremock/wiremock:3.13.1

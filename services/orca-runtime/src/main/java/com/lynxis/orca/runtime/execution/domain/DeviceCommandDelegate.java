@@ -47,10 +47,12 @@ public class DeviceCommandDelegate implements JavaDelegate {
 	public void execute(DelegateExecution execution) {
 		String laneExternalId = required(execution, ProcessVariables.LANE_EXTERNAL_ID);
 		String action = required(execution, ProcessVariables.COMMAND_ACTION);
+		// Required, because the device id IS the device host's address (H1).
+		String deviceExternalId = required(execution, ProcessVariables.COMMAND_DEVICE_EXTERNAL_ID);
 		long deadline = deadlineOf(execution);
 
 		String outcome = deviceCommandPort.issue(new DeviceCommandPort.DeviceCommand(
-				execution.getId(), laneExternalId, action, deadline));
+				execution.getId(), laneExternalId, deviceExternalId, action, deadline));
 
 		execution.setVariable(ProcessVariables.DEVICE_COMMAND_OUTCOME, outcome);
 

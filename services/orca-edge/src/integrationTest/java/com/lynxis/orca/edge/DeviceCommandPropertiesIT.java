@@ -225,7 +225,7 @@ class DeviceCommandPropertiesIT {
 	@DisplayName("a device host that goes quiet is UNKNOWN, not FAILED — §B10's whole point")
 	void aSilentDeviceHostProducesUnknown() throws Exception {
 		HttpServer host = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
-		host.createContext("/api/v1/commands", exchange -> {
+		host.createContext("/", exchange -> {
 			// Accepts the request and never answers. The barrier may be rising right
 			// now, and nothing in this process can know.
 			sleep(3_000);
@@ -256,7 +256,7 @@ class DeviceCommandPropertiesIT {
 	@DisplayName("a device host that answers with an error is FAILED — knowable, quite unlike a silence")
 	void aRefusingDeviceHostProducesFailed() throws Exception {
 		HttpServer host = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
-		host.createContext("/api/v1/commands", exchange -> {
+		host.createContext("/", exchange -> {
 			byte[] body = "{\"status\":\"ERROR\",\"detail\":\"barrier is padlocked\"}"
 					.getBytes(StandardCharsets.UTF_8);
 			exchange.sendResponseHeaders(503, body.length);
@@ -287,7 +287,7 @@ class DeviceCommandPropertiesIT {
 	@DisplayName("a 200 whose body does not decode is FAILED — an acknowledgement is not a confirmation")
 	void anUndecodableAnswerIsNotAnExecution() throws Exception {
 		HttpServer host = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
-		host.createContext("/api/v1/commands", exchange -> {
+		host.createContext("/", exchange -> {
 			byte[] body = "<html>proxy interposed</html>".getBytes(StandardCharsets.UTF_8);
 			exchange.sendResponseHeaders(200, body.length);
 			try (OutputStream out = exchange.getResponseBody()) {

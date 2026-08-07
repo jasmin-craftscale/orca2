@@ -1,0 +1,18 @@
+{
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/api/[^/]+/print/[^/]+"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "status": "OK",
+      "code": 200,
+      "message": "STUB. The request body is the file's RAW BYTES and carries no Content-Type — DERIVED-FROM-1X.",
+      "request_id": "stub-print",
+      "timestamp": "2026-08-07T00:00:00Z"
+    }
+  }
+}

@@ -262,6 +262,7 @@ class GateVisitProcessIT {
 		keys.put(ProcessVariables.LANE_EXTERNAL_ID, "LANE-DEMO-01");
 		keys.put(ProcessVariables.CONNECTOR_NAME, "tos");
 		keys.put(ProcessVariables.COMMAND_ACTION, "RAISE_GATE");
+		keys.put(ProcessVariables.COMMAND_DEVICE_EXTERNAL_ID, "DEV-DEMO-BARRIER");
 		keys.put(ProcessVariables.COMMAND_DEADLINE_MILLIS, 5_000L);
 		return keys;
 	}

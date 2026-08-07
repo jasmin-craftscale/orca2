@@ -199,7 +199,11 @@ class VisitLifecycleIT {
 				.hasSize(1);
 		assertThat(deviceCommands.getFirst())
 				.contains("\"action\":\"RAISE_GATE\"")
-				.contains("\"laneExternalId\":\"" + LANE + "\"");
+				.contains("\"laneExternalId\":\"" + LANE + "\"")
+				// H1: the device host addresses the device in the URL path, so a command
+				// that does not name one cannot be sent. This assertion is what stops the
+				// field being quietly dropped again.
+				.contains("\"deviceExternalId\":\"DEV-DEMO-BARRIER\"");
 
 		// The fact, in the visit's own transaction. §D3: save the thing then tell
 		// somebody fails in two directions and neither is detectable.

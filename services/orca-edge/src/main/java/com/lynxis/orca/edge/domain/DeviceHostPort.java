@@ -4,27 +4,33 @@ package com.lynxis.orca.edge.domain;
  * The way out to a lane's device host — the .NET component that actually moves the
  * barrier.
  *
- * <p>⚠️ <strong>THE OUTBOUND SHAPE IS PROVISIONAL.</strong> §D2 freezes the
- * device-host REST contract and says why — <em>"a field-proven vendor component
- * that loads a driver plugin per device; changing this contract would mean
+ * <p><strong>The outbound shape is now DERIVED-FROM-1X, not invented.</strong> §D2
+ * freezes the device-host REST contract and says why — <em>"a field-proven vendor
+ * component that loads a driver plugin per device; changing this contract would mean
  * re-certifying every device vendor"</em> — and §C3 names what travels in each
- * direction. What neither states is the request body, the route, or the response
- * document for an outbound command, and <strong>nothing in this repository records
- * them</strong>. The inbound half is specified to the endpoint
- * ({@code /device/{uuid}/data}, {@code /device/{uuid}/io-state}); the outbound half
- * is one sentence.
+ * direction, but neither states the route, the body or the response document for an
+ * outbound command. {@code docs/device-host-outbound-from-1x.md} does: it was
+ * extracted from the ORCA 1.x production caller, the way
+ * {@code docs/lpr-wire-format-from-1x.md} was extracted for the camera.
+ * {@link RestDeviceHost} implements exactly that and marks what it had to choose.
  *
- * <p>So this is an interface with one provisional implementation, exactly as
- * {@code LprFraming} was before the 1.x listener was extracted. That shape is the
- * honest one: the idempotency, the expiry check and the command log — which are
- * ours and are settled — are testable today, and adopting the real contract is
- * writing one class rather than unpicking assumptions from five.
+ * <p><strong>Two things that extraction still does not settle</strong>, and neither
+ * may be closed in code:
  *
- * <p><strong>Before this reaches a device host</strong>, someone must obtain the
- * vendor's specification or extract the outbound calls from the 1.x estate, the
- * way {@code docs/lpr-wire-format-from-1x.md} was extracted for the camera. Do not
- * treat a green test suite as evidence that the contract is right: every test here
- * speaks the same provisional dialect as the code.
+ * <ol>
+ *   <li><strong>The Authorization header</strong> — 1.x mints a Keycloak token per
+ *       command; whether the host validates it is unknown and the answer collides
+ *       with ADR-011 on the barrier path. OPEN QUESTION, register NEW-4.</li>
+ *   <li><strong>{@code PTZ_PRESET} has no route in the extraction.</strong> §C3's
+ *       vocabulary has five actions and the 1.x caller has three calls.
+ *       {@link RestDeviceHost} refuses the command rather than inventing a URL for
+ *       it.</li>
+ * </ol>
+ *
+ * <p>The interface survives the correction for the reason it was introduced: the
+ * idempotency, the expiry check and the command log are ours and were settled
+ * already, and adopting a contract meant writing one class rather than unpicking
+ * assumptions from five. It earned its keep.
  */
 public interface DeviceHostPort {
 
@@ -40,9 +46,14 @@ public interface DeviceHostPort {
 	Outcome issue(String deviceHostUrl, HostCommand command);
 
 	/**
-	 * @param params action parameters as a JSON object, passed through untouched.
-	 *               Edge takes no position on what a {@code PRINT} needs — that is
-	 *               between the process designer and the device plugin
+	 * @param params action parameters as a JSON object.
+	 *               <p>⚠️ <strong>No longer passed through untouched, and the change
+	 *               is a consequence of the real contract.</strong> The 1.x calls put
+	 *               the print format, the IO port and the IO state <em>in the URL</em>
+	 *               and send an empty body, so edge has to read them to address the
+	 *               host at all. The key names are {@link RestDeviceHost}'s choice —
+	 *               marked {@code CHOSEN-HERE} there — because the extraction records
+	 *               the wire and not the message 1.x built it from
 	 */
 	record HostCommand(String commandId, String deviceExternalId, String action, String params,
 			long deadlineMillis) {

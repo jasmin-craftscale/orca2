@@ -41,11 +41,16 @@ public interface DeviceCommandPort {
 	 *                        it is stable for the life of the node execution, which
 	 *                        is the property the key needs
 	 * @param laneExternalId  which lane, in core's published vocabulary
+	 * @param deviceExternalId which device on that lane. <strong>Required</strong>:
+	 *                        the device-host contract addresses the device in the
+	 *                        URL path (DERIVED-FROM-1X), so a command that names no
+	 *                        device cannot be sent at all
 	 * @param action          {@code RAISE_GATE}, {@code LOWER_GATE}, … (§C3)
 	 * @param deadlineMillis  after which the answer is {@link #UNKNOWN}. §B8: every
 	 *                        external call has a deadline and a defined outcome when
 	 *                        it is exceeded
 	 */
-	record DeviceCommand(String commandId, String laneExternalId, String action, long deadlineMillis) {
+	record DeviceCommand(String commandId, String laneExternalId, String deviceExternalId,
+			String action, long deadlineMillis) {
 	}
 }

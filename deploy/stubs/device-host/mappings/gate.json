@@ -1,0 +1,18 @@
+{
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/api/[^/]+/(raiseGate|lowerGate)"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "status": "OK",
+      "code": 200,
+      "message": "STUB. DERIVED-FROM-1X: 200 AND a body that decodes is what 1.x treats as performed.",
+      "request_id": "stub-gate",
+      "timestamp": "2026-08-07T00:00:00Z"
+    }
+  }
+}

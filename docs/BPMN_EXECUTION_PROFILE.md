@@ -133,6 +133,7 @@ the bean names:
 | `laneExternalId` | correlation key | The lane, in core's published vocabulary |
 | `connectorName` | correlation key | Which configured connector — a **name**, never an endpoint |
 | `commandAction` | correlation key | `RAISE_GATE`, `LOWER_GATE`, … (§C3) |
+| `commandDeviceExternalId` | correlation key | Which device on the lane. **Required** — see below |
 | `commandDeadlineMillis` | correlation key | After which the outcome is `UNKNOWN` |
 | `connectorOutcome` | discriminator | What the customer system said, as a routing token |
 | `deviceCommandOutcome` | discriminator | `EXECUTED` · `FAILED` · `UNKNOWN` |
@@ -140,6 +141,15 @@ the bean names:
 ⚠️ **`connectorName` is a name, not a URL.** The endpoint, its authentication mode
 and its certificate trust are configuration owned by `runtime.integration` (§C2). A
 process carrying a URL would have to be republished to change one.
+
+⚠️ **`commandDeviceExternalId` is required on every device step, and a compiler
+that omits it emits a process that cannot command anything.** Added by H1, with a
+reason that is not a convention: the real device-host contract
+(`docs/device-host-outbound-from-1x.md`, DERIVED-FROM-1X) addresses the device **in
+the URL path** — `POST /api/{device}/raiseGate` — so the device's external id *is*
+the host's address. It was optional under the invented contract this repository
+shipped in WP7, which carried the device in a JSON body. A lane with exactly one
+barrier still has to name it.
 
 ---
 

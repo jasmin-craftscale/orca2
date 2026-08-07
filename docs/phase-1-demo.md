@@ -10,11 +10,13 @@ Every command below is copy-paste. Every one of them was executed against this
 repository while this file was written; §8 records what the run produced.
 
 > **Two stubs stand in for things ORCA does not build** — a customer's Terminal
-> Operating System and the per-lane .NET device host. ⚠️ The device-host stub
-> speaks a **provisional** dialect: §D2 freezes that contract and §C3 specifies its
-> *inbound* half, but the outbound command shape is recorded nowhere in this
-> repository. See `deploy/stubs/README.md`. **A green demo proves the plumbing and
-> nothing about the vendor.**
+> Operating System and the per-lane .NET device host. The device-host stub speaks
+> the **DERIVED-FROM-1X** routes: `POST /api/{device}/raiseGate`, the print call,
+> and the `/api/io/…` asymmetry, extracted from the ORCA 1.x production caller
+> (`docs/device-host-outbound-from-1x.md`). See `deploy/stubs/README.md`. **That is
+> evidence about the fielded estate, not a vendor specification** — and one thing
+> in it is still unruled: 1.x sends `Authorization: Bearer …` and ORCA does not,
+> because nobody knows whether the host enforces it (register **NEW-4**).
 
 ---
 
@@ -247,7 +249,7 @@ the lane.
 curl -s -X POST http://localhost:18083/internal/commands/v1 \
   -H 'X-Orca-Internal-Auth: local-dev-internal-credential-not-for-deployment' \
   -H 'X-Orca-Service: orca-runtime' -H 'Content-Type: application/json' \
-  -d '{"commandId":"cmd-stale-demo","laneExternalId":"LANE-DEMO-01","action":"RAISE_GATE","deadlineMs":0}'
+  -d '{"commandId":"cmd-stale-demo","laneExternalId":"LANE-DEMO-01","deviceExternalId":"DEV-DEMO-BARRIER","action":"RAISE_GATE","deadlineMs":0}'
 ```
 
 The answer is `FAILED` with `"discarded as expired"` in `detail` — **not**
@@ -349,7 +351,11 @@ Replayed with the same `commandId`, it answers with the recorded outcome — the
 Named here rather than left for a reviewer to discover:
 
 - **A real camera.** The wire format is DERIVED-FROM-1X, not vendor-confirmed.
-- **A real device host.** The outbound command shape is provisional (§7 above).
+- **A real device host.** The outbound shape is now DERIVED-FROM-1X too, which is
+  evidence about the fielded estate and still not a vendor document. Two things it
+  cannot show: whether the host validates the `Authorization` header 1.x sends and
+  ORCA does not (register **NEW-4**), and what a `PTZ_PRESET` addresses — the
+  extraction has no route for it, so edge refuses the command (**NEW-5**).
 - **A consumer of `visit.completed`.** There is none, deliberately.
 - **`/internal/buffer/stats`.** §C3's diagnostics endpoint is not built, so a
   `DEAD` event is visible only in the table.

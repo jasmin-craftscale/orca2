@@ -212,6 +212,11 @@ orca:
     gate-visit:
       connector-name: ${ORCA_GATE_VISIT_CONNECTOR:tos}
       command-action: ${ORCA_GATE_VISIT_ACTION:RAISE_GATE}
+      # Which device the action goes to. NOT optional, and not decoration: the
+      # device-host contract addresses the device in the URL path
+      # (POST /api/{device}/raiseGate — DERIVED-FROM-1X), so a command that names
+      # no device cannot be sent. Same slice-shaped caveat as the two above.
+      command-device: ${ORCA_GATE_VISIT_DEVICE:DEV-DEMO-BARRIER}
       # §B8: every external call has a deadline and a defined outcome when it is
       # exceeded. This one's defined outcome is UNKNOWN, which routes to
       # verify-the-device rather than to a retry (§B10).

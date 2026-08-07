@@ -72,6 +72,7 @@ public class EdgeDeviceCommandClient implements DeviceCommandPort {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("commandId", command.commandId());
 		body.put("laneExternalId", command.laneExternalId());
+		body.put("deviceExternalId", command.deviceExternalId());
 		body.put("action", command.action());
 		body.put("deadlineMs", command.deadlineMillis());
 

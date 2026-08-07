@@ -150,7 +150,7 @@ components:
 
     DeviceCommand:
       type: object
-      required: [commandId, laneExternalId, action, deadlineMs]
+      required: [commandId, laneExternalId, deviceExternalId, action, deadlineMs]
       properties:
         commandId:
           type: string
@@ -163,8 +163,16 @@ components:
           type: string
           maxLength: 64
           description: |
-            Which device on the lane. Optional: a lane with one barrier does not
-            need to say which barrier, and §C3's actions are per lane.
+            Which device on the lane.
+
+            ⚠️ **Required as of H1, and it was optional before.** The reason is the
+            real device-host contract: `docs/device-host-outbound-from-1x.md` shows
+            the device addressed **in the URL path** —
+            `POST /api/{device}/raiseGate` — so a command that does not name a
+            device cannot be sent at all. The previous wording ("a lane with one
+            barrier does not need to say which barrier") was written against an
+            invented contract that carried the device in a JSON body, where it was
+            genuinely optional. It is not optional against the fielded estate.
         action:
           type: string
           maxLength: 32

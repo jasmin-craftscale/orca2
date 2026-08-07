@@ -35,6 +35,7 @@ This file is a map. It does not restate the architecture — follow the link.
 | What did Phase 1 build, and what is still guessed? | `docs/phase-1-report.md` — **§3, §5 and §7** |
 | How do I run the slice end to end? | `docs/phase-1-demo.md` |
 | What does the camera actually put on the wire? | `docs/lpr-wire-format-from-1x.md` — DERIVED-FROM-1X, not a vendor spec |
+| What does ORCA send a device host to move a barrier? | `docs/device-host-outbound-from-1x.md` — DERIVED-FROM-1X; **§3 is an open question, not a design** |
 
 **If something is unspecified, check the register before concluding it was
 forgotten. Never invent a resolution — a gap reported is worth more than a gap

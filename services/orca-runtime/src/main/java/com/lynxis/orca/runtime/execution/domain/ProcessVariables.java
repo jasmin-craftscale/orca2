@@ -35,6 +35,18 @@ public final class ProcessVariables {
 	/** Which device action to issue — RAISE_GATE, LOWER_GATE, … (§C3). */
 	public static final String COMMAND_ACTION = "commandAction";
 
+	/**
+	 * Which device the action is issued to, in core's published vocabulary
+	 * (core.topology_device).
+	 *
+	 * <p>⚠️ <strong>Added by H1, and not decoration.</strong> The device-host
+	 * contract addresses the device <em>in the URL path</em>
+	 * ({@code POST /api/{device}/raiseGate} — DERIVED-FROM-1X), so a command that
+	 * does not name a device cannot be sent. A lane with one barrier still has to
+	 * say which barrier, because the barrier's id is the address.
+	 */
+	public static final String COMMAND_DEVICE_EXTERNAL_ID = "commandDeviceExternalId";
+
 	/** How long the device command may take before its outcome is UNKNOWN (§B8, §C3). */
 	public static final String COMMAND_DEADLINE_MILLIS = "commandDeadlineMillis";
 
