@@ -1,8 +1,10 @@
 # ORCA — Repository Guide
 
-**For review before Phase 0 starts · August 2026**
+**Current as of the Phase 1 hardening · August 2026**
 
-What each folder is, why it exists, and how the whole thing builds and runs. One decision at the end needs settling before the build agent runs.
+What each folder is, why it exists, and how the whole thing builds and runs.
+
+⚠️ **This document was written before Phase 0 started and has been brought current twice.** Where it still reads like a plan — §7's review questions, in particular — that is history and is marked. What Phase 0 and Phase 1 actually built is `docs/phase-0-report.md` and `docs/phase-1-report.md`; what the hardening changed is `docs/phase-1-hardening-report.md`. **This guide says where things are. Those say what happened.**
 
 ---
 
@@ -10,6 +12,7 @@ What each folder is, why it exists, and how the whole thing builds and runs. One
 
 ```
 orca/                                    git root = Gradle root
+├── AGENTS.md · CLAUDE.md                the instruction file, and its adapter
 ├── build.gradle.kts                     AGGREGATOR — no src/, no application
 ├── settings.gradle.kts                  12 modules registered
 ├── gradle/libs.versions.toml            one version catalog for every module
@@ -17,9 +20,12 @@ orca/                                    git root = Gradle root
 ├── platform/                            THE PRIMITIVES — no domain types
 │   ├── outbox/                          transactional outbox + relay
 │   ├── lease/                           lease with fence token
-│   ├── scope/                           the query seam
+│   ├── scope/                           the query seam — reads, writes, and
+│   │                                      scope/table/ (@PersistentTable,
+│   │                                      @RetentionClass, Growth)
 │   ├── idempotency/                     recorded outcomes
-│   └── web/                             envelope · codes · system identity
+│   └── web/                             envelope · codes · system identity ·
+│       │                                  web/internal/ (the ADR-011 filter)
 │       └── src/main/resources/openapi/_shared.yaml
 │
 ├── services/                            SIX BOOTABLE APPLICATIONS
@@ -31,25 +37,36 @@ orca/                                    git root = Gradle root
 │   │           ├── openapi/orca-core.yaml    its own contract
 │   │           └── db/migration/             its own migrations
 │   ├── orca-runtime/                    + execution · workitem · integration
-│   │                                      · notify · readmodel
+│   │   └── src/main/resources/            · notify · readmodel
+│   │       ├── processes/gate-visit.bpmn20.xml   deployed from the classpath
+│   │       └── db/migration/V110–V114     Flowable's 45 tables, EXTRACTED
 │   ├── orca-edge/  orca-portal/  orca-sync/  orca-fleet/
 │   └── orca-media/                      README only — NOT a module
 │
+│   Each service also carries src/integrationTest/ — a separate source set,
+│   NOT wired into `check`, and where every property test lives.
+│
 ├── build-checks/                        TESTS ONLY — output is build failures
-│       platform purity · module walls · scope seam
-│       error envelope · retention class
+│       platform purity · module walls · scope seam · error envelope
+│       retention class · system context · engine confinement
+│       scope index · contract interface · internal surface
+│       + ImportedSetGuard, the check on the checks
 │
 ├── deploy/
 │   ├── bootstrap/                       schemas, logins, grants — once, first
-│   ├── docker-compose.yml               SQL Server 2022 + Keycloak 26
+│   ├── demo/                            seed.sh + send-plate.py, a deliberate act
+│   ├── stubs/                           WireMock: the TOS and the device host
+│   ├── adopt-flowable/                  the path off engine self-migration
+│   ├── docker-compose.yml               SQL Server 2022 + Keycloak 26 + stubs
 │   ├── .env.example                     committed — working local values
 │   └── keycloak/realm-export.json
 │
-├── .github/workflows/ci.yml
-└── docs/
+├── .github/workflows/ci.yml             ⚠️ never executed — see §3
+└── docs/                                the corpus — see §3
 ```
 
-**12 Gradle modules. Six bootable applications. Zero business logic.**
+
+**12 Gradle modules. Six bootable applications.** Phase 0 added zero business logic on purpose; **Phase 1 added exactly one vertical slice** — a plate read in over the camera's wire format, one visit, a connector call, a barrier commanded and confirmed, and the visit's fact recorded in one transaction. Everything else is still deliberately absent.
 
 **Each service owns its schema, its database login, its migrations and its OpenAPI contract.** The shared response envelope lives with `platform/web`, which implements it. Only `orca-runtime` is decomposed into modules — those five are named by the architecture and the module wall depends on them; every other service is flat.
 
@@ -153,16 +170,23 @@ One database, seven schemas, each written by exactly one service — enforced by
 
 A module containing **only tests, no production code.** Its entire output is build failures.
 
-| Check | Fails when |
-|---|---|
-| Platform purity | A class in `platform/` references a domain type |
-| Module walls | A module reads another module's `persistence` package |
-| Scope seam | A query is constructed outside the seam |
-| Error envelope | A controller returns a shape other than the envelope |
-| Retention class | A traffic-growing table has no declared retention class |
-| System context | A `@Scheduled` entry point runs without entering `SystemContext` |
+| Check | Fails when | Arrived |
+|---|---|---|
+| `PlatformPurityRule` | A class in `platform/` names or references a domain type | Phase 0 |
+| `ModuleWallRule` | A module reads another module's `persistence` **or** `domain` package — or one service imports another's | Phase 0 |
+| `ScopeSeamRule` | A service class touches `JdbcTemplate`, `EntityManager`, `DataSource` or raw JDBC | Phase 0 |
+| `ErrorEnvelopeRule` | A controller method returns a shape other than the envelope | Phase 0 |
+| `RetentionClassRule` | A traffic-growing table has no declared retention class | Phase 0 |
+| `SystemContextRule` | A `@Scheduled` entry point runs without entering `SystemContext` | Phase 0 |
+| `EngineConfinementRule` | Anything outside `execution` depends on `org.flowable` | Phase 1 · WP4 |
+| `ScopeIndexRule` | A scoped table has no index leading with the scope column | Hardening · H2 |
+| `ContractInterfaceRule` | A `@RestController` implements no generated API interface | Hardening · H2 |
+| `InternalSurfaceRule` | An operation tagged internal maps outside `/internal/**`, or vice versa | Hardening · H2 |
+| `ImportedSetGuard` | The importer saw fewer classes, modules or files than the rules need to be governing anything | Phase 0 |
 
-The sixth rule was added beyond the brief's five — §B10's "assert every scheduled job, relay and reconciler enters it" can only be a rule over every class, not a unit test. Note it currently governs an empty set: Phase 0 has no `@Scheduled` methods, so it has never fired outside a deliberate violation.
+**Ten rules and the guard.** Two of them — `ScopeIndexRule` and `InternalSurfaceRule` — read the repository's **files** rather than its bytecode, because an index definition and a contract's paths leave no trace in a `.class` file. Both assert a floor on what they read, for the same reason `ImportedSetGuard` exists.
+
+⚠️ **A rule does not count until it has been watched to fail.** `PlatformPurityRule` passed vacuously for a whole phase because its word matcher required a non-letter after the match, so `VisitResponse` — the single most likely violation there is — did not match. Every rule since has been deliberately violated, watched to stop the build, and reverted, with the violation written down in the phase report.
 
 **This folder is why the monorepo is the right choice.** These checks have to see every service at once. In seven separate repositories they degrade into a code-review convention — and a convention is what the current system enforced tenancy with, across 816 hand-written conditions.
 
@@ -170,11 +194,35 @@ The sixth rule was added beyond the brief's five — §B10's "assert every sched
 
 ## 3 · The supporting folders
 
-**`deploy/`** — `docker-compose.yml` (SQL Server and Keycloak), a committed `.env.example` with working local values, and the Keycloak realm export: one realm, one client per service, service accounts for service-to-service calls. A developer clones, copies one file, and runs.
+**`deploy/`** — `docker-compose.yml` (SQL Server, Keycloak and Phase 1's two WireMock stubs), a committed `.env.example` with working local values, and the Keycloak realm export. Four things run out of it, and each is a **deliberate act rather than a profile**:
 
-**`.github/workflows/`** — build → unit tests → integration tests on Testcontainers against real SQL Server → all build checks → coverage. A pull request cannot merge with any of them failing.
+| | |
+|---|---|
+| `bootstrap/run.sh` | The privileged half — database, seven schemas, seven logins, grants. Once, as `sa`, before any service starts. `V004__verify.sql` asserts the confinement rather than assuming it |
+| `demo/seed.sh` | One site, one lane, one camera, one barrier, and the connector row. Two halves under **two logins**, because the topology is core's and the connector configuration is runtime's |
+| `stubs/` | The Terminal Operating System and the .NET device host. The device-host mappings are **DERIVED-FROM-1X** — the routes the fielded 1.x caller uses, not a vendor specification |
+| `adopt-flowable/run.sh` | The path off `database-schema-update: true`, as `orca_runtime` and never as `sa`. Refuses a schema holding process data — `docs/flowable-adoption.md` |
 
-**`docs/`** — the architecture document (the specification), the open-questions register (what is deliberately unsettled), the Phase 0 brief (what the agent builds), and this guide.
+**`.github/workflows/`** — `ci.yml` describes build → unit tests → integration tests on Testcontainers against real SQL Server → all build checks → coverage.
+
+⚠️ **It has never run.** This repository has **no git remote**, so nothing has ever executed that workflow — every result quoted anywhere in this corpus was produced by running the commands locally. Where the repository is hosted is the product owner's decision, and until it is taken, "CI" is a file rather than a gate. Recorded in `docs/phase-1-hardening-report.md` §H6.
+
+**`docs/`** — the corpus. In the order somebody arriving should read them:
+
+| | |
+|---|---|
+| `ORCA_ARCHITECTURE.md` | The specification. **§B10 is the acceptance criteria** |
+| `ORCA_OPEN_QUESTIONS_REGISTER.md` | What is deliberately unsettled. Check it before concluding something was forgotten |
+| `PLATFORM_PRIMITIVES.md` | The five primitives and the named pattern behind each |
+| `REPOSITORY_GUIDE.md` | This file — where things are |
+| `phase-0-brief.md` · `phase-0-report.md` | What Phase 0 was asked for, and what it built |
+| `phase-1-plan.md` · `phase-1-report.md` · `phase-1-demo.md` | The vertical slice: the plan, the build, and how to run it end to end |
+| `phase-1-hardening-report.md` | The six hardening packages after it |
+| `BPMN_EXECUTION_PROFILE.md` | What the visual builder's compiler must emit |
+| `lpr-wire-format-from-1x.md` · `device-host-outbound-from-1x.md` | The two hardware wire formats, **extracted from the 1.x estate**. Evidence, not vendor specifications |
+| `flowable-adoption.md` | Adopting a database the engine migrated itself |
+| `ai-context-brief.md` · `ai-context-report.md` | The instruction files, and the review of them |
+| `ORCA_ORCHESTRATOR_HANDOVER.md` | Where this programme came from |
 
 ---
 
@@ -187,10 +235,14 @@ The Spring Boot plugin is declared at the root with `apply false` and applied in
 ```
 ./gradlew build              everything
 ./gradlew test               unit tests
-./gradlew integrationTest    Testcontainers, real SQL Server
-./gradlew check              the seven build checks
+./gradlew integrationTest    Testcontainers, real SQL Server, real Flowable
+./gradlew check              unit tests + the ten build checks
 ./gradlew bootRun -p services/orca-core --args='--spring.profiles.active=local'
 ```
+
+⚠️ **`test` runs almost none of what proves this repository, and `check` does not run `integrationTest`.** That is deliberate — `build` has to succeed on a machine with no Docker daemon — but what it skips is every property that matters: the admission race, the severed link, the lease handover, the expired command, the outbox's atomicity. **Full verification is `./gradlew check integrationTest`.**
+
+⚠️ **A green `check` does not mean a service starts.** Every suite constructs its beans directly rather than refreshing a context, so a broken bean definition passes all of them — which is how Phase 1 shipped an `orca-edge` that could not boot. Run the demo.
 
 ⚠️ **The `local` profile is required to run a service on a laptop.** Since
 ADR-011, services authenticate to each other with a per-installation credential,
@@ -212,21 +264,27 @@ check; set the profile.
 
 ---
 
-## 6 · What Phase 0 delivers, and what it does not
+## 6 · What exists today, and what does not
 
-**Delivers:** a repository that builds, a local stack that runs, seven schemas that migrate, five primitives with tests that prove their properties, six build checks that fail the build when violated, CI, and six services that boot and report health.
+**Written before Phase 0 as a warning about having nothing to show. Both phases have now run, so it says what is there.**
 
-**Does not deliver:** any product behaviour. No visit can start, no gate can open, no screen exists. Nothing is demonstrable to a customer.
+**Phase 0 delivered** the foundations: twelve modules, six services that boot and report health, seven schemas that migrate under seven confined logins, five primitives with property tests, and the build checks. No product behaviour at all — no visit could start, no gate could open.
 
-⚠️ **Worth saying out loud before it starts.** Two to three weeks with four developers and nothing to show is entirely reasonable if it was announced and uncomfortable if it was not. The first demonstrable thing — a plate read producing a visit and a confirmed barrier — comes at the end of Phase 1.
+**Phase 1 delivered one vertical slice, and it runs end to end.** A plate read arrives at `orca-edge` over the camera's wire format → exactly one visit starts in `orca-runtime` → the process calls a stubbed Terminal Operating System → commands the barrier through the device-host contract → the barrier confirms → the visit completes with its outbox fact in one transaction. The property that matters most is proven rather than asserted: **two simultaneous plate reads for one truck produce exactly one visit, 1,000 times out of 1,000.**
 
-**What you are buying** is that the guarantees move from a document into the build. After Phase 0 a developer *cannot* write a query that escapes its scope or publish a fact without recording it, because the build stops them. Before Phase 0, all of it depends on everyone remembering.
+**Still absent, deliberately.** No screens, no work items, no visual builder, no partner API, no retention jobs, no second process, no cloud tier. `orca-portal`, `orca-sync` and `orca-fleet` are the Phase 0 skeletons they were: the programme is **on-site first**, and the cloud scope is per-customer and opens later (register NEW-1b).
+
+**What was bought** is that the guarantees are in the build rather than in a document. A developer *cannot* write a query that escapes its scope, publish a fact without recording it, put a route in Java that is not in a contract, or add a scoped table that can only be scanned — because the build stops them.
+
+⚠️ **Two wire formats are DERIVED-FROM-1X, and one question inside them is unruled.** The camera's framing and the device host's outbound routes were extracted from the fielded 1.x estate — evidence about what runs today, and still not vendor specifications. `docs/device-host-outbound-from-1x.md` §3 is an open question for the product owner and the vendor, and it is deliberately unanswered in code.
 
 ---
 
-## 7 · Questions worth raising in review
+## 7 · The questions this document was written to raise — and where they went
 
-1. **Does the frontend live in this repository?** It decides §1, and it is cheaper to decide now than after seven services exist.
-2. **Is `platform/` the right set of five?** They are the primitives the architecture's guarantees rest on. If your lead sees a sixth, better to know before they are built.
-3. **Is one database with seven schemas acceptable to whoever will operate it?** It is a deliberate choice — it is what allows in-transaction reads across services and removes the broker. A database per service would forbid both.
-4. **Who owns `platform/` after Phase 0?** It is shared code with no natural owner, and shared code with no owner is how it drifts.
+**Historical. Kept because the answers are decisions, and a decision with no record of the question behind it is the kind that gets quietly reversed.**
+
+1. **Does the frontend live in this repository?** Still open, and no longer urgent: React is decided (register #3), the visual builder is a separate developer's work, and nothing on-site needs a screen yet.
+2. **Is `platform/` the right set of five?** Answered by use. All five are load-bearing in the slice, and the one thing they were missing — a scoped write — was added in Phase 1 WP2 rather than by inventing a sixth primitive. Register **S1** and **S2** ask the sharper version: whether the *dialect SPI* and the six duplicate `service_lease` tables are earning their keep.
+3. **Is one database with seven schemas acceptable to whoever will operate it?** Not withdrawn. The confinement is proven 36/36 by `deploy/bootstrap/verify-isolation.sh`, and register **S2** carries the cost side.
+4. **Who owns `platform/` after Phase 0?** ⚠️ **Still unanswered, and it is the one on this list with no proxy elsewhere.** Shared code with no owner is how it drifts.

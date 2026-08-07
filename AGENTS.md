@@ -33,6 +33,7 @@ This file is a map. It does not restate the architecture — follow the link.
 | Where does anything live in this repository? | `docs/REPOSITORY_GUIDE.md` |
 | What did Phase 0 build, decide, and fail to settle? | `docs/phase-0-report.md` |
 | What did Phase 1 build, and what is still guessed? | `docs/phase-1-report.md` — **§3, §5 and §7** |
+| What did the hardening after it change? | `docs/phase-1-hardening-report.md` — **§5 is what it found and did not fix** |
 | How do I run the slice end to end? | `docs/phase-1-demo.md` |
 | What does the camera actually put on the wire? | `docs/lpr-wire-format-from-1x.md` — DERIVED-FROM-1X, not a vendor spec |
 | What does ORCA send a device host to move a barrier? | `docs/device-host-outbound-from-1x.md` — DERIVED-FROM-1X; **§3 is an open question, not a design** |
@@ -100,13 +101,13 @@ written.
 ./gradlew build              # compile, unit tests, build checks — the whole tree
 ./gradlew test               # unit tests only
 ./gradlew check              # unit tests + the ten build checks
-./gradlew integrationTest    # 113 property tests, real SQL Server, real Flowable
+./gradlew integrationTest    # 136 property tests, real SQL Server, real Flowable
 ```
 
 ⚠️ **`test` runs almost none of what proves this repository.** `integrationTest`
 is a separate source set and a separate task, deliberately **not** wired into
 `check`, so that `build` succeeds on a machine with no Docker daemon. What it
-skips is fifteen suites and every property that matters — the admission race, the
+skips is eighteen suites and every property that matters — the admission race, the
 severed link, the lease handover, the expired command, the outbox's atomicity.
 **Full verification is `./gradlew check integrationTest`.**
 

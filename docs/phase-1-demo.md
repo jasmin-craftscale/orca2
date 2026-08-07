@@ -319,47 +319,71 @@ from a genuinely empty database.
 
 ## 11 · What the run that produced this file actually printed
 
-Executed 7 August 2026 against the local stack, on the +10000 offset.
+Executed 7 August 2026 against the local stack, on the +10000 offset. **Re-run in
+full after the hardening**, because H1 changed what goes on the wire to the device
+host and H3 added an endpoint to look at.
 
 ```
-→ lane LANE-DEMO-01, plate T-DEMO-01, EventGuid evt-dfc3d8c3-…
-← <ZapPacket Type="ACK" Id="pkt-evt-dfc3d8c3-…" Version="4.4" SenderId="999"></ZapPacket>
+→ lane LANE-DEMO-01, plate T-HARD-01, EventGuid evt-8a74114f-…
+← <ZapPacket Type="ACK" Id="pkt-evt-8a74114f-…" Version="4.4" SenderId="999"></ZapPacket>
 ```
 
 ```
-BUFFER   ACKED  {"plate":"T-DEMO-01","confidence":"0.94","charConfidence":"0.93",
-                 "resultIndex":2,"capturedAt":"2026-08-07T09:00:00","packetId":"pkt-evt-dfc3d8c3-…"}
-VISIT    vis-f8c9f7eb-…  COMPLETED  plate=T-DEMO-01
-COMMAND  RAISE_GATE  EXECUTED  {"status":"OK","note":"STUB, AND THE SHAPE IS PROVISIONAL…"}
+BUFFER   evt-8a74114f-…  ACKED  attempts=0
+VISIT    vis-4fcba26c-…  COMPLETED  plate=T-HARD-01
+COMMAND  RAISE_GATE  EXECUTED
+         {"status":"OK","code":200,"message":"STUB. DERIVED-FROM-1X: 200 AND a body that
+          decodes is what 1.x treats as performed.","request_id":"stub-gate",
+          "timestamp":"2026-08-07T00:00:00Z"}
 OUTBOX   lane:LANE-DEMO-01  visit.completed
-         {"visitExternalId":"vis-f8c9f7eb-…","laneExternalId":"LANE-DEMO-01","plate":"T-DEMO-01"}
 DELIVERY rows: 0
 ```
 
-`resultIndex: 2` is worth noticing: the camera sent two plate hypotheses and the
-listener took the **more confident** one, which was the second.
-
-The dedup demonstration:
+**What the device host actually received**, from its own admin API — this is the
+line worth reading, because the previous run's was `POST /api/v1/commands` with a
+JSON envelope and that route existed nowhere but in this repository:
 
 ```
-← <ZapPacket Type="ACK" Id="pkt-evt-fixed-demo" …>   (twice)
-buffer rows for evt-fixed-demo: 1
+method   POST
+url      /api/DEV-DEMO-BARRIER/raiseGate
+body     ''
+headers  {'Content-Type': 'application/json'}
 ```
 
-Two acknowledgements, one row. **Both ACKs are honest** — the row exists when each
-is sent, which is exactly what the receipt claims.
+Empty body, the device addressed in the path, and **no `Authorization` header** —
+1.x sends one and nobody knows whether the host requires it (register **NEW-4**).
+
+The buffer diagnostics, immediately after the visit closed:
+
+```json
+{"siteExternalId": "SITE-DEMO", "observedAt": "2026-08-07T19:15:31.376835Z",
+ "totalDepth": 0, "totalDead": 0,
+ "lanes": [{"laneExternalId": "LANE-DEMO-01", "ownedByThisInstance": true,
+            "depth": 0, "dead": 0}]}
+```
+
+`oldestUndeliveredAt` and its age are **absent rather than zero**: the buffer is
+empty, and an empty buffer has no oldest event.
 
 The expired command:
 
-```
-{"status":"SUCCESS","code":"OK","data":{"commandId":"cmd-stale-demo",
- "detail":"discarded as expired: 3 ms elapsed of a 0 ms deadline. Nothing was sent.",
- "status":"FAILED"}, …}
-device-host calls mentioning cmd-stale-demo: 0
+```json
+{"commandId": "cmd-stale-hard", "status": "FAILED",
+ "detail": "discarded as expired: 7 ms elapsed of a 0 ms deadline. Nothing was sent."}
 ```
 
-Replayed with the same `commandId`, it answers with the recorded outcome — the same
-`detail`, and the original `ackedAt` rather than a fresh one.
+```
+device-host calls mentioning cmd-stale-hard: 0
+```
+
+And an action the 1.x extraction has no route for — **refused, with the reason in
+the outcome an operator reads**, rather than posted at a guessed URL:
+
+```json
+{"commandId": "cmd-ptz-hard", "status": "FAILED",
+ "detail": "no device-host route is recorded for action 'PTZ_PRESET'. The 1.x extraction
+            covers the gate, print and IO calls and nothing else …"}
+```
 
 ---
 
