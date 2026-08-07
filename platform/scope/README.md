@@ -22,6 +22,53 @@ carry neither `site_id` nor `customer_id` by design. A tenant column baked into
 this type would decide NEW-1a by accident, in the direction that cannot express
 what the portal actually needs.
 
+## Why a write throws where a read returns nothing
+
+Phase 0's seam read only. WP2 added the write half, and it is deliberately **not**
+symmetrical: an out-of-scope read returns an empty list, an out-of-scope write
+throws `ScopeViolationException`.
+
+The asymmetry is the point. The two failures look identical to the code that
+follows them — no exception either way — but they are not identical to whoever has
+to find the problem later:
+
+| | What the caller sees | What is left behind |
+|---|---|---|
+| Read outside scope | An empty list, which is a thing you can branch on | Nothing |
+| Write "outside scope", if it returned 0 | The same absence of an exception a success gives | **No row, and no record that one was wanted** |
+
+A write that quietly changed nothing is indistinguishable from a write that
+worked, and the symptom arrives much later as missing data with no log line. So it
+is loud.
+
+An **update that matches no rows** is a different thing again, and returns `0`
+normally — the caller holds the scope, the rows had simply moved on. Only *not
+holding the scope at all* throws.
+
+**There is no delete.** §D3 retires records rather than removing them, so a
+retirement is an update — which means the one operation that makes a row vanish
+from every published view acquires the scope predicate like any other write.
+
+## How a scope gets established
+
+The seam applies whatever `ScopeContext` carries and **never invents one**. Two
+deliberate acts, and nothing else:
+
+- **A request path** derives it at the request boundary from claims and
+  configuration, and runs the work inside `ScopeContext.callIn`. *What* that
+  derivation is belongs to the security design and to register item **NEW-1a** —
+  this module takes no position, which is why `Scope` is opaque about what a
+  dimension means.
+- **Background work** sets the installation's own scope explicitly, inside the
+  system context it is already required to enter.
+
+⚠️ **Entering `SystemContext` grants an identity, not an entitlement**, and the two
+are deliberately not wired together. A background job that acquired scope merely by
+being a background job would be a bypass — and the one bypass nobody would ever
+notice, because system work has no user to notice on its behalf. Work that
+establishes neither runs under `Scope.DENY`: reads return nothing, writes are
+refused. That is the intended outcome, not a gap.
+
 ## ⚠️ The connection-pool trap
 
 **If SQL Server row-level security is ever chosen, the connection pool is the trap,
@@ -59,6 +106,7 @@ may be right for the appliance's site filter and is not a general answer.
 |---|---|
 | `Scope` · `ScopeContext` | The ambient scope. Default is `Scope.DENY`, and a denied scope returns zero rows — never all rows |
 | `ScopedSelect` | A read, described. There is nowhere in it to put a scope predicate, and it refuses to be built without saying which column it is scoped by |
+| `ScopedInsert` · `ScopedUpdate` | A write, described. Same rule, same allow-list — and an insert must say which scope the row lands in, because the seam will not choose one for it |
 | `ScopeSeam` · `JdbcScopeSeam` | The one place the predicate is applied |
 | `readiness/` | The startup gate that refuses to serve when a published view this service requires is absent (Package 3) |
 | `table/` | `@PersistentTable` and `@RetentionClass` — how a table declares whether it grows with traffic, and under which retention class |

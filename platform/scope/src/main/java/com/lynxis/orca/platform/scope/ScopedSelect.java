@@ -127,22 +127,14 @@ public final class ScopedSelect {
 	}
 
 	/**
-	 * Identifiers are allow-listed by shape rather than escaped.
+	 * Identifiers are allow-listed by shape rather than escaped — see
+	 * {@link Identifiers}, which reads and writes share.
 	 *
-	 * <p>These reach SQL as text — there is no way to bind a table name — so the
-	 * only safe rule is a narrow one: letters, digits and underscore, starting with
-	 * a letter. Anything else is refused rather than quoted, because quoting is
-	 * where injection defences go wrong.
+	 * <p>Shared rather than duplicated on purpose: two copies of an allow-list is
+	 * one copy that eventually gets a special case added to it, and it is never the
+	 * copy the reviewer is looking at.
 	 */
 	private static String identifier(String value, String what) {
-		if (value == null || value.isBlank()) {
-			throw new IllegalArgumentException("A " + what + " name is required");
-		}
-		if (!value.matches("[A-Za-z][A-Za-z0-9_]*")) {
-			throw new IllegalArgumentException(
-					"Refusing '" + value + "' as a " + what + " name. Identifiers reach SQL as text "
-							+ "and are allow-listed by shape: letters, digits and underscore only.");
-		}
-		return value;
+		return Identifiers.require(value, what);
 	}
 }

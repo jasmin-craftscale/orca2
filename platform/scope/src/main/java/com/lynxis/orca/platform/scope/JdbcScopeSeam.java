@@ -42,6 +42,80 @@ public class JdbcScopeSeam implements ScopeSeam {
 		return count == null ? 0L : count;
 	}
 
+	@Override
+	public int insert(ScopedInsert insert) {
+		// The check happens BEFORE any SQL exists. There is no statement to inspect,
+		// no predicate to get wrong, and no path where an unpermitted row reaches the
+		// database and is then cleaned up.
+		requirePermitted(insert.table(), insert.scopeDimension(), insert.scopeValue());
+
+		List<String> columns = insert.columnOrder();
+		StringBuilder sql = new StringBuilder("INSERT INTO ").append(insert.table()).append(" (");
+		sql.append(String.join(", ", columns)).append(") VALUES (");
+		for (int i = 0; i < columns.size(); i++) {
+			sql.append(i == 0 ? "?" : ", ?");
+		}
+		sql.append(')');
+
+		Object[] values = columns.stream().map(insert.columns()::get).toArray();
+		return jdbc.update(sql.toString(), values);
+	}
+
+	@Override
+	public int update(ScopedUpdate update) {
+		Scope scope = ScopeContext.current();
+		Set<String> permitted = permittedFor(scope, update.scopeDimension());
+		if (permitted.isEmpty()) {
+			// Deliberately not "UPDATE ... WHERE 1 = 0". That would return zero and be
+			// indistinguishable from an update whose rows had already moved on.
+			throw ScopeViolationException.noScopeFor(update.table(), update.scopeDimension());
+		}
+
+		List<String> assignments = update.assignmentOrder();
+		List<Object> parameters = new ArrayList<>();
+
+		StringBuilder sql = new StringBuilder("UPDATE ").append(update.table()).append(" SET ");
+		for (int i = 0; i < assignments.size(); i++) {
+			sql.append(i == 0 ? "" : ", ").append(assignments.get(i)).append(" = ?");
+			parameters.add(update.assignments().get(assignments.get(i)));
+		}
+
+		// Scope first, caller's filter second, and the filter is ANDed — so it can
+		// only ever narrow. There is no arrangement of the caller's fragment that
+		// widens the set of rows this statement can reach.
+		sql.append(" WHERE ").append(update.scopeColumn()).append(" IN (");
+		for (int i = 0; i < permitted.size(); i++) {
+			sql.append(i == 0 ? "?" : ", ?");
+		}
+		sql.append(')');
+		parameters.addAll(permitted);
+
+		if (update.filter() != null && !update.filter().isBlank()) {
+			sql.append(" AND (").append(update.filter()).append(')');
+			parameters.addAll(update.filterParameters());
+		}
+
+		return jdbc.update(sql.toString(), parameters.toArray());
+	}
+
+	private void requirePermitted(String table, String dimension, Object value) {
+		Set<String> permitted = permittedFor(ScopeContext.current(), dimension);
+		if (permitted.isEmpty()) {
+			throw ScopeViolationException.noScopeFor(table, dimension);
+		}
+		// Compared as text because Scope is deliberately opaque about what a
+		// dimension holds: it does not know that site_id is a number here and a UUID
+		// somewhere else, and it must not have to.
+		if (value == null || !permitted.contains(String.valueOf(value))) {
+			throw ScopeViolationException.valueNotPermitted(table, dimension, value);
+		}
+	}
+
+	/** The permitted values, or empty for both "denied" and "says nothing about this dimension". */
+	private static Set<String> permittedFor(Scope scope, String dimension) {
+		return scope.isDeny() ? Set.of() : scope.permitted(dimension);
+	}
+
 	private Statement build(String projection, ScopedSelect select, boolean allowOrderAndLimit) {
 		Scope scope = ScopeContext.current();
 		List<Object> parameters = new ArrayList<>();
