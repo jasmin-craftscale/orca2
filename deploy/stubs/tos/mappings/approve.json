@@ -1,0 +1,15 @@
+{
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "urlPath": "/tos/v1/visits"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "decision": "APPROVED",
+      "note": "STUB. A real Terminal Operating System would decide this from the booking, the container and the driver."
+    }
+  }
+}

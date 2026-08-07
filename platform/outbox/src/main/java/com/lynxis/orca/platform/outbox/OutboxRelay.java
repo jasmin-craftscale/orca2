@@ -131,6 +131,30 @@ public class OutboxRelay {
 				() -> deliverPendingAsSystem(batchSize));
 	}
 
+	/**
+	 * The same pass, for a caller that has <em>already</em> established a system
+	 * identity.
+	 *
+	 * <p><strong>This exists because {@link #deliverPending} and
+	 * {@code SystemContextRule} contradicted each other, and running it is what found
+	 * it.</strong> The build check requires every {@code @Scheduled} method to enter a
+	 * system context; {@code deliverPending} enters one itself; and
+	 * {@link SystemContext} refuses to nest — deliberately, because a system entry
+	 * point reached from inside another one is a call path nobody expected. So the
+	 * first scheduled method that called the relay threw on every tick.
+	 *
+	 * <p>The guard is not weakened and the nesting rule is not relaxed. The identity
+	 * is <em>asserted</em> here instead of established: a caller with none is refused
+	 * by {@link SystemContext#require()}, so the relay still cannot run anonymously —
+	 * which is the guarantee §B6 and §D3 actually ask for. What changes is who names
+	 * the identity, and the scheduling service naming its own is the better answer:
+	 * an operator reading the audit trail sees {@code orca-runtime}, not a primitive.
+	 */
+	public int deliverPendingUnderCurrentIdentity(int batchSize) {
+		SystemContext.require();
+		return deliverPendingAsSystem(batchSize);
+	}
+
 	private int deliverPendingAsSystem(int batchSize) {
 		int acknowledged = 0;
 		for (OutboxConsumer consumer : consumers) {

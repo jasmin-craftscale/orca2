@@ -16,6 +16,9 @@ archunit = "1.5.0"
 # Flowable 8.0.0 is the first line built for Spring Framework 7 / Spring Boot 4.
 flowable = "8.0.0"
 openapiGenerator = "7.14.0"
+# The Spring Boot BOM does not manage Resilience4j, so this is one of the two
+# versions named outside it. See the library entry for why the dependency exists.
+resilience4j = "2.3.0"
 
 [libraries]
 # The Spring Boot BOM. Applied as a platform in every module by the root build, so
@@ -65,6 +68,27 @@ lombok = { module = "org.projectlombok:lombok" }
 # /openapi/<service>.yaml instead — §4b's own stated fallback.
 archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
 flowable-spring-boot-starter-process = { module = "org.flowable:flowable-spring-boot-starter-process", version.ref = "flowable" }
+
+# --- Resilience (WP7) · orca-runtime only ---------------------------------
+# WHY: §B8 requires every outbound call to have a deadline AND a defined outcome
+# when it is exceeded, and §A1 requires the gate to keep working when other things
+# do not. A customer system that has stopped answering must not be given a fresh
+# connection and a fresh deadline by every truck that arrives — that is how a slow
+# dependency becomes an unavailable gate, because the calls pile up faster than
+# they time out. A breaker turns the wait into an immediate, routable answer, and a
+# bulkhead bounds how much of this service one connector can occupy.
+#
+# WHY THIS LIBRARY: it is the boring, defensible choice — the one Spring Boot's own
+# documentation points at, with no server, no agent and no ambient behaviour. It is
+# used PROGRAMMATICALLY here rather than through its Spring Boot starter and its
+# AOP annotations: a breaker that opens is a routing decision the process has to
+# see (§C2 routes on the outcome token), and an aspect that throws from around a
+# method makes that decision invisible at the call site.
+#
+# `circuitbreaker` carries the bulkhead and the core; no starter, no actuator, no
+# metrics binding — those are a deployment's choice and not a slice's.
+resilience4j-circuitbreaker = { module = "io.github.resilience4j:resilience4j-circuitbreaker", version.ref = "resilience4j" }
+resilience4j-bulkhead = { module = "io.github.resilience4j:resilience4j-bulkhead", version.ref = "resilience4j" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }

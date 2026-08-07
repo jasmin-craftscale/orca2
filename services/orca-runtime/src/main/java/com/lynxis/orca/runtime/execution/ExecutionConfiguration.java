@@ -1,6 +1,10 @@
 package com.lynxis.orca.runtime.execution;
 
+import java.util.List;
+
 import org.flowable.engine.RuntimeService;
+import org.flowable.spring.SpringProcessEngineConfiguration;
+import org.flowable.spring.boot.EngineConfigurationConfigurer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -9,16 +13,20 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.lynxis.orca.platform.idempotency.IdempotencyStore;
+import com.lynxis.orca.platform.outbox.OutboxWriter;
 import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.runtime.execution.api.DeviceEventController;
 import com.lynxis.orca.runtime.execution.domain.AdmissionService;
 import com.lynxis.orca.runtime.execution.domain.ConnectorCallDelegate;
-import com.lynxis.orca.runtime.execution.domain.ConnectorPort;
 import com.lynxis.orca.runtime.execution.domain.DeviceCommandDelegate;
 import com.lynxis.orca.runtime.execution.domain.DeviceCommandPort;
 import com.lynxis.orca.runtime.execution.domain.ProcessEngineGateway;
+import com.lynxis.orca.runtime.execution.domain.VisitCompletion;
+import com.lynxis.orca.runtime.execution.domain.VisitCompletionListener;
 import com.lynxis.orca.runtime.execution.persistence.AdmissionRepository;
+import com.lynxis.orca.runtime.execution.persistence.EdgeDeviceCommandClient;
 import com.lynxis.orca.runtime.execution.persistence.FlowableProcessEngineGateway;
+import com.lynxis.orca.runtime.integration.api.ConnectorPort;
 
 /**
  * Wires the `execution` module.
@@ -74,6 +82,43 @@ public class ExecutionConfiguration {
 	public DeviceEventController deviceEventController(AdmissionService admission,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
 		return new DeviceEventController(admission, siteExternalId);
+	}
+
+	// --- WP7 · out to the hardware, and the end of the visit ------------------
+
+	/**
+	 * The device transport, replacing the deployment-fault fallback below.
+	 *
+	 * <p>It reaches edge's {@code /internal/commands/v1} with the per-installation
+	 * shared credential (ADR-011). No token is minted, because token <em>issuing</em>
+	 * would put the identity provider on the gate path.
+	 */
+	@Bean
+	public DeviceCommandPort deviceCommandPort(
+			@Value("${orca.runtime.edge-base-url:http://localhost:8083}") String edgeBaseUrl,
+			@Value("${orca.internal.shared-credential}") String sharedCredential) {
+		return new EdgeDeviceCommandClient(edgeBaseUrl, sharedCredential);
+	}
+
+	@Bean
+	public VisitCompletion visitCompletion(AdmissionRepository repository, OutboxWriter outbox,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new VisitCompletion(repository, outbox, siteExternalId);
+	}
+
+	/**
+	 * Registers the completion listener on the engine.
+	 *
+	 * <p>Through the engine's configuration rather than as a {@code @Bean} of a
+	 * Flowable type, so that the listener is attached once, at startup, to the one
+	 * engine — and so that this file remains the only place in the module that says
+	 * anything about how the engine is assembled.
+	 */
+	@Bean
+	public EngineConfigurationConfigurer<SpringProcessEngineConfiguration> visitCompletionRegistrar(
+			VisitCompletion completion) {
+		return configuration -> configuration.setEventListeners(
+				List.of(new VisitCompletionListener(completion)));
 	}
 
 	/**

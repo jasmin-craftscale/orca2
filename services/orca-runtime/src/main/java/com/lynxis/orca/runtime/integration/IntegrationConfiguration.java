@@ -1,0 +1,92 @@
+package com.lynxis.orca.runtime.integration;
+
+import java.time.Duration;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import com.lynxis.orca.platform.scope.ScopeSeam;
+import com.lynxis.orca.runtime.integration.api.ConnectorPort;
+import com.lynxis.orca.runtime.integration.domain.RestConnector;
+import com.lynxis.orca.runtime.integration.persistence.ConnectorConfigRepository;
+
+import io.github.resilience4j.bulkhead.BulkheadConfig;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+
+/**
+ * Wires the `integration` module — its first classes.
+ *
+ * <p><strong>{@link ConnectorPort} lives here, not in {@code execution}.</strong>
+ * WP4 put it in {@code execution.domain} because {@code integration} was empty and
+ * there was nothing to talk to. Now there is, and {@code ModuleWallRule} is right
+ * to forbid {@code integration} from reaching into another module's {@code domain}:
+ * modules talk through their {@code api} packages. The direction is the natural one
+ * — {@code integration} owns what a connector <em>is</em> and publishes the
+ * interface; {@code execution}'s delegate calls it. Recorded in the phase report as
+ * a change to WP4's placement.
+ */
+@Configuration(proxyBeanMethods = false)
+public class IntegrationConfiguration {
+
+	@Bean
+	public ConnectorConfigRepository connectorConfigRepository(ScopeSeam seam) {
+		return new ConnectorConfigRepository(seam);
+	}
+
+	/**
+	 * ⚠️ <strong>These numbers are a local profile's answer and not a
+	 * recommendation for a site.</strong> The architecture states no threshold and
+	 * no window, and it is right not to: a terminal operating system that is
+	 * routinely slow at shift change and one that is never slow want different
+	 * numbers, and choosing them belongs to whoever runs the site. They are
+	 * configuration, with defaults, exactly as the lease's durations are.
+	 *
+	 * <p>The one thing that is not tunable is the shape: {@code COUNT_BASED} rather
+	 * than time-based, because a gate that sees six trucks an hour would never fill
+	 * a time window, and a breaker that never has enough data never opens.
+	 */
+	@Bean
+	public CircuitBreakerRegistry connectorCircuitBreakers(
+			@Value("${orca.runtime.connector.breaker.window:20}") int window,
+			@Value("${orca.runtime.connector.breaker.failure-rate-percent:50}") float failureRate,
+			@Value("${orca.runtime.connector.breaker.open-duration:30s}") Duration openDuration,
+			@Value("${orca.runtime.connector.breaker.half-open-calls:3}") int halfOpenCalls) {
+
+		return CircuitBreakerRegistry.of(CircuitBreakerConfig.custom()
+				.slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
+				.slidingWindowSize(window)
+				.minimumNumberOfCalls(window)
+				.failureRateThreshold(failureRate)
+				.waitDurationInOpenState(openDuration)
+				.permittedNumberOfCallsInHalfOpenState(halfOpenCalls)
+				.automaticTransitionFromOpenToHalfOpenEnabled(true)
+				.build());
+	}
+
+	/**
+	 * How many calls one connector may have in flight.
+	 *
+	 * <p>{@code maxWaitDuration} is zero on purpose: a caller that cannot get a
+	 * permit is refused immediately rather than queued. Queueing here would
+	 * reintroduce exactly the pile-up the bulkhead exists to prevent, one level up.
+	 */
+	@Bean
+	public BulkheadRegistry connectorBulkheads(
+			@Value("${orca.runtime.connector.bulkhead.max-concurrent-calls:16}") int maxConcurrentCalls) {
+
+		return BulkheadRegistry.of(BulkheadConfig.custom()
+				.maxConcurrentCalls(maxConcurrentCalls)
+				.maxWaitDuration(Duration.ZERO)
+				.build());
+	}
+
+	@Bean
+	public ConnectorPort connectorPort(ConnectorConfigRepository configuration,
+			CircuitBreakerRegistry breakers, BulkheadRegistry bulkheads,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new RestConnector(configuration, breakers, bulkheads, siteExternalId);
+	}
+}

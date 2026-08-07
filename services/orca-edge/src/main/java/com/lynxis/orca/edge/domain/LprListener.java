@@ -13,8 +13,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynxis.orca.edge.domain.EdgeTables.BufferedEvent;
 import com.lynxis.orca.edge.persistence.EventBufferRepository;
 import com.lynxis.orca.platform.lease.FencedWrite;
@@ -23,6 +21,9 @@ import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.platform.web.system.SystemContext;
 import com.lynxis.orca.platform.web.system.SystemIdentity;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -85,14 +86,14 @@ public class LprListener implements AutoCloseable {
 	private final EventBufferRepository buffer;
 	private final LaneOwnership ownership;
 	private final FencedWrite fencedWrite;
-	private final ObjectMapper json;
+	private final JsonMapper json;
 
 	private final AtomicBoolean running = new AtomicBoolean();
 	private ServerSocket serverSocket;
 	private ExecutorService connections;
 
 	public LprListener(int port, String siteExternalId, LprFraming framing, EventBufferRepository buffer,
-			LaneOwnership ownership, FencedWrite fencedWrite, ObjectMapper json) {
+			LaneOwnership ownership, FencedWrite fencedWrite, JsonMapper json) {
 		this.port = port;
 		this.siteExternalId = siteExternalId;
 		this.framing = framing;
@@ -255,7 +256,7 @@ public class LprListener implements AutoCloseable {
 		try {
 			return json.writeValueAsString(attributes);
 		}
-		catch (JsonProcessingException cannotSerialise) {
+		catch (JacksonException cannotSerialise) {
 			// A map of strings that will not serialise is not a condition this can
 			// recover from, and dropping the attributes silently would leave the row
 			// looking complete.

@@ -83,6 +83,36 @@ services:
       retries: 30
       start_period: 20s
 
+  # ---------------------------------------------------------------------------
+  # The two parties in §B9's sequence that ORCA does not build (WP7).
+  #
+  # A demo needs something at the other end of the connector call and something at
+  # the other end of the barrier command. Both are WireMock with static mappings,
+  # and both are deliberately dumb: a stub that reasoned about the request would
+  # start encoding assumptions about the real component.
+  #
+  # ⚠️ The device-host mappings speak a PROVISIONAL dialect. §D2 freezes that
+  # contract and §C3 specifies its INBOUND half; the outbound command shape is one
+  # sentence and is recorded nowhere. See deploy/stubs/README.md.
+  # ---------------------------------------------------------------------------
+  tos-stub:
+    image: wiremock/wiremock:3.13.1
+    container_name: orca-tos-stub
+    command: ["--verbose", "--global-response-templating"]
+    ports:
+      - "${ORCA_TOS_STUB_PORT:-9200}:8080"
+    volumes:
+      - ./stubs/tos:/home/wiremock:ro
+
+  device-host-stub:
+    image: wiremock/wiremock:3.13.1
+    container_name: orca-device-host-stub
+    command: ["--verbose", "--global-response-templating"]
+    ports:
+      - "${ORCA_DEVICE_HOST_STUB_PORT:-9300}:8080"
+    volumes:
+      - ./stubs/device-host:/home/wiremock:ro
+
 volumes:
   orca-sqlserver-data:
     name: orca-sqlserver-data

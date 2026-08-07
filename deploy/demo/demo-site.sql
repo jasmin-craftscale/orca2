@@ -60,13 +60,26 @@ IF NOT EXISTS (SELECT 1 FROM core.area WHERE external_id = N'AREA-DEMO-GATE')
 	FROM core.site s WHERE s.external_id = N'SITE-DEMO';
 GO
 
--- `device_host_url` is deliberately left NULL here. WP7 sets it when the
--- device-host stub exists and has an address worth writing down; inventing a port
--- now would be a number nobody chose.
+-- `device_host_url` now points at WP7's device-host stub, and the address comes in
+-- as a sqlcmd variable from seed.sh rather than being written here — it is
+-- .env's ORCA_DEVICE_HOST_STUB_PORT, and two copies of a port number is one copy
+-- that eventually disagrees.
+--
+-- It is a LOCALHOST url because edge runs on the developer's machine and the stub
+-- runs in the compose network; the container name would resolve only from inside
+-- another container.
 IF NOT EXISTS (SELECT 1 FROM core.lane WHERE external_id = N'LANE-DEMO-01')
 	INSERT INTO core.lane (external_id, area_id, code, name, device_host_url, is_out_of_service, lane_priority)
-	SELECT N'LANE-DEMO-01', a.area_id, N'L01', N'Lane 1', NULL, 0, 0
+	SELECT N'LANE-DEMO-01', a.area_id, N'L01', N'Lane 1', N'$(deviceHostUrl)', 0, 0
 	FROM core.area a WHERE a.external_id = N'AREA-DEMO-GATE';
+GO
+
+-- Re-running the seed after changing the stub's port should move the lane, not
+-- leave it pointing at a port nothing listens on. The insert above is guarded by
+-- existence; this is the part that has to be idempotent by UPDATE.
+UPDATE core.lane SET device_host_url = N'$(deviceHostUrl)'
+WHERE external_id = N'LANE-DEMO-01'
+  AND (device_host_url IS NULL OR device_host_url <> N'$(deviceHostUrl)');
 GO
 
 -- ⚠️ PROVISIONAL device-type vocabulary. Nothing in the architecture enumerates

@@ -1,0 +1,16 @@
+{
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/tos/v1/visits",
+    "bodyPatterns": [ { "matchesJsonPath": "$[?(@.laneExternalId == 'LANE-DEMO-BLOCKED')]" } ]
+  },
+  "response": {
+    "status": 409,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "decision": "REFUSED",
+      "note": "STUB. 409 is mapped to REFUSED by connector_route, which routes the visit to a human."
+    }
+  }
+}

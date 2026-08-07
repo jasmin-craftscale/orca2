@@ -8,20 +8,28 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestClient;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lynxis.orca.edge.api.DeviceCommandController;
 import com.lynxis.orca.edge.domain.DeliveryPump;
+import com.lynxis.orca.edge.domain.DeviceCommandService;
+import com.lynxis.orca.edge.domain.DeviceHostPort;
 import com.lynxis.orca.edge.domain.IngestTasks;
 import com.lynxis.orca.edge.domain.LaneOwnership;
 import com.lynxis.orca.edge.domain.LprFraming;
 import com.lynxis.orca.edge.domain.LprListener;
+import com.lynxis.orca.edge.domain.RestDeviceHost;
 import com.lynxis.orca.edge.domain.RuntimeEventWire;
+import com.lynxis.orca.edge.persistence.CommandLogRepository;
 import com.lynxis.orca.edge.persistence.EventBufferRepository;
+import com.lynxis.orca.platform.idempotency.IdempotencyStore;
 import com.lynxis.orca.platform.lease.FencedWrite;
 import com.lynxis.orca.platform.lease.LeaseManager;
 import com.lynxis.orca.platform.scope.ScopeSeam;
+
+import tools.jackson.databind.json.JsonMapper;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -57,14 +65,32 @@ public class EdgeIngestConfiguration {
 	 * the request, and {@code X-Orca-Service} is attribution only — a shared
 	 * credential cannot prove which peer is calling, and treating it as authority
 	 * would be reading more into it than it can carry.
+	 *
+	 * <p>⚠️ Built with {@code RestClient.builder()} and not with an injected
+	 * {@code RestClient.Builder}.
+	 *
+	 * <p>That is a fix, not a preference. Spring Boot 4 does not auto-configure a
+	 * {@code RestClient.Builder} bean here, so the injected form made this service
+	 * <strong>fail to start</strong> — and no test saw it, because every suite
+	 * constructs these beans directly rather than refreshing the context. Found by
+	 * running the demo; recorded in the phase report.
+	 *
+	 * <p>The deadline is new with it. §B8 requires every external call to have one,
+	 * and the pump's POST had none: a runtime that accepted the connection and then
+	 * went quiet would have held the pump's only thread indefinitely, which is a
+	 * lane that stops draining rather than one that retries.
 	 */
 	@Bean
 	public DeliveryPump.EventDeliveryPort eventDeliveryPort(
-			RestClient.Builder restClients,
 			@Value("${orca.edge.runtime-base-url:http://localhost:8082}") String runtimeBaseUrl,
+			@Value("${orca.edge.pump.deadline:10s}") Duration deadline,
 			@Value("${orca.internal.shared-credential}") String sharedCredential) {
 
-		RestClient runtime = restClients
+		JdkClientHttpRequestFactory transport = new JdkClientHttpRequestFactory();
+		transport.setReadTimeout(deadline);
+
+		RestClient runtime = RestClient.builder()
+				.requestFactory(transport)
 				.baseUrl(runtimeBaseUrl)
 				.defaultHeader("X-Orca-Internal-Auth", sharedCredential)
 				.defaultHeader("X-Orca-Service", "orca-edge")
@@ -112,10 +138,37 @@ public class EdgeIngestConfiguration {
 
 	@Bean(destroyMethod = "close")
 	public LprListener lprListener(LprFraming framing, EventBufferRepository buffer,
-			LaneOwnership ownership, FencedWrite fencedWrite, ObjectMapper json,
+			LaneOwnership ownership, FencedWrite fencedWrite, JsonMapper json,
 			@Value("${orca.edge.lpr.port:9100}") int port,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
 		return new LprListener(port, siteExternalId, framing, buffer, ownership, fencedWrite, json);
+	}
+
+	// --- WP7 · commands in (§C3) ----------------------------------------------
+
+	@Bean
+	public CommandLogRepository commandLogRepository(ScopeSeam seam) {
+		return new CommandLogRepository(seam);
+	}
+
+	/** ⚠️ The outbound device-host shape is PROVISIONAL — see {@link DeviceHostPort}. */
+	@Bean
+	public DeviceHostPort deviceHostPort() {
+		return new RestDeviceHost();
+	}
+
+	@Bean
+	public DeviceCommandService deviceCommandService(CommandLogRepository commandLog,
+			DeviceHostPort deviceHost, IdempotencyStore idempotency,
+			@Value("${orca.installation.site-external-id}") String siteExternalId,
+			@Value("${orca.edge.holder-id:${HOSTNAME:edge-local}}") String holderId) {
+		return new DeviceCommandService(commandLog, deviceHost, idempotency, siteExternalId, holderId);
+	}
+
+	@Bean
+	public DeviceCommandController deviceCommandController(DeviceCommandService commands,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new DeviceCommandController(commands, siteExternalId);
 	}
 
 	/**

@@ -30,7 +30,7 @@ import org.springframework.test.context.DynamicPropertySource;
 
 import com.lynxis.orca.platform.outbox.testing.PlatformDatabase;
 import com.lynxis.orca.runtime.RuntimeApplication;
-import com.lynxis.orca.runtime.execution.domain.ConnectorPort;
+import com.lynxis.orca.runtime.integration.api.ConnectorPort;
 import com.lynxis.orca.runtime.execution.domain.DeviceCommandPort;
 import com.lynxis.orca.runtime.execution.domain.ProcessEngineGateway;
 import com.lynxis.orca.runtime.execution.domain.ProcessVariables;
@@ -303,6 +303,16 @@ class GateVisitProcessIT {
 	 * not the delegates — so what is exercised is the real
 	 * {@code ConnectorCallDelegate} and {@code DeviceCommandDelegate}, under the
 	 * bean names the compiler emits.
+	 *
+	 * <p>⚠️ {@code @Primary} since WP7. Both ports now have real implementations —
+	 * {@code RestConnector} and {@code EdgeDeviceCommandClient} — so a substitution
+	 * has to say which one wins. Without it this suite passed on a real connector
+	 * with no configuration and asserted the failure branch, which is a green test
+	 * measuring something it was not written to measure.
+	 *
+	 * <p>This suite is about the PROCESS: the gateway's branching, the two BPMN
+	 * error codes, and the end states. {@code VisitLifecycleIT} is the one that runs
+	 * both real transports against real sockets.
 	 */
 	@Configuration(proxyBeanMethods = false)
 	static class StubPorts {
@@ -313,6 +323,7 @@ class GateVisitProcessIT {
 		}
 
 		@Bean
+		@org.springframework.context.annotation.Primary
 		ConnectorPort stubConnectorPort(Recorder recorder) {
 			return call -> {
 				while (recorder.blockUntilReleased.get()) {
@@ -327,6 +338,7 @@ class GateVisitProcessIT {
 		}
 
 		@Bean
+		@org.springframework.context.annotation.Primary
 		DeviceCommandPort stubDeviceCommandPort(Recorder recorder) {
 			return command -> {
 				recorder.deviceCommands.add(command);

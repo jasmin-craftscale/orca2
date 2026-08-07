@@ -12,9 +12,9 @@ openapi: 3.0.3
 # Generated sources are never committed. In version control they drift from the
 # spec and nobody notices.
 #
-# ⚠️ Phase 0 authors ONE route. The routes in §C3's interface table arrive with
-# the behaviour behind them; writing them here now would be publishing a surface
-# nothing implements.
+# A route is authored here when the behaviour behind it exists, and not before —
+# publishing a surface nothing implements is how a contract stops being true.
+# WP7 adds §C3's /internal/commands/v1 and its read-back.
 # =============================================================================
 
 info:
@@ -30,6 +30,12 @@ servers:
 tags:
   - name: health
     description: The service's own contracted health route.
+  - name: internalCommands
+    description: |
+      Device commands arriving from orca-runtime (§C3, §B9 step 6).
+
+      Under `/internal/**`, so the per-installation shared credential authenticates
+      it and no token is minted (ADR-011).
 
 paths:
   /api/v1/health:
@@ -56,8 +62,162 @@ paths:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 
+  /internal/commands/v1:
+    post:
+      tags: [internalCommands]
+      operationId: issueDeviceCommand
+      summary: Issue one command to a lane's device host
+      description: |
+        **`commandId` is the idempotency key**, and §C3 fixes what it is: the
+        node-execution id. Replaying a command returns the recorded outcome rather
+        than acting again — a barrier does not rise twice because a caller retried.
+
+        **An expired command is discarded, never delivered.** A command whose
+        `deadlineMs` has elapsed before it reached the device host describes a
+        world that has moved on: the truck may have gone, another may be in the
+        lane. Stale actuation is dangerous in a way that a missed command is not,
+        so the deadline is checked here, at the last moment before the physical
+        act, and not only by the caller.
+
+        **`UNKNOWN` is part of the enum, not an omission.** It is what the deadline
+        produces, and §B10 resolves it by verifying the device's actual state —
+        never by retrying and never by assuming failure. A client that coerces it
+        to `FAILED` produces the exact hazard the enum exists to prevent: the gate
+        told that a barrier did not rise when it did.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceCommand"
+      responses:
+        "200":
+          description: The command reached a recorded outcome
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceCommandEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: The lane is not one this installation's site publishes
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /internal/commands/{commandId}:
+    get:
+      tags: [internalCommands]
+      operationId: readDeviceCommand
+      summary: The recorded outcome and device response of a command
+      description: |
+        §C3's read-back. For a caller that issued a command, lost its answer, and
+        must not issue it again to find out what happened.
+      parameters:
+        - name: commandId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: The recorded outcome
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceCommandEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No command by that id was ever issued here
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
 components:
   schemas:
+
+    DeviceCommand:
+      type: object
+      required: [commandId, laneExternalId, action, deadlineMs]
+      properties:
+        commandId:
+          type: string
+          maxLength: 64
+          description: The node-execution id (§C3). The idempotency key.
+        laneExternalId:
+          type: string
+          maxLength: 64
+        deviceExternalId:
+          type: string
+          maxLength: 64
+          description: |
+            Which device on the lane. Optional: a lane with one barrier does not
+            need to say which barrier, and §C3's actions are per lane.
+        action:
+          type: string
+          maxLength: 32
+          description: "`RAISE_GATE` · `LOWER_GATE` · `PRINT` · `SET_IO` · `PTZ_PRESET` (§C3)."
+        params:
+          type: string
+          description: Action parameters as a JSON object, passed through to the device host.
+        deadlineMs:
+          type: integer
+          format: int64
+          description: |
+            How long the command remains worth performing, from when the caller
+            issued it. Checked here, at the last moment before the physical act.
+
+    DeviceCommandEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/DeviceCommandResult"
+
+    DeviceCommandResult:
+      type: object
+      properties:
+        commandId:
+          type: string
+        status:
+          type: string
+          enum: [EXECUTED, FAILED, UNKNOWN, IN_PROGRESS]
+          description: |
+            §C3's enum, verbatim.
+
+            * `EXECUTED` — the device host acknowledged **and** its response
+              decoded. Anything less is not an execution.
+            * `FAILED` — the host answered with an error, its response did not
+              decode, or the command was discarded as expired before it was sent.
+            * `UNKNOWN` — the deadline passed with no answer. Resolved by
+              verifying the device, never by retrying.
+            * `IN_PROGRESS` — another delivery of this same `commandId` is being
+              performed right now. Not terminal, and not a failure.
+        deviceResponse:
+          type: string
+          description: What the device host said, verbatim, for an operator reading the log.
+        detail:
+          type: string
+          description: |
+            Why, in one line, when the status alone does not say — notably the
+            difference between a host that refused and a command discarded as
+            expired. Both are `FAILED`; only one of them reached the hardware.
+        ackedAt:
+          type: string
+          format: date-time
 
     # The envelope comes from platform/web, which DEFINES and IMPLEMENTS it.
     # A cross-module $ref, resolved by the generator — deliberately not a copy.

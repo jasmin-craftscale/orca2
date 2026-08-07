@@ -200,6 +200,11 @@ dependencies {
 	implementation(libs.flowable.spring.boot.starter.process) // the process engine, embedded (ADR-006)
 	implementation(libs.spring.boot.starter.websocket)        // mechanism 5 of §B4: console live updates
 
+	// WP7's one catalog addition, and only this service calls a customer system.
+	// The why is recorded on the catalog entry, which is where the rule puts it.
+	implementation(libs.resilience4j.circuitbreaker)
+	implementation(libs.resilience4j.bulkhead)
+
 	// --- Tests ----------------------------------------------------------
 	testImplementation(libs.spring.boot.starter.test)
 	testImplementation(libs.spring.boot.starter.webmvc.test)

@@ -58,6 +58,16 @@ public class AdmissionRepository {
 				.stream().findFirst();
 	}
 
+	/** The reverse of {@link #laneIdOf}, for anything leaving this service (§B8). */
+	public Optional<String> laneExternalIdOf(long laneId) {
+		return seam.select(ScopedSelect.from("core.topology_lane")
+								.columns("lane_external_id")
+								.scopedBy(SCOPE_COLUMN)
+								.where("lane_id = ?", laneId),
+						(rs, row) -> rs.getString("lane_external_id"))
+				.stream().findFirst();
+	}
+
 	/**
 	 * Creates the lane's admission row if it has none. Idempotent.
 	 *

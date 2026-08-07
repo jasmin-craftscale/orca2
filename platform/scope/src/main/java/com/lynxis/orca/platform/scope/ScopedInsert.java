@@ -73,8 +73,22 @@ public final class ScopedInsert {
 		return table;
 	}
 
+	/**
+	 * ⚠️ Not {@code Map.copyOf}, and that is a fix rather than a style choice.
+	 *
+	 * <p>{@code Map.copyOf} rejects a null <em>value</em> with a bare
+	 * {@link NullPointerException} out of {@code ImmutableCollections}, which says
+	 * nothing about columns, inserts or scope. A nullable column is entirely
+	 * ordinary — a device that did not identify itself, a command with no
+	 * parameters, an event with no attributes — and a seam that cannot express
+	 * {@code NULL} pushes every such write back to raw JDBC, which the build check
+	 * correctly forbids.
+	 *
+	 * <p>It was latent from WP2 until WP7's first insert with a genuinely absent
+	 * value found it. Recorded in the phase report rather than fixed quietly.
+	 */
 	Map<String, Object> columns() {
-		return Map.copyOf(columns);
+		return java.util.Collections.unmodifiableMap(new LinkedHashMap<>(columns));
 	}
 
 	java.util.List<String> columnOrder() {

@@ -1,0 +1,15 @@
+{
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/v1/commands"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "status": "OK",
+      "note": "STUB, AND THE SHAPE IS PROVISIONAL. See deploy/stubs/README.md: the outbound device-host contract is not recorded anywhere in this repository."
+    }
+  }
+}

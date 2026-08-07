@@ -275,6 +275,31 @@ class ScopeWritePropertiesIT {
 	// ------------------------------------------------------------------------
 
 	@Test
+	@DisplayName("a nullable column can be written as NULL — a seam that cannot express it forces raw JDBC")
+	void aNullableColumnCanBeWrittenAsNull() {
+		// Latent from WP2 until WP7's first insert with a genuinely absent value: the
+		// builder copied its values with Map.copyOf, which rejects a null with a bare
+		// NullPointerException out of ImmutableCollections. A nullable column is
+		// entirely ordinary — a device that did not identify itself, a command with no
+		// parameters — and a seam that cannot express NULL pushes every such write
+		// back to raw JDBC, which ScopeSeamRule correctly forbids.
+		jdbc.execute("IF COL_LENGTH('work_item', 'note') IS NULL ALTER TABLE work_item ADD note VARCHAR(50) NULL");
+
+		ScopeContext.runIn(Scope.of("site_id", Set.of("site-1")), () ->
+				assertThat(seam.insert(ScopedInsert.into("work_item")
+						.scopedBy("site_id")
+						.value("site_id", "site-1")
+						.value("status", "NEW")
+						.value("note", null))).isEqualTo(1));
+
+		assertThat(jdbc.queryForObject(
+				"SELECT COUNT(*) FROM work_item WHERE status = 'NEW' AND note IS NULL", Long.class))
+				.as("NULL, and not the string 'null' — which is what a workaround at the call site "
+						+ "would most likely have produced")
+				.isEqualTo(1L);
+	}
+
+	@Test
 	@DisplayName("insertReturningKey gives back the assigned key — and is refused by scope exactly as insert is")
 	void theAssignedKeyComesBackFromTheInsertItself() {
 		long key = ScopeContext.callIn(Scope.of("site_id", Set.of("site-1")),

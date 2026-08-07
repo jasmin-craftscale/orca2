@@ -88,4 +88,50 @@ public final class EdgeTables {
 			String state,
 			Instant observedAt) {
 	}
+
+	/**
+	 * One command this site was asked to perform, and its outcome (§C3).
+	 *
+	 * <p>{@link Growth#TRAFFIC_GROWING}: a barrier command per truck, forever, at
+	 * every lane. ⚠️ Retention class PROVISIONAL, as every other one in this phase
+	 * is — see {@link BufferedEvent}.
+	 *
+	 * @param status  {@code EXECUTED · FAILED · UNKNOWN}. {@code IN_PROGRESS} is a
+	 *                wire status and is deliberately absent: it describes a delivery
+	 *                in flight, not an outcome, and a row recording it would be a
+	 *                recorded outcome that is not one
+	 * @param detail  why, when the status alone does not say — notably the
+	 *                difference between a host that refused and a command discarded
+	 *                as expired before it was sent. Both are {@code FAILED}; only
+	 *                one of them reached the hardware
+	 */
+	@PersistentTable(name = "command_log", growth = Growth.TRAFFIC_GROWING)
+	@RetentionClass("device_command") // PROVISIONAL — see BufferedEvent
+	public record CommandLogEntry(
+			long commandLogId,
+			String commandId,
+			String siteExternalId,
+			String laneExternalId,
+			String deviceExternalId,
+			String action,
+			String params,
+			long deadlineMillis,
+			String status,
+			String deviceResponse,
+			String detail,
+			Instant receivedAt,
+			Instant ackedAt) {
+
+		/** The host acknowledged and its response decoded. Anything less is not an execution. */
+		public static final String EXECUTED = "EXECUTED";
+
+		/** The host answered with an error, its response did not decode, or the command had expired. */
+		public static final String FAILED = "FAILED";
+
+		/** The deadline passed with no answer. Resolved by verifying the device, never by retrying (§B10). */
+		public static final String UNKNOWN = "UNKNOWN";
+
+		/** ⚠️ A WIRE status only. Never written to the log — see the record's javadoc. */
+		public static final String IN_PROGRESS = "IN_PROGRESS";
+	}
 }

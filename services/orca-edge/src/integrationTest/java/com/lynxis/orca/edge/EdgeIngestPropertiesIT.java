@@ -524,7 +524,7 @@ class EdgeIngestPropertiesIT {
 
 	private LprListener listenerOwnedBy(LaneOwnership ownership) {
 		return new LprListener(0, SITE, new LprFraming.ZapPacketStxEtx(), buffer, ownership,
-				fencedWrite, new com.fasterxml.jackson.databind.ObjectMapper());
+				fencedWrite, tools.jackson.databind.json.JsonMapper.builder().build());
 	}
 
 	private static String zapPacket(String lane, String eventGuid, String plate, String confidence) {
@@ -631,25 +631,19 @@ class EdgeIngestPropertiesIT {
 				+ "WHERE lease_name = ?", LaneOwnership.LEASE_PREFIX + lane);
 	}
 
+	/**
+	 * ⚠️ Deliberately the SAME view definition {@code DeviceCommandPropertiesIT}
+	 * creates. The two suites share one integration database and one {@code core}
+	 * schema, so the one that ran last is the one whose definition survives — and
+	 * two definitions would make the pair pass or fail by test ordering, which is
+	 * the worst kind of green.
+	 */
 	private static void publishTopologyLane() {
-		admin("IF SCHEMA_ID(N'core') IS NULL EXEC('CREATE SCHEMA [core]')");
-		admin("IF OBJECT_ID(N'core.topology_lane', 'V') IS NOT NULL DROP VIEW core.topology_lane");
-		admin("EXEC('CREATE VIEW core.topology_lane AS SELECT ''" + SITE + "'' AS site_external_id, "
-				+ "''" + LANE + "'' AS lane_external_id')");
+		DeviceCommandPropertiesIT.EdgeTopologyFixture.publishTopologyLane(SITE, LANE, "http://localhost:1");
 	}
 
 	private static void grantTopologyLaneTo(String login) {
-		admin("GRANT SELECT ON core.topology_lane TO [" + login + "]");
-	}
-
-	private static void admin(String sql) {
-		try (Connection connection = PlatformDatabase.administrative().getConnection();
-				Statement statement = connection.createStatement()) {
-			statement.execute(sql);
-		}
-		catch (SQLException e) {
-			throw new IllegalStateException("Failed: " + sql, e);
-		}
+		DeviceCommandPropertiesIT.EdgeTopologyFixture.grantTo(login);
 	}
 
 	@SuppressWarnings("unused")

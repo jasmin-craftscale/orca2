@@ -45,9 +45,36 @@ if ! docker exec -i "$container" "$sqlcmd" \
 	exit 1
 fi
 
+# The two stub addresses, from .env, so that the port is written down once. They
+# are localhost URLs because the SERVICES run on the developer's machine while the
+# stubs run in the compose network — a container name would resolve only from
+# inside another container.
+tos_url="http://localhost:${ORCA_TOS_STUB_PORT:-9200}"
+device_host_url="http://localhost:${ORCA_DEVICE_HOST_STUB_PORT:-9300}"
+
 docker exec -i "$container" "$sqlcmd" \
-	-S localhost -U orca_core -P "$ORCA_CORE_DB_PASSWORD" -C -No -b -d orca \
+	-S localhost -U orca_core -P "$ORCA_CORE_DB_PASSWORD" -C -No -b -I -d orca \
+	-v deviceHostUrl="$device_host_url" \
 	< "$here/demo-site.sql"
+
+# Part two, as orca_runtime — these rows are in the `runtime` schema and
+# `orca_core` cannot write it. That is ADR-004 working, not an inconvenience: a
+# single seed login that could write both would mean the database was not
+# enforcing the confinement verify-isolation.sh asserts.
+if ! docker exec -i "$container" "$sqlcmd" \
+		-S localhost -U orca_runtime -P "$ORCA_RUNTIME_DB_PASSWORD" -C -No -b -I -d orca \
+		-Q "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'runtime' AND TABLE_NAME = 'connector_config'" \
+		2>/dev/null | grep -q 1; then
+	echo "runtime.connector_config does not exist. Start orca-runtime once so it migrates its schema, then run this again." >&2
+	exit 1
+fi
+
+docker exec -i "$container" "$sqlcmd" \
+	-S localhost -U orca_runtime -P "$ORCA_RUNTIME_DB_PASSWORD" -C -No -b -I -d orca \
+	-v tosUrl="$tos_url" \
+	< "$here/demo-connector.sql"
 
 echo
 echo "Demo data seeded."
+echo "  TOS stub          $tos_url"
+echo "  device-host stub  $device_host_url"

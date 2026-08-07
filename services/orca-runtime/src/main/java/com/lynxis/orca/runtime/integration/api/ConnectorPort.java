@@ -1,4 +1,4 @@
-package com.lynxis.orca.runtime.execution.domain;
+package com.lynxis.orca.runtime.integration.api;
 
 /**
  * The way out to a customer system, as the process sees it.

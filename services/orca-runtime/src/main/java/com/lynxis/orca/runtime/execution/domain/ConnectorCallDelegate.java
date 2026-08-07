@@ -4,6 +4,8 @@ import org.flowable.engine.delegate.BpmnError;
 import org.flowable.engine.delegate.JavaDelegate;
 import org.flowable.engine.delegate.DelegateExecution;
 
+import com.lynxis.orca.runtime.integration.api.ConnectorPort;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
