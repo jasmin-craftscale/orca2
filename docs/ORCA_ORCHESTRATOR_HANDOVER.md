@@ -10,7 +10,7 @@ You are picking up an engagement that has been running for some weeks. The archi
 
 ⚠️ **One boundary, and it is about timing rather than permission.** While the Phase 0 build session is running, stay out of that repository — it is being restructured wholesale and concurrent edits conflict on nearly every commit. Once Phase 0 has landed and been reviewed, the constraint lifts.
 
-**When you do write code there:** `docs/ORCA_PHASE0_BUILD_BRIEF.md` §2 carries the ground rules, and they apply to you too — `platform/` holds no domain types, tests prove properties rather than exercise paths, and build checks land with the code they govern.
+**When you do write code there:** `docs/phase-0-brief.md` §2 carries the ground rules, and they apply to you too — `platform/` holds no domain types, tests prove properties rather than exercise paths, and build checks land with the code they govern.
 
 **Onboard yourself properly before acting.** §7 tells you what to read and in what order. Do not act on this handover alone; it is a map, not the territory.
 
@@ -33,7 +33,7 @@ Two properties shape every decision:
 | Path | What it is |
 |---|---|
 | `~/Documents/Projects/lynxis/Lynxis-Gate` | **The existing system**, in production today — 25 Go microservices, 4 React applications, SQL Server. Also holds the full document corpus for the rewrite. **Read-only for analysis. Never modify production code here** |
-| `~/Documents/Projects/orca` | **The new build.** A Spring Boot 4.0.7 / Java 25 project, one commit of Initializr base plus the documents the build agent needs. Phase 0 has not started |
+| `~/Documents/Projects/orca` | **The new build.** Spring Boot 4.0.7 / Java 25, branch `phase-0-foundations`. **Phase 0 is built** — twelve Gradle modules, six bootable applications, five primitives, the build checks, per-service migrations and contracts. See §9 |
 
 ---
 
@@ -128,7 +128,7 @@ The ones that gate work:
 3. **`Lynxis-Gate/docs/ORCA_SECURITY_FINDINGS_PRIVATE.md`** 🔒 — five code-verified findings in the existing system. **Product owner and technical lead only.**
 4. **This handover** — the map.
 
-**In `~/Documents/Projects/orca/docs/`**, for the build rather than the programme: `ORCA_PHASE0_BUILD_BRIEF.md` (what the build agent does), `PLATFORM_PRIMITIVES.md` (what each shared primitive prevents, and the named pattern behind it), `REPOSITORY_GUIDE.md` (the repository layout). Read those when working on Phase 0. `orca/KICKOFF.md` is the build session's entry point.
+**In `~/Documents/Projects/orca/docs/`**, for the build rather than the programme: `phase-0-brief.md` (what the build agent did), `PLATFORM_PRIMITIVES.md` (what each shared primitive prevents, and the named pattern behind it), `REPOSITORY_GUIDE.md` (the repository layout), `phase-0-report.md` (what was built and verified). Phase work artifacts sit flat in `docs/` with their phase prefix — future phases follow the same pattern (`docs/phase-1-plan.md`); `phase-0-kickoff.md` was the build session's entry point.
 
 **For the existing system:** `Lynxis-Gate/CLAUDE.md` — the operating manual for that codebase.
 
@@ -158,19 +158,33 @@ These are not preferences. Each was learned by getting it wrong.
 
 ## 9 · Where things stand right now
 
-**Phase 0 has not started.** The `orca` repository holds the Initializr base and the documents, on branch `phase-0-foundations`.
+**Phase 0 is built.** Eight work packages committed on `phase-0-foundations`, plus uncommitted work on top. What exists:
 
-**Next action — a separate session, not this one.** Working directory `~/Documents/Projects/orca`, opened with `Read KICKOFF.md and begin.`, Opus at high effort, committing once per work package. `KICKOFF.md` sits at that repository's root and points at the brief.
+| | |
+|---|---|
+| Gradle modules | **12** registered — five primitives, six services, `build-checks`. Root is an aggregator with no `src/` |
+| Bootable applications | **6** |
+| Build-check rules | **6** — platform purity, module walls, scope seam, error envelope, retention class, **and a system-context rule the brief did not ask for** |
+| Migrations | **13 files** — 4 bootstrap (`deploy/bootstrap/`), 3 platform-primitive, 6 service baselines, each service against its own schema |
+| Contracts | **7 authored** — one per service, plus the shared envelope `_shared.yaml` in `platform/web` |
+| Bootstrap · compose · CI | all present |
 
-It builds the five primitives, the build checks, per-service migrations and contracts, the local stack and CI — **eight work packages, thirteen executed verification checks, and no business logic at all.**
+**After the eight packages, three more commits landed:** the `NON_NULL` envelope-serialisation fix (`5bd278e` — *"one shape on paper, two on the wire"*), the **ADR-011 narrowing** (`c4730b1`, a product-owner decision: Keycloak authenticates people only; services present a per-installation shared credential on `/internal/**`), the **§9 report** (`3b0bc3d` — now at `docs/phase-0-report.md`, read it before the code), and a review pass (`a11b8ec`) that closed a real loophole in the envelope rule (`ResponseEntity<Object>` passed the check) and removed dead springdoc.
 
-**When that session reports, your first job is to read its §9 report before its code** — specifically what it could not build, and every decision it made that the architecture did not dictate. Those two lists are where the review value is. Code written confidently is the least likely place to find a problem.
+### Verification — executed 7 August 2026, independently of the build session
 
-⚠️ **One verification item is the easiest to skip while still writing a report that reads well:** deliberately violating each of the five build checks and proving each fails the build. Everything else in Phase 0 is proven by things working; the checks are only proven by things breaking. If the report is vague there, ask.
+The brief's rule was verify before trusting. Done, by the orchestrator session, against a moving-free tree:
 
-**The team:** four developers. The plan is that all four work together through Phase 0 rather than taking one service each, because the five primitives are what every guarantee depends on and four parallel implementations would recreate the defect class the rewrite exists to remove.
+1. **`./gradlew build`** — green.
+2. **`./gradlew integrationTest --rerun-tasks`** — green: 31 property tests against real SQL Server via Testcontainers, including kill-between-writes on the outbox, the 16-way lease race with fence monotonicity, default-deny scope, and the 32-way idempotency race.
+3. **All six build-check rules proven to fire** — one deliberate violation each, in throwaway copies, each failing the build with a message naming the violating class: platform purity (caught `VisitResponse`, the exact camelCase compound the pre-`ac0eb0d` matcher missed), module walls (caught all three dependency edges into another module's `persistence`), scope seam (Spring Data interface), error envelope (`ResponseEntity<String>` — confirming the `a11b8ec` loophole is closed), retention class, and system context (a naked `@Scheduled` method, with a green control run after removal).
+4. **The primitives' tests were read for property-versus-path**: six of eight suites are genuinely property-style; the four strongest live in `src/integrationTest/`, so plain `./gradlew test` does not run them — use `check` plus `integrationTest`.
 
-**Open with the product owner:** the review of the repository structure with the lead developer, and the four questions at the end of `REPOSITORY_GUIDE.md`.
+**Still open, deliberately:**
+
+- **Six services on their committed ports** was verified only on a +10000 offset — this machine runs the ORCA 1.x devcontainer on exactly 8081–8086. The CI local-stack job (bootstrap twice, prove credential isolation) is the standing cover; a literal-ports boot needs a machine without the 1.x stack.
+- **`ImportedSetGuard` has no vacuity tripwire for the system-context rule** — it registers emptiness for runtime's module packages but not for "no `@Scheduled` exists yet". The rule is proven to fire, but a guard entry mirroring `whatIsStillEmptyIsStated` would make its empty set visible. Small, worth adding.
+- **Gradle materialises phantom `:platform` and `:services` container projects** from the nested include paths — two empty jars a naive publish task would ship. Cosmetic until someone wires publishing.
 
 ### What comes after Phase 0
 
@@ -179,6 +193,6 @@ It builds the five primitives, the build checks, per-service migrations and cont
 **The recommended sequencing with four developers:**
 
 - **Spike 1 starts immediately, regardless of Phase 0.** It is the only open item where a bad answer changes the architecture, it needs one person, and it runs in a throwaway project with no repo conflict. Every week it is not run is a week the runtime design is unconfirmed.
-- **While the build agent works, the humans stay out of the repository** — it is being restructured wholesale, and concurrent work conflicts on nearly every commit. The high-value work is Spike 1, NEW-1a, NEW-1b, and the volume measurement.
-- **When Phase 0 lands:** two developers on the vertical slice, two continuing on the open questions.
+- **The build session is over and Phase 0 is verified** — the repository is the team's to work in. The high-value non-code work remains Spike 1, NEW-1a, NEW-1b and the volume measurement.
+- **With Phase 0 verified:** two developers on the vertical slice, two continuing on the open questions.
 - **Core and runtime need two developers each** when service build-out starts. Between them they are 76% of the tables and 62% of the endpoints.

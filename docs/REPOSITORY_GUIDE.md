@@ -115,7 +115,7 @@ So they are not discovered during the work. They are discovered in production, i
 
 ⚠️ **The rule that keeps this module honest:** if a class in `platform/` names a **visit**, a **lane**, a **ticket**, a **driver** or a **truck**, it is in the wrong place. These know about transactions, leases, keys, scopes and HTTP. They do not know what business this is — and the moment one does, every service depends on it and it can no longer be changed.
 
-### `services/` — seven modules, six deployable applications
+### `services/` — six service modules plus one placeholder, six deployable applications
 
 Each service module is **its own Spring Boot application**: its own `main`, its own configuration, its own image, deployed independently. They share a repository and a version catalog, nothing else.
 
@@ -133,21 +133,21 @@ Each service module is **its own Spring Boot application**: its own `main`, its 
 
 **Inside every module, the same three packages:** `api` (controllers and DTOs) · `domain` (entities and domain services) · `persistence` (repositories). This is not a style preference — it is what makes the module wall expressible as one rule: *no module may reference another module's `persistence` package.*
 
-### `contracts/` — the API source of truth
+### Contracts — the API source of truth, living with their owners
 
-Eight OpenAPI documents: one per service, plus `_shared.yaml` holding the response envelope, the error object, the error codes and pagination.
+Seven authored OpenAPI documents: one per service at `services/<name>/src/main/resources/openapi/orca-<name>.yaml`, plus `platform/web`'s `_shared.yaml` holding the response envelope, the error object, the error codes and pagination. There is no top-level `contracts/` folder — a contract lives with the service that owns it, and the service contracts `$ref` the shared definitions across the module boundary. (`orca-media` is inherited and has no authored contract here.)
 
-**The API layer is generated from these, not the other way round.** The generator emits an **interface** and its DTOs; the controller is hand-written and implements that interface. Change the contract and the build breaks until the controller matches.
+**The API layer is generated from these, not the other way round.** The generator emits an **interface** and its DTOs; the controller is hand-written and implements that interface. Change the contract and the build breaks until the controller matches. A second generator pass bundles a self-contained copy of each contract into its service's jar, and every service serves it at `/openapi/orca-<name>.yaml`.
 
 That is what makes contract-first real rather than aspirational — the API surface stops being documentation and becomes a compile-time constraint.
 
-`_shared.yaml` matters more than it looks: without one shared definition, seven services each invent their own error schema and the single-envelope guarantee decays into a convention within a month.
+`_shared.yaml` matters more than it looks: without one shared definition, six services each invent their own error schema and the single-envelope guarantee decays into a convention within a month. `schemaMappings` binds its schemas to `platform/web`'s hand-written Java types, so the generated DTOs and the platform envelope are the same classes rather than two shapes that drift.
 
-### `migrations/` — one module, seven schema folders
+### Migrations — each service migrates its own schema
 
-One database, seven schemas, each written by exactly one service — enforced by database credentials, not by convention.
+One database, seven schemas, each written by exactly one service — enforced by database credentials, not by convention. There is no shared `migrations/` module: each service carries its own Flyway migrations at `services/<name>/src/main/resources/db/migration`, scoped to its own schema and run under its own login. The platform primitives ship their table DDL on their own Flyway locations, applied into each schema by the owning service's Flyway — one definition, applied per schema.
 
-**It is one Gradle module rather than seven** because the ordering is a constraint: `core` migrates first, since it publishes the read-only views the other services consume, and a dependent migration cannot run before the view it reads exists. Split per service and that ordering becomes a race between developers.
+**Ordering is a deployment property, not a build one.** `core` publishes the read-only views the other services consume, so `core` deploys first; a dependent service started before those views exist **fails startup through the `RequiredViewsGate`, naming every missing view** rather than limping into runtime errors. `deploy/bootstrap/` creates the database, the seven schemas, the seven logins and the grants — and `V004__verify.sql` asserts the isolation properties rather than assuming them.
 
 ### `build-checks/` — the enforcement
 
@@ -160,6 +160,9 @@ A module containing **only tests, no production code.** Its entire output is bui
 | Scope seam | A query is constructed outside the seam |
 | Error envelope | A controller returns a shape other than the envelope |
 | Retention class | A traffic-growing table has no declared retention class |
+| System context | A `@Scheduled` entry point runs without entering `SystemContext` |
+
+The sixth rule was added beyond the brief's five — §B10's "assert every scheduled job, relay and reconciler enters it" can only be a rule over every class, not a unit test. Note it currently governs an empty set: Phase 0 has no `@Scheduled` methods, so it has never fired outside a deliberate violation.
 
 **This folder is why the monorepo is the right choice.** These checks have to see every service at once. In seven separate repositories they degrade into a code-review convention — and a convention is what the current system enforced tenancy with, across 816 hand-written conditions.
 
@@ -185,7 +188,7 @@ The Spring Boot plugin is declared at the root with `apply false` and applied in
 ./gradlew build              everything
 ./gradlew test               unit tests
 ./gradlew integrationTest    Testcontainers, real SQL Server
-./gradlew check              the five build checks
+./gradlew check              the six build checks
 ./gradlew bootRun -p services/orca-core --args='--spring.profiles.active=local'
 ```
 
@@ -211,7 +214,7 @@ check; set the profile.
 
 ## 6 · What Phase 0 delivers, and what it does not
 
-**Delivers:** a repository that builds, a local stack that runs, seven schemas that migrate, five primitives with tests that prove their properties, five build checks that fail the build when violated, CI, and six services that boot and report health.
+**Delivers:** a repository that builds, a local stack that runs, seven schemas that migrate, five primitives with tests that prove their properties, six build checks that fail the build when violated, CI, and six services that boot and report health.
 
 **Does not deliver:** any product behaviour. No visit can start, no gate can open, no screen exists. Nothing is demonstrable to a customer.
 
