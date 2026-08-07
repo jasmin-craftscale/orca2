@@ -39,7 +39,7 @@ public final class ScopedUpdate {
 	private final List<Object> filterParameters = new ArrayList<>();
 
 	private ScopedUpdate(String table) {
-		this.table = Identifiers.require(table, "table");
+		this.table = Identifiers.requireTable(table);
 	}
 
 	public static ScopedUpdate table(String table) {

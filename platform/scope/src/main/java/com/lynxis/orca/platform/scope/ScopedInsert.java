@@ -39,7 +39,7 @@ public final class ScopedInsert {
 	private String scopeDimension;
 
 	private ScopedInsert(String table) {
-		this.table = Identifiers.require(table, "table");
+		this.table = Identifiers.requireTable(table);
 	}
 
 	public static ScopedInsert into(String table) {

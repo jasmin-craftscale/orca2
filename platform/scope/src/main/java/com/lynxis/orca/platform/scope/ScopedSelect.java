@@ -36,7 +36,7 @@ public final class ScopedSelect {
 	private Integer limit;
 
 	private ScopedSelect(String table) {
-		this.table = identifier(table, "table");
+		this.table = Identifiers.requireTable(table);
 	}
 
 	public static ScopedSelect from(String table) {

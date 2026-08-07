@@ -120,6 +120,47 @@ orca:
   # both, rather than answering a device host with an empty configuration poll.
   required-views: ${ORCA_REQUIRED_VIEWS:core.topology_lane,core.topology_device}
 
+  # --- Which installation this is (WP5) --------------------------------------
+  # The site this appliance belongs to, in core's published vocabulary. It is the
+  # SCOPE every background loop establishes before it reads or writes anything.
+  #
+  # Configuration rather than derivation, deliberately: §C1 says exactly one site
+  # is primary and it is the one the licence binds to, so which site this is
+  # belongs to the installation. Deriving it per cycle from whatever happens to be
+  # in the world model would let a mis-seeded database silently redirect a gate's
+  # traffic — and nothing would report it, because every read would look scoped.
+  installation:
+    site-external-id: ${ORCA_SITE_EXTERNAL_ID:SITE-DEMO}
+
+  edge:
+    # This instance's identity in `service_lease`. An operator reading that table
+    # needs to know WHICH MACHINE owns a lane, so it defaults to the hostname
+    # rather than to a uuid.
+    holder-id: ${ORCA_EDGE_HOLDER_ID:${HOSTNAME:edge-local}}
+
+    # Where runtime accepts device events. §C2's /internal/events/v1.
+    runtime-base-url: ${ORCA_RUNTIME_BASE_URL:http://localhost:8082}
+
+    ownership:
+      # How often the per-lane election runs. Must be well under orca.lease.duration
+      # — a renewal that arrives after expiry lets another instance in between, and
+      # both then believe they own the lane.
+      interval: ${ORCA_EDGE_OWNERSHIP_INTERVAL:5s}
+
+    pump:
+      interval: ${ORCA_EDGE_PUMP_INTERVAL:1s}
+      batch-size: ${ORCA_EDGE_PUMP_BATCH_SIZE:100}
+      # After this many failed deliveries an event becomes DEAD — visible through
+      # /internal/buffer/stats, never discarded. ⚠️ A local value: §C3 states no
+      # number, and a site with a flaky link needs a different one.
+      max-attempts: ${ORCA_EDGE_PUMP_MAX_ATTEMPTS:10}
+
+    lpr:
+      # ⚠️ The port and the WIRE FORMAT are both provisional — see LprFraming.
+      # Nothing in this repository records the camera vendor's actual protocol, and
+      # no capture samples from the existing estate were provided.
+      port: ${ORCA_EDGE_LPR_PORT:9100}
+
 ---
 # --- The `local` profile ------------------------------------------------------
 # Activate with --spring.profiles.active=local. Nothing here is for a deployment.
