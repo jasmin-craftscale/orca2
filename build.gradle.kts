@@ -25,6 +25,30 @@ repositories {
 // so shared configuration reaches the catalog through the extension instead.
 val catalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
+// --- One integration suite at a time ----------------------------------------
+//
+// `org.gradle.parallel=true` runs every module's tasks concurrently, and each
+// module's integrationTest starts its OWN SQL Server container: the shared
+// fixture is a static singleton per JVM, and Gradle gives each module its own
+// test JVM.
+//
+// Phase 0 had four such modules and it fit. Phase 1 added three more — core,
+// runtime and edge — and `./gradlew integrationTest` began failing with
+// "Container startup failed": seven SQL Server instances at once, emulated
+// (the image is amd64-only), on a Docker VM with two CPUs. Each suite passed
+// on its own, which is the worst version of this failure — it looks like a
+// flaky test rather than a resource limit.
+//
+// A shared build service with one permit is Gradle's mechanism for exactly this:
+// a resource that is machine-wide rather than per-project. Compilation and the
+// unit tests stay parallel; only the container-bound suites queue.
+abstract class ContainerBoundSuites : BuildService<BuildServiceParameters.None>
+
+val containerBound = gradle.sharedServices.registerIfAbsent(
+	"orcaContainerBoundSuites", ContainerBoundSuites::class) {
+	maxParallelUsages = 1
+}
+
 fun VersionCatalog.lib(alias: String) = findLibrary(alias).orElseThrow {
 	IllegalStateException("No library '$alias' in the version catalog")
 }
@@ -102,6 +126,9 @@ subprojects {
 		testClassesDirs = integrationTest.output.classesDirs
 		classpath = integrationTest.runtimeClasspath
 		shouldRunAfter(tasks.named("test"))
+
+		// One at a time across the whole build — see ContainerBoundSuites above.
+		usesService(containerBound)
 	}
 }
 
