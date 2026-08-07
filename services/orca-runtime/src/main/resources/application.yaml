@@ -128,9 +128,15 @@ orca:
   outbox:
     consumers: []
 
-  # See ReadinessGate: fully-qualified views this service requires before it will
-  # serve. Empty in Phase 0 because orca-core publishes none yet.
-  required-views: ${ORCA_REQUIRED_VIEWS:}
+  # See RequiredViewsGate: fully-qualified views this service requires before it
+  # will serve. No longer empty — WP1 gave orca-core its first two published
+  # views, so the gate finally guards something real.
+  #
+  # This is the deployment ordering, expressed where a person can act on it: core
+  # migrates first, because it publishes the views the gate path reads (ADR-009).
+  # Start this service first and it refuses, naming both — rather than starting
+  # and failing on its first lane lookup, which is far harder to diagnose.
+  required-views: ${ORCA_REQUIRED_VIEWS:core.topology_lane,core.topology_device}
 
 ---
 # --- The `local` profile ------------------------------------------------------

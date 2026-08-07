@@ -80,6 +80,10 @@ import com.lynxis.orca.runtime.RuntimeApplication;
 				// The committed value is 10, which would turn the property under test
 				// into a measurement of pool contention.
 				"spring.datasource.hikari.maximum-pool-size=32",
+				// WP1 made this default to core's two published views, and this schema
+				// is a spike schema with no orca-core in it. RequiredViewsGateIT is
+				// where that gate is proven; here it would only be in the way.
+				"orca.required-views=",
 		})
 class AdmissionPropertiesIT {
 

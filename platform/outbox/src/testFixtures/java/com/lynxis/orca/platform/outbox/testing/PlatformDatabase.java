@@ -66,6 +66,31 @@ public final class PlatformDatabase {
 		return new DriverManagerDataSource(url(DATABASE), "it_" + schema, PASSWORD);
 	}
 
+	/**
+	 * Creates a login and database user with <em>exactly</em> the given name, owning
+	 * no schema and granted nothing.
+	 *
+	 * <p>For the other side of ADR-009. A published view is only published if some
+	 * <em>other</em> service's login can select it, and that cannot be tested
+	 * unless a principal by that name exists — {@code GRANT SELECT ON
+	 * core.topology_lane TO [orca_runtime]} fails outright otherwise.
+	 * {@code deploy/bootstrap} creates these in a real database; this is the
+	 * test's equivalent, and it deliberately grants nothing beyond the ability to
+	 * connect, so a view the consumer can read is a view it was granted rather
+	 * than one it could reach anyway.
+	 *
+	 * @param login the exact login name, e.g. {@code orca_runtime} — not prefixed
+	 */
+	public static DataSource consumerLogin(String login) {
+		createDatabase();
+		DataSource admin = administrative();
+		execute(admin, "IF SUSER_ID(N'" + login + "') IS NULL "
+				+ "EXEC('CREATE LOGIN [" + login + "] WITH PASSWORD = ''" + PASSWORD + "'', CHECK_POLICY = OFF')");
+		execute(admin, "IF DATABASE_PRINCIPAL_ID(N'" + login + "') IS NULL "
+				+ "EXEC('CREATE USER [" + login + "] FOR LOGIN [" + login + "]')");
+		return new DriverManagerDataSource(url(DATABASE), login, PASSWORD);
+	}
+
 	/** An administrative datasource, for the few things a schema owner cannot do. */
 	public static DataSource administrative() {
 		return new DriverManagerDataSource(url(DATABASE), OrcaSqlServer.saUsername(), OrcaSqlServer.saPassword());

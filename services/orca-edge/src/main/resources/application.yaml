@@ -111,9 +111,14 @@ orca:
   outbox:
     consumers: []
 
-  # See ReadinessGate: fully-qualified views this service requires before it will
-  # serve. Empty in Phase 0 because orca-core publishes none yet.
-  required-views: ${ORCA_REQUIRED_VIEWS:}
+  # See RequiredViewsGate: fully-qualified views this service requires before it
+  # will serve. No longer empty — WP1 gave orca-core its first two published
+  # views, so the gate finally guards something real.
+  #
+  # Edge reads the lane's device_host_url and its device inventory, so core must
+  # have migrated before edge starts. Start edge first and it refuses, naming
+  # both, rather than answering a device host with an empty configuration poll.
+  required-views: ${ORCA_REQUIRED_VIEWS:core.topology_lane,core.topology_device}
 
 ---
 # --- The `local` profile ------------------------------------------------------
