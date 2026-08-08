@@ -84,6 +84,15 @@ management:
 
 orca:
   service: orca-core
+  # --- Scope (Phase 2) --------------------------------------------------------
+  # The installation's own site, from configuration and never from a request —
+  # the same pattern edge and runtime already follow (phase-1 decision 7). Core's
+  # request boundary permits this site plus the INSTALLATION realm; see
+  # CoreScopes. A multi-site installation is hosted-tier shape, deferred with
+  # cloud scope (register NEW-1b).
+  installation:
+    site-external-id: ${ORCA_SITE_EXTERNAL_ID:SITE-DEMO}
+
   # --- Service-to-service authentication (ADR-011) ----------------------------
   # Keycloak authenticates PEOPLE. A service calling another service presents this
   # per-installation shared credential on /internal/** instead of minting a token,

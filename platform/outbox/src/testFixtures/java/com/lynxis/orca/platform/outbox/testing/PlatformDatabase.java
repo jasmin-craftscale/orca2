@@ -126,10 +126,16 @@ public final class PlatformDatabase {
 	}
 
 	private static void dropAllTables(String schema) {
-		// Foreign keys first: outbox_delivery references outbox, so dropping in an
-		// arbitrary order fails and leaves the schema half-cleaned.
+		// Views first — they depend on the tables, and a view left behind makes
+		// Flyway refuse the NEXT clean migration of this schema with "found
+		// non-empty schema but no schema history table". Found by Phase 2's core
+		// suites, which are the first to migrate a schema with published views
+		// (V102) twice in one build. Then foreign keys, then tables: dropping in
+		// an arbitrary order fails and leaves the schema half-cleaned.
 		execute(administrative(), """
 				DECLARE @sql NVARCHAR(MAX) = N'';
+				SELECT @sql = @sql + N'DROP VIEW [%1$s].[' + name + N'];'
+				FROM sys.views WHERE schema_id = SCHEMA_ID(N'%1$s');
 				SELECT @sql = @sql + N'ALTER TABLE [%1$s].[' + OBJECT_NAME(parent_object_id)
 				                   + N'] DROP CONSTRAINT [' + name + N'];'
 				FROM sys.foreign_keys WHERE schema_id = SCHEMA_ID(N'%1$s');

@@ -12,9 +12,9 @@ openapi: 3.0.3
 # Generated sources are never committed. In version control they drift from the
 # spec and nobody notices.
 #
-# ⚠️ Phase 0 authors ONE route. The routes in §C1's interface table arrive with
-# the behaviour behind them; writing them here now would be publishing a surface
-# nothing implements.
+# Phase 2 authors the configuration-world surface from §C1's interface table —
+# users, roles, entitlements (WP1); the routes still absent arrive with the
+# behaviour behind them.
 # =============================================================================
 
 info:
@@ -30,8 +30,246 @@ servers:
 tags:
   - name: health
     description: The service's own contracted health route.
+  - name: users
+    description: User management (§C1). Profile and claim mapping only — credentials are Keycloak's.
+  - name: roles
+    description: Customer-defined roles, their entitlement grants and site scoping (§C1).
+  - name: entitlements
+    description: The four-level entitlement catalog (application → module → sub-module → action item).
 
 paths:
+  /api/v1/users:
+    get:
+      tags: [users]
+      operationId: listUsers
+      summary: List the installation's users
+      description: |
+        Retired users are included, flagged, so an administrator can see the
+        whole directory; consumers gating on activity read `retired`.
+      responses:
+        "200":
+          description: The directory
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsersEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    post:
+      tags: [users]
+      operationId: createUser
+      summary: Create a user
+      description: |
+        The external id is minted by the service and returned. Exactly one role
+        per user — `roleExternalId` is required, and the platform will not
+        create a user without one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: The named role does not exist
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/users/{userExternalId}:
+    patch:
+      tags: [users]
+      operationId: updateUser
+      summary: Update a user
+      description: |
+        Absent fields are unchanged. `retired: true` retires the user
+        (§D3 — records are retired, never removed); `retired: false` reinstates.
+      parameters:
+        - name: userExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: The user after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such user
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: The named role does not exist
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/roles:
+    get:
+      tags: [roles]
+      operationId: listRoles
+      summary: List roles, each with its site scope and resolved entitlement grants
+      responses:
+        "200":
+          description: The roles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RolesEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    post:
+      tags: [roles]
+      operationId: createRole
+      summary: Create a role, optionally with grants and site scope
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoleRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: An active role already carries that name
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: An entitlement code or site is unknown
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/roles/{roleExternalId}:
+    patch:
+      tags: [roles]
+      operationId: updateRole
+      summary: Update a role, its grants or its site scope
+      description: |
+        Absent fields are unchanged. `entitlementCodes` and `siteExternalIds`,
+        when present, REPLACE the grant set and the site scope respectively —
+        they are declarative, not additive. A role still held by an active user
+        cannot be retired.
+      parameters:
+        - name: roleExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoleRequest"
+      responses:
+        "200":
+          description: The role after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such role
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: An active role already carries that name, or active users still hold this role
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: An entitlement code or site is unknown
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/entitlements:
+    get:
+      tags: [entitlements]
+      operationId: entitlementCatalog
+      summary: The entitlement catalog, as the four-level tree
+      description: |
+        Codes are the contract; names are display-only (translation rule 7 —
+        1.x gated on display strings, and that is exactly what 2.0 does not
+        repeat). Licence filtering arrives with the licensing phase; until then
+        the whole seeded tree is returned.
+      responses:
+        "200":
+          description: The tree
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntitlementTreeEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
   /api/v1/health:
     get:
       tags: [health]
@@ -68,3 +306,299 @@ components:
           properties:
             data:
               $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ServiceHealth"
+
+    # --- WP1 · identity ------------------------------------------------------
+
+    UserSummary:
+      type: object
+      description: A platform user — profile and claim mapping. No credential ever appears here.
+      required: [externalId, displayName, email, roleExternalId, retired]
+      properties:
+        externalId:
+          type: string
+          description: Minted by the service on creation, never reused (§B8).
+        displayName:
+          type: string
+        firstName:
+          type: string
+        middleName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        profileImageUrl:
+          type: string
+        languageCode:
+          type: string
+        keycloakSubject:
+          type: string
+          description: The identity-provider subject this user's tokens carry, once linked.
+        privacyAcceptedAt:
+          type: string
+          format: date-time
+        termsAcceptedAt:
+          type: string
+          format: date-time
+        roleExternalId:
+          type: string
+          description: Exactly one role per user.
+        retired:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateUserRequest:
+      type: object
+      required: [displayName, email, roleExternalId]
+      properties:
+        displayName:
+          type: string
+          maxLength: 200
+        firstName:
+          type: string
+          maxLength: 100
+        middleName:
+          type: string
+          maxLength: 100
+        lastName:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          maxLength: 320
+        profileImageUrl:
+          type: string
+          maxLength: 512
+        languageCode:
+          type: string
+          maxLength: 32
+        keycloakSubject:
+          type: string
+          maxLength: 64
+        roleExternalId:
+          type: string
+
+    UpdateUserRequest:
+      type: object
+      description: Absent fields are unchanged.
+      properties:
+        displayName:
+          type: string
+          maxLength: 200
+        firstName:
+          type: string
+          maxLength: 100
+        middleName:
+          type: string
+          maxLength: 100
+        lastName:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          maxLength: 320
+        profileImageUrl:
+          type: string
+          maxLength: 512
+        languageCode:
+          type: string
+          maxLength: 32
+        keycloakSubject:
+          type: string
+          maxLength: 64
+        roleExternalId:
+          type: string
+        privacyAcceptedAt:
+          type: string
+          format: date-time
+        termsAcceptedAt:
+          type: string
+          format: date-time
+        retired:
+          type: boolean
+
+    UserEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/UserSummary"
+
+    UsersEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/UserSummary"
+
+    RoleSummary:
+      type: object
+      required: [externalId, name, retired, siteExternalIds, entitlementCodes]
+      properties:
+        externalId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        siteExternalIds:
+          type: array
+          description: The sites this role is scoped to (role-based site scoping — 1.x user↔site mapping is dead).
+          items:
+            type: string
+        entitlementCodes:
+          type: array
+          description: The granted catalog leaves, by stable code.
+          items:
+            type: string
+        retired:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateRoleRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 3000
+        siteExternalIds:
+          type: array
+          items:
+            type: string
+        entitlementCodes:
+          type: array
+          items:
+            type: string
+
+    UpdateRoleRequest:
+      type: object
+      description: |
+        Absent fields are unchanged; `entitlementCodes` and `siteExternalIds`
+        REPLACE their sets when present.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 3000
+        siteExternalIds:
+          type: array
+          items:
+            type: string
+        entitlementCodes:
+          type: array
+          items:
+            type: string
+        retired:
+          type: boolean
+
+    RoleEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/RoleSummary"
+
+    RolesEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/RoleSummary"
+
+    EntitlementActionItem:
+      type: object
+      required: [externalId, code, name, licenceRoute]
+      properties:
+        externalId:
+          type: string
+        code:
+          type: string
+          description: The stable machine code — the contract. Grant by this, gate by this.
+        name:
+          type: string
+          description: Display-only.
+        licenceRoute:
+          type: string
+          description: |
+            The 1.x licence-gate string, verbatim. NOT unique across the tree —
+            licence filtering by route is coarser than the catalog.
+
+    EntitlementSubModule:
+      type: object
+      required: [externalId, code, name, actionItems]
+      properties:
+        externalId:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        actionItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntitlementActionItem"
+
+    EntitlementModule:
+      type: object
+      required: [externalId, code, name, subModules]
+      properties:
+        externalId:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        subModules:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntitlementSubModule"
+
+    EntitlementApplication:
+      type: object
+      required: [externalId, code, name, modules]
+      properties:
+        externalId:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        modules:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntitlementModule"
+
+    EntitlementTree:
+      type: object
+      required: [applications]
+      properties:
+        applications:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntitlementApplication"
+
+    EntitlementTreeEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/EntitlementTree"
