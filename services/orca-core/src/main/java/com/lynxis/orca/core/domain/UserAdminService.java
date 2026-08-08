@@ -73,10 +73,18 @@ public class UserAdminService {
 	public UserView create(UserDraft draft) {
 		Role role = activeRole(draft.roleExternalId());
 		String externalId = "usr-" + UUID.randomUUID();
-		users.insert(new UserAccount(0, externalId, IdentityTables.INSTALLATION_REALM,
-				draft.keycloakSubject(), draft.firstName(), draft.middleName(), draft.lastName(),
-				draft.displayName(), draft.email(), draft.profileImageUrl(), draft.languageCode(),
-				null, null, role.roleId(), null, null));
+		try {
+			users.insert(new UserAccount(0, externalId, IdentityTables.INSTALLATION_REALM,
+					draft.keycloakSubject(), draft.firstName(), draft.middleName(), draft.lastName(),
+					draft.displayName(), draft.email(), draft.profileImageUrl(), draft.languageCode(),
+					null, null, role.roleId(), null, null));
+		}
+		catch (org.springframework.dao.DuplicateKeyException subjectTaken) {
+			// The only unique this insert can violate: the external id is a fresh
+			// UUID and email is deliberately non-unique, so this is the filtered
+			// one-active-user-per-subject index.
+			throw new KeycloakSubjectInUseException(draft.keycloakSubject());
+		}
 		return viewOf(externalId);
 	}
 
@@ -87,10 +95,18 @@ public class UserAdminService {
 		if (change.roleExternalId() != null) {
 			roleId = activeRole(change.roleExternalId()).roleId();
 		}
-		users.update(externalId, new UserPatch(
-				change.keycloakSubject(), change.firstName(), change.middleName(), change.lastName(),
-				change.displayName(), change.email(), change.profileImageUrl(), change.languageCode(),
-				change.privacyAcceptedAt(), change.termsAcceptedAt(), roleId, change.retired()));
+		try {
+			users.update(externalId, new UserPatch(
+					change.keycloakSubject(), change.firstName(), change.middleName(), change.lastName(),
+					change.displayName(), change.email(), change.profileImageUrl(), change.languageCode(),
+					change.privacyAcceptedAt(), change.termsAcceptedAt(), roleId, change.retired()));
+		}
+		catch (org.springframework.dao.DuplicateKeyException subjectTaken) {
+			// Fires on a subject patch AND on reinstatement (retired: false) of a
+			// user whose subject was meanwhile linked to a new active user — the
+			// row re-enters the filtered unique index and collides.
+			throw new KeycloakSubjectInUseException(change.keycloakSubject());
+		}
 		return viewOf(externalId);
 	}
 
@@ -125,6 +141,18 @@ public class UserAdminService {
 	public static class UserUnknownException extends RuntimeException {
 		public UserUnknownException(String externalId) {
 			super("No user '" + externalId + "'");
+		}
+	}
+
+	/**
+	 * One identity-provider subject maps to at most one ACTIVE user — the
+	 * filtered unique index holds it; this is its typed answer. The subject in
+	 * the message may be null when the collision came from reinstatement.
+	 */
+	public static class KeycloakSubjectInUseException extends RuntimeException {
+		public KeycloakSubjectInUseException(String subject) {
+			super("Identity-provider subject already linked to an active user"
+					+ (subject == null ? " (reinstatement collision)" : ": '" + subject + "'"));
 		}
 	}
 }

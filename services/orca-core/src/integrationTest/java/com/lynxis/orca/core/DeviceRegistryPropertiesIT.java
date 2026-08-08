@@ -283,13 +283,60 @@ class DeviceRegistryPropertiesIT {
 	}
 
 	@Test
-	@DisplayName("variables for a resource that does not exist are refused with the typed error")
+	@DisplayName("variables for a resource that does not exist are 404 — path-identified, like every sibling route")
 	void unknownResourcesAreRefused() {
 		assertThatThrownBy(() -> inScope(() -> resourceApi.replaceResourceConfiguration(
 				ResourceScopeType.LANE, "LANE-NOWHERE",
 				List.of(new ResourceConfigurationEntry().key("X").value("1")))))
 				.isInstanceOfSatisfying(ApiException.class, refusal ->
-						assertThat(refusal.getErrorCode().code()).isEqualTo("RESOURCE_UNKNOWN"));
+						assertThat(refusal.getErrorCode().code()).isEqualTo("NOT_FOUND"));
+	}
+
+	@Test
+	@DisplayName("a layout repeating a port, presets repeating a name, and variables repeating a key are refused as validation")
+	void duplicateSetEntriesAreRefusedUpFront() {
+		DeviceSummary device = inScope(() -> deviceApi.registerDevice("LANE-IT-01",
+				new RegisterDeviceRequest().name("Dupes").deviceTypeCode("EDGE_DEVICE_DISPLAY"))
+				.getBody().getData());
+
+		assertThatThrownBy(() -> inScope(() -> deviceApi.replaceIoAssignments(device.getExternalId(),
+				List.of(new IoAssignmentItem().portType(PortType.INPUT).ioPort(1),
+						new IoAssignmentItem().portType(PortType.INPUT).ioPort(1).portAliasName("again")))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("VALIDATION_FAILED"));
+
+		assertThatThrownBy(() -> inScope(() -> deviceApi.replacePerspectives(device.getExternalId(),
+				List.of(new PerspectiveItem().name("Gate"),
+						new PerspectiveItem().name("Gate").zoom(new BigDecimal("2"))))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("VALIDATION_FAILED"));
+
+		assertThatThrownBy(() -> inScope(() -> resourceApi.replaceResourceConfiguration(
+				ResourceScopeType.SITE, SITE,
+				List.of(new ResourceConfigurationEntry().key("K").value("1"),
+						new ResourceConfigurationEntry().key("K").value("2")))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("VALIDATION_FAILED"));
+
+		assertThat(core.queryForObject(
+				"SELECT COUNT(*) FROM device_io_assignment WHERE retired_at IS NULL", Long.class))
+				.as("nothing half-applied — the refusal came before any row")
+				.isZero();
+	}
+
+	@Test
+	@DisplayName("an unknown lane on the inventory route, and an unknown device on the mutation routes, are 404")
+	void unknownLaneAndDeviceAre404() {
+		assertThatThrownBy(() -> inScope(() -> deviceApi.listLaneDevices("LANE-NOWHERE")))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("NOT_FOUND"));
+		assertThatThrownBy(() -> inScope(() -> deviceApi.updateDevice("dev-ghost",
+				new UpdateDeviceRequest().name("X"))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("NOT_FOUND"));
+		assertThatThrownBy(() -> inScope(() -> deviceApi.retireDevice("dev-ghost")))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("NOT_FOUND"));
 	}
 
 	@Test

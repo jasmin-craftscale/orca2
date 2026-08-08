@@ -302,6 +302,40 @@ class TeamsTemplatesPropertiesIT {
 	}
 
 	@Test
+	@DisplayName("a break plan repeating a start time is refused as validation, before any row — not a 500 from the index")
+	void duplicateTimingsAreRefusedUpFront() {
+		assertThatThrownBy(() -> inScope(() -> breakApi.createBreakTemplate(new CreateBreakTemplateRequest()
+				.name("Echo")
+				.addTimingsItem(new BreakTimingItem().startTime("12:00").durationMinutes(30))
+				.addTimingsItem(new BreakTimingItem().startTime("12:00").durationMinutes(15)))))
+				.as("the review's finding: request-shaped faults must answer 4xx, the index is the backstop")
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("VALIDATION_FAILED"));
+		assertThat(core.queryForObject("SELECT COUNT(*) FROM break_template", Long.class))
+				.as("refused before the template row, not after it")
+				.isZero();
+	}
+
+	@Test
+	@DisplayName("a team naming an unknown template, and a patch on a team nobody has, are typed refusals")
+	void unknownTemplatesAndTeamsAreTyped() {
+		assertThatThrownBy(() -> inScope(() -> teamApi.createTeam(new CreateTeamRequest()
+				.siteExternalId(SITE).name("Lost shift").handlingMethod(HandlingMethod.PUSH)
+				.shiftTemplateExternalId("shf-ghost"))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("SHIFT_TEMPLATE_UNKNOWN"));
+		assertThatThrownBy(() -> inScope(() -> teamApi.createTeam(new CreateTeamRequest()
+				.siteExternalId(SITE).name("Lost break").handlingMethod(HandlingMethod.PUSH)
+				.breakTemplateExternalId("brk-ghost"))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("BREAK_TEMPLATE_UNKNOWN"));
+		assertThatThrownBy(() -> inScope(() -> teamApi.updateTeam("team-ghost",
+				new UpdateTeamRequest().name("X"))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("NOT_FOUND"));
+	}
+
+	@Test
 	@DisplayName("a team for an unknown site and a membership naming an unknown user are typed refusals")
 	void unknownReferencesAreTypedRefusals() {
 		assertThatThrownBy(() -> inScope(() -> teamApi.createTeam(new CreateTeamRequest()

@@ -1,6 +1,7 @@
 package com.lynxis.orca.core.api;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -11,13 +12,17 @@ import com.lynxis.orca.core.api.generated.model.ResourceConfigurationEnvelope;
 import com.lynxis.orca.core.api.generated.model.ResourceConfigurationView;
 import com.lynxis.orca.core.api.generated.model.ResourceScopeType;
 import com.lynxis.orca.core.domain.CoreScopes;
+import com.lynxis.orca.core.domain.DuplicateRequestEntryException;
 import com.lynxis.orca.core.domain.ResourceConfigurationService;
 import com.lynxis.orca.core.domain.ResourceConfigurationService.ResourceUnknownException;
 import com.lynxis.orca.core.persistence.ResourceConfigurationRepository.Entry;
+import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
+import com.lynxis.orca.platform.web.ApiError;
 import com.lynxis.orca.platform.web.ApiException;
 import com.lynxis.orca.platform.web.ApiResponse;
 import com.lynxis.orca.platform.web.ApiStatus;
+import com.lynxis.orca.platform.web.PlatformErrorCode;
 import com.lynxis.orca.platform.web.RequestId;
 
 /** §C1's `/resource-configurations/{scope}/{id}` — custom variables, read by selectors. */
@@ -52,17 +57,25 @@ public class ResourceConfigurationController implements ResourceConfigurationsAp
 	}
 
 	private static ResourceConfigurationService.ResourceView translating(
-			java.util.function.Supplier<ResourceConfigurationService.ResourceView> work) {
+			Supplier<ResourceConfigurationService.ResourceView> work) {
 		try {
 			return work.get();
 		}
 		catch (ResourceUnknownException unknown) {
-			throw new ApiException(CoreErrorCode.RESOURCE_UNKNOWN,
+			// 404, not 422: the resource is path-identified, and every sibling
+			// route answers a path miss with NOT_FOUND (review finding).
+			throw new ApiException(PlatformErrorCode.NOT_FOUND,
 					"No such resource at this installation.");
+		}
+		catch (DuplicateRequestEntryException repeated) {
+			throw new ApiException(PlatformErrorCode.VALIDATION_FAILED,
+					"The request repeats an entry.",
+					List.of(ApiError.field(PlatformErrorCode.VALIDATION_FAILED,
+							repeated.getField(), "duplicated: " + repeated.getDuplicate())));
 		}
 	}
 
-	private com.lynxis.orca.platform.scope.Scope scope() {
+	private Scope scope() {
 		return CoreScopes.installation(siteExternalId);
 	}
 

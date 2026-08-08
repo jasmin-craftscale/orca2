@@ -1,10 +1,7 @@
 package com.lynxis.orca.core.api;
 
-import java.time.Instant;
-import java.time.LocalTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,13 +15,16 @@ import com.lynxis.orca.core.api.generated.model.BreakTimingItem;
 import com.lynxis.orca.core.api.generated.model.CreateBreakTemplateRequest;
 import com.lynxis.orca.core.api.generated.model.UpdateBreakTemplateRequest;
 import com.lynxis.orca.core.domain.CoreScopes;
+import com.lynxis.orca.core.domain.DuplicateRequestEntryException;
 import com.lynxis.orca.core.domain.TeamTables.BreakTiming;
 import com.lynxis.orca.core.domain.TemplateAdminService;
 import com.lynxis.orca.core.domain.TemplateAdminService.BreakTemplateUnknownException;
 import com.lynxis.orca.core.domain.TemplateAdminService.BreakTemplateView;
 import com.lynxis.orca.core.domain.TemplateAdminService.TemplateInUseException;
 import com.lynxis.orca.core.domain.TemplateAdminService.TemplateNameInUseException;
+import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
+import com.lynxis.orca.platform.web.ApiError;
 import com.lynxis.orca.platform.web.ApiException;
 import com.lynxis.orca.platform.web.ApiResponse;
 import com.lynxis.orca.platform.web.ApiStatus;
@@ -71,7 +71,7 @@ public class BreakTemplateController implements BreakTemplatesApi {
 		return ResponseEntity.ok(envelope(updated));
 	}
 
-	private static BreakTemplateView translating(java.util.function.Supplier<BreakTemplateView> work) {
+	private static BreakTemplateView translating(Supplier<BreakTemplateView> work) {
 		try {
 			return work.get();
 		}
@@ -86,6 +86,12 @@ public class BreakTemplateController implements BreakTemplatesApi {
 			throw new ApiException(CoreErrorCode.TEMPLATE_IN_USE,
 					"Active teams still reference this template; detach them first.");
 		}
+		catch (DuplicateRequestEntryException repeated) {
+			throw new ApiException(PlatformErrorCode.VALIDATION_FAILED,
+					"The request repeats an entry.",
+					List.of(ApiError.field(PlatformErrorCode.VALIDATION_FAILED,
+							repeated.getField(), "duplicated: " + repeated.getDuplicate())));
+		}
 	}
 
 	/** {@code null} stays null — for PATCH, an absent list means "unchanged". */
@@ -95,14 +101,12 @@ public class BreakTemplateController implements BreakTemplatesApi {
 		}
 		return items.stream()
 				.map(item -> new BreakTiming(0, 0, null,
-						LocalTime.parse(item.getStartTime().length() == 5
-								? item.getStartTime() + ":00"
-								: item.getStartTime()),
+						ApiTime.parseLocalTime(item.getStartTime()),
 						item.getDurationMinutes(), null, null))
 				.toList();
 	}
 
-	private com.lynxis.orca.platform.scope.Scope scope() {
+	private Scope scope() {
 		return CoreScopes.installation(siteExternalId);
 	}
 
@@ -125,10 +129,6 @@ public class BreakTemplateController implements BreakTemplatesApi {
 								.durationMinutes(timing.durationMinutes()))
 						.toList())
 				.retired(view.template().retiredAt() != null)
-				.createdAt(offset(view.template().createdAt()));
-	}
-
-	private static OffsetDateTime offset(Instant instant) {
-		return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
+				.createdAt(ApiTime.offset(view.template().createdAt()));
 	}
 }

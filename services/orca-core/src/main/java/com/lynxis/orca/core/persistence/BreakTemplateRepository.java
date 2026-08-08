@@ -99,14 +99,14 @@ public class BreakTemplateRepository {
 		return touched ? seam.update(update) : 0;
 	}
 
-	/** Active timings of every template, in start-time order per template. */
+	/** Active timings of every template, in start-time order (grouping preserves it per template). */
 	public List<BreakTiming> activeTimings() {
 		return seam.select(ScopedSelect.from("break_timing")
 						.columns("break_timing_id", "break_template_id", "config_realm",
 								"break_start_time", "duration_minutes", "retired_at", "created_at")
 						.scopedBy(REALM)
 						.where("retired_at IS NULL")
-						.orderBy("break_timing_id"),
+						.orderBy("break_start_time"),
 				TIMING_MAPPER);
 	}
 

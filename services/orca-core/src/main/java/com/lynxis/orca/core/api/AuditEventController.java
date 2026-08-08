@@ -1,8 +1,5 @@
 package com.lynxis.orca.core.api;
 
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
@@ -47,16 +44,12 @@ public class AuditEventController implements AuditApi {
 				.requestId(RequestId.current())
 				.data(page.stream()
 						.map(event -> new AuditEventSummary()
-								.occurredAt(offset(event.occurredAt()))
+								.occurredAt(ApiTime.offset(event.occurredAt()))
 								.actor(event.actor())
 								.entityType(event.entityType())
 								.entityExternalId(event.entityExternalId())
 								.action(AuditEventSummary.ActionEnum.fromValue(event.action()))
 								.detail(event.detail()))
 						.toList()));
-	}
-
-	private static OffsetDateTime offset(Instant instant) {
-		return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
 	}
 }

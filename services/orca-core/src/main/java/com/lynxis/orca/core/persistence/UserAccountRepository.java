@@ -64,6 +64,21 @@ public class UserAccountRepository {
 				MAPPER);
 	}
 
+	/**
+	 * The active user a token's subject maps to — the read
+	 * {@code ux_user_account_keycloak_subject} exists for. Every {@code /me/**}
+	 * request and every audit attribution goes through here; before this method
+	 * both streamed the whole directory (review finding, Phase 2 addendum).
+	 */
+	public Optional<UserAccount> activeByKeycloakSubject(String keycloakSubject) {
+		return seam.select(ScopedSelect.from(TABLE)
+						.columns(COLUMNS)
+						.scopedBy(SCOPE_COLUMN)
+						.where("keycloak_subject = ? AND retired_at IS NULL", keycloakSubject),
+				MAPPER)
+				.stream().findFirst();
+	}
+
 	public Optional<UserAccount> byExternalId(String externalId) {
 		return seam.select(ScopedSelect.from(TABLE)
 						.columns(COLUMNS)

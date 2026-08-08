@@ -1,9 +1,7 @@
 package com.lynxis.orca.core.api;
 
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +24,7 @@ import com.lynxis.orca.core.domain.TeamAdminService.TeamUnknownException;
 import com.lynxis.orca.core.domain.TeamAdminService.TeamView;
 import com.lynxis.orca.core.domain.TemplateAdminService.BreakTemplateUnknownException;
 import com.lynxis.orca.core.domain.TemplateAdminService.ShiftTemplateUnknownException;
+import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.platform.web.ApiException;
 import com.lynxis.orca.platform.web.ApiResponse;
@@ -76,7 +75,7 @@ public class TeamAdminController implements TeamsApi {
 		return ResponseEntity.ok(envelope(updated));
 	}
 
-	private static TeamView translating(java.util.function.Supplier<TeamView> work) {
+	private static TeamView translating(Supplier<TeamView> work) {
 		try {
 			return work.get();
 		}
@@ -105,7 +104,7 @@ public class TeamAdminController implements TeamsApi {
 		}
 	}
 
-	private com.lynxis.orca.platform.scope.Scope scope() {
+	private Scope scope() {
 		return CoreScopes.installation(siteExternalId);
 	}
 
@@ -129,10 +128,6 @@ public class TeamAdminController implements TeamsApi {
 				.breakTemplateExternalId(view.breakTemplateExternalId())
 				.memberUserExternalIds(view.memberUserExternalIds())
 				.retired(team.retiredAt() != null)
-				.createdAt(offset(team.createdAt()));
-	}
-
-	private static OffsetDateTime offset(Instant instant) {
-		return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
+				.createdAt(ApiTime.offset(team.createdAt()));
 	}
 }

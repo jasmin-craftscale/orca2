@@ -40,6 +40,7 @@ public class ResourceConfigurationService {
 	@Transactional
 	public ResourceView replace(String scopeType, String resourceExternalId, List<Entry> entries) {
 		String siteExternalId = requireResource(scopeType, resourceExternalId);
+		DuplicateRequestEntryException.requireDistinct(entries, "key", Entry::key);
 		configurations.replaceFor(scopeType, resourceExternalId, siteExternalId, entries);
 		return new ResourceView(scopeType, resourceExternalId,
 				configurations.activeFor(scopeType, resourceExternalId));

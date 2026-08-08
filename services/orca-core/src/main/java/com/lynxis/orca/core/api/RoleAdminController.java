@@ -1,9 +1,7 @@
 package com.lynxis.orca.core.api;
 
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +21,7 @@ import com.lynxis.orca.core.domain.RoleAdminService.RoleStillHeldException;
 import com.lynxis.orca.core.domain.RoleAdminService.RoleView;
 import com.lynxis.orca.core.domain.RoleAdminService.SiteUnknownException;
 import com.lynxis.orca.core.domain.UserAdminService.RoleUnknownException;
+import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.platform.web.ApiException;
 import com.lynxis.orca.platform.web.ApiResponse;
@@ -73,7 +72,7 @@ public class RoleAdminController implements RolesApi {
 	 * One translation table for both mutations — the same domain refusals mean
 	 * the same contract answers on either route.
 	 */
-	private static RoleView translating(java.util.function.Supplier<RoleView> work) {
+	private static RoleView translating(Supplier<RoleView> work) {
 		try {
 			return work.get();
 		}
@@ -99,7 +98,7 @@ public class RoleAdminController implements RolesApi {
 		}
 	}
 
-	private com.lynxis.orca.platform.scope.Scope scope() {
+	private Scope scope() {
 		return CoreScopes.installation(siteExternalId);
 	}
 
@@ -120,10 +119,6 @@ public class RoleAdminController implements RolesApi {
 				.siteExternalIds(view.siteExternalIds())
 				.entitlementCodes(view.entitlementCodes())
 				.retired(role.retiredAt() != null)
-				.createdAt(offset(role.createdAt()));
-	}
-
-	private static OffsetDateTime offset(Instant instant) {
-		return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
+				.createdAt(ApiTime.offset(role.createdAt()));
 	}
 }

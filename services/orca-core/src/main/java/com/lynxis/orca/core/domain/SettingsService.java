@@ -56,11 +56,11 @@ public class SettingsService {
 		SettingDefinition definition = settings.definitionByKey(settingKey)
 				.orElseThrow(() -> new SettingUnknownException(settingKey));
 		validate(definition, value);
-		String oldValue = settings.valueOf(definition.settingDefinitionId())
-				.map(SettingValue::settingValue)
-				.orElse(null);
-		String actor = audit.currentActor();
-		settings.write(definition.settingDefinitionId(), oldValue, value, actor);
+		// The repository serializes concurrent writers (locked read, first-write
+		// retry) and reports the value it really replaced — so the CREATED/
+		// UPDATED distinction below is decided from the truth, not a stale read.
+		String oldValue = settings.write(definition.settingDefinitionId(), value,
+				audit.currentActor());
 		audit.record("SETTING", settingKey, oldValue == null ? "CREATED" : "UPDATED",
 				"value changed"); // never the value itself — a setting may be sensitive without being a secret
 		return new SettingView(definition,

@@ -87,6 +87,10 @@ public class DeviceAdminService {
 	public DeviceView replaceIoAssignments(String externalId, List<IoAssignmentDraft> layout) {
 		Device device = devices.byExternalId(externalId)
 				.orElseThrow(() -> new DeviceUnknownException(externalId));
+		// After the existence check: an unknown device answers 404, not a
+		// verdict on the payload it cannot apply to (guard-order finding).
+		DuplicateRequestEntryException.requireDistinct(layout, "portType/ioPort",
+				draft -> draft.portType() + "/" + draft.ioPort());
 		Map<String, Long> portNamesByCode = catalogs.ioPortNames().stream()
 				.collect(Collectors.toMap(DeviceIoPortName::code, DeviceIoPortName::portNameId));
 		List<DeviceIoAssignment> assignments = layout.stream()
@@ -120,6 +124,7 @@ public class DeviceAdminService {
 	public DeviceView replacePerspectives(String externalId, List<PtzPreset> presets) {
 		Device device = devices.byExternalId(externalId)
 				.orElseThrow(() -> new DeviceUnknownException(externalId));
+		DuplicateRequestEntryException.requireDistinct(presets, "name", PtzPreset::name);
 		devices.replacePresets(device.deviceId(), device.siteExternalId(), presets);
 		return viewOf(externalId);
 	}

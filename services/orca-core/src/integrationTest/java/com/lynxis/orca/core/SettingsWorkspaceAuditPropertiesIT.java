@@ -261,6 +261,61 @@ class SettingsWorkspaceAuditPropertiesIT {
 	}
 
 	@Test
+	@DisplayName("an unknown grid code and a duplicated column code are typed refusals, not 500s")
+	void gridPreferenceRefusals() {
+		assertThatThrownBy(() -> inScope(() -> workspaceApi.replaceMyGridPreferences(List.of(
+				new GridPreferences().gridCode("NO_SUCH_GRID")
+						.columns(List.of(new ColumnPreference().columnCode("a").displayOrder(1)))))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("GRID_UNKNOWN"));
+
+		assertThatThrownBy(() -> inScope(() -> workspaceApi.replaceMyGridPreferences(List.of(
+				new GridPreferences().gridCode("USER_MANAGEMENT")
+						.columns(List.of(
+								new ColumnPreference().columnCode("email").displayOrder(1),
+								new ColumnPreference().columnCode("email").displayOrder(2)))))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("VALIDATION_FAILED"));
+	}
+
+	@Test
+	@DisplayName("a branding request repeating a color or language code is refused as validation — in the INDEX's collation")
+	void duplicateBrandingCodesAreRefusedUpFront() {
+		// Deliberately case-variant: the unique indexes compare case-insensitively,
+		// so a guard that only caught exact-case repeats would let this through
+		// to a 500 (skeptical review, finding A3).
+		assertThatThrownBy(() -> inScope(() -> brandingApi.updateSiteBranding(SITE,
+				new UpdateSiteBrandingRequest().colors(List.of(
+						new SiteColorItem().code("PRIMARY").hexValue("#111111"),
+						new SiteColorItem().code("primary").hexValue("#222222"))))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("VALIDATION_FAILED"));
+
+		assertThatThrownBy(() -> inScope(() -> brandingApi.updateSiteBranding(SITE,
+				new UpdateSiteBrandingRequest().languages(List.of(
+						new SiteLanguageItem().code("en").name("English"),
+						new SiteLanguageItem().code("EN").name("Also English"))))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("VALIDATION_FAILED"));
+
+		assertThat(core.queryForObject("SELECT COUNT(*) FROM site_color", Long.class)).isZero();
+		assertThat(core.queryForObject("SELECT COUNT(*) FROM site_language", Long.class)).isZero();
+	}
+
+	@Test
+	@DisplayName("a filter name differing only in case is the 409 the database means, not a 500")
+	void caseVariantFilterNameIsAConflict() {
+		inScope(() -> workspaceApi.createMyFilter(new CreateFilterRequest()
+				.gridCode("USER_MANAGEMENT").name("Trucks").filterJson("{}")));
+
+		assertThatThrownBy(() -> inScope(() -> workspaceApi.createMyFilter(new CreateFilterRequest()
+				.gridCode("USER_MANAGEMENT").name("trucks").filterJson("{}"))))
+				.as("the CI unique index fires on the case variant; the diagnosis must speak its collation")
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("CONFLICT"));
+	}
+
+	@Test
 	@DisplayName("a token that maps to no platform user is USER_NOT_LINKED, not an empty workspace")
 	void anUnlinkedTokenIsRefused() {
 		callerSubject = "kc-stranger";

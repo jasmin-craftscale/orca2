@@ -97,10 +97,7 @@ public class TemplateAdminService {
 				? overnight(effectiveStart, effectiveEnd)
 				: null;
 		try {
-			shiftTemplates.update(externalId, name, timeZone,
-					start != null ? effectiveStart : null,
-					end != null ? effectiveEnd : null,
-					recomputed, retired);
+			shiftTemplates.update(externalId, name, timeZone, start, end, recomputed, retired);
 		}
 		catch (DuplicateKeyException lostTheRace) {
 			throw new TemplateNameInUseException(name);
@@ -125,6 +122,7 @@ public class TemplateAdminService {
 	@Transactional
 	public BreakTemplateView createBreakTemplate(String name, String description,
 			List<BreakTiming> timings) {
+		requireDistinctStarts(timings);
 		if (breakTemplates.nameInUse(name, 0)) {
 			throw new TemplateNameInUseException(name);
 		}
@@ -147,6 +145,7 @@ public class TemplateAdminService {
 			List<BreakTiming> timings, Boolean retired) {
 		BreakTemplate existing = breakTemplates.byExternalId(externalId)
 				.orElseThrow(() -> new BreakTemplateUnknownException(externalId));
+		requireDistinctStarts(timings);
 		if (name != null && breakTemplates.nameInUse(name, existing.breakTemplateId())) {
 			throw new TemplateNameInUseException(name);
 		}
@@ -178,6 +177,14 @@ public class TemplateAdminService {
 				.filter(view -> view.template().externalId().equals(externalId))
 				.findFirst()
 				.orElseThrow(() -> new BreakTemplateUnknownException(externalId));
+	}
+
+	/** Two breaks cannot start at the same instant — refused before any row, not by the index. */
+	private static void requireDistinctStarts(List<BreakTiming> timings) {
+		if (timings != null) {
+			DuplicateRequestEntryException.requireDistinct(timings, "startTime",
+					timing -> timing.breakStartTime().toString());
+		}
 	}
 
 	private static void requireKnownZone(String timeZone) {

@@ -121,6 +121,12 @@ public class DeviceRepository {
 
 	// --- devices ------------------------------------------------------------
 
+	/**
+	 * The lane's inventory, retired devices INCLUDED and flagged — the same
+	 * deliberate choice as the user directory: an administrator sees the whole
+	 * history, and consumers gating on activity read {@code retired}. The
+	 * published view is where retirement hides rows.
+	 */
 	public List<Device> byLane(long laneId) {
 		return seam.select(ScopedSelect.from("device")
 						.columns(DEVICE_COLUMNS)

@@ -91,21 +91,42 @@ public class SettingRepository {
 				.stream().findFirst();
 	}
 
-	/** Upserts the current value and APPENDS the change to history, in the caller's transaction. */
-	public void write(long settingDefinitionId, String oldValue, String newValue, String changedBy) {
-		int changed = seam.update(ScopedUpdate.table("setting_value")
-				.set("setting_value", newValue)
-				.set("updated_by", changedBy)
-				.set("updated_at", Utc.now())
-				.scopedBy(REALM)
-				.where("setting_definition_id = ?", settingDefinitionId));
-		if (changed == 0) {
-			seam.insert(ScopedInsert.into("setting_value")
-					.scopedBy(REALM)
-					.value("setting_definition_id", settingDefinitionId)
-					.value(REALM, IdentityTables.INSTALLATION_REALM)
-					.value("setting_value", newValue)
-					.value("updated_by", changedBy));
+	/**
+	 * Upserts the current value and APPENDS the change to history, in the
+	 * caller's transaction, and returns the value that was replaced.
+	 *
+	 * <p>Concurrency is handled here, not hoped away (review finding, Phase 2
+	 * addendum): the existing row is read under {@code UPDLOCK}
+	 * ({@code lockMatchedRows}), so two writers serialize and each history row
+	 * records the old value that was really replaced. The first-ever write has
+	 * no row to lock — two concurrent first writes both insert, the loser hits
+	 * {@code uq_setting_value_definition}, and instead of surfacing a 500 it
+	 * re-reads (now locked, now present) and retries as the update it has
+	 * become.
+	 */
+	public String write(long settingDefinitionId, String newValue, String changedBy) {
+		String oldValue;
+		Optional<SettingValue> current = lockedValueOf(settingDefinitionId);
+		if (current.isPresent()) {
+			oldValue = current.get().settingValue();
+			updateValue(settingDefinitionId, newValue, changedBy);
+		}
+		else {
+			try {
+				seam.insert(ScopedInsert.into("setting_value")
+						.scopedBy(REALM)
+						.value("setting_definition_id", settingDefinitionId)
+						.value(REALM, IdentityTables.INSTALLATION_REALM)
+						.value("setting_value", newValue)
+						.value("updated_by", changedBy));
+				oldValue = null;
+			}
+			catch (org.springframework.dao.DuplicateKeyException lostTheFirstWriteRace) {
+				oldValue = lockedValueOf(settingDefinitionId)
+						.map(SettingValue::settingValue)
+						.orElse(null);
+				updateValue(settingDefinitionId, newValue, changedBy);
+			}
 		}
 		seam.insert(ScopedInsert.into("setting_history")
 				.scopedBy(REALM)
@@ -114,6 +135,27 @@ public class SettingRepository {
 				.value("old_value", oldValue)
 				.value("new_value", newValue)
 				.value("changed_by", changedBy));
+		return oldValue;
+	}
+
+	private Optional<SettingValue> lockedValueOf(long settingDefinitionId) {
+		return seam.select(ScopedSelect.from("setting_value")
+						.columns("setting_value_id", "setting_definition_id", "config_realm",
+								"setting_value", "updated_by", "updated_at")
+						.scopedBy(REALM)
+						.where("setting_definition_id = ?", settingDefinitionId)
+						.lockMatchedRows(),
+				VALUE_MAPPER)
+				.stream().findFirst();
+	}
+
+	private void updateValue(long settingDefinitionId, String newValue, String changedBy) {
+		seam.update(ScopedUpdate.table("setting_value")
+				.set("setting_value", newValue)
+				.set("updated_by", changedBy)
+				.set("updated_at", Utc.now())
+				.scopedBy(REALM)
+				.where("setting_definition_id = ?", settingDefinitionId));
 	}
 
 	public List<SettingHistory> historyOf(long settingDefinitionId) {

@@ -1,10 +1,7 @@
 package com.lynxis.orca.core.api;
 
-import java.time.Instant;
-import java.time.LocalTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +20,7 @@ import com.lynxis.orca.core.domain.TemplateAdminService.ShiftTemplateUnknownExce
 import com.lynxis.orca.core.domain.TemplateAdminService.TemplateInUseException;
 import com.lynxis.orca.core.domain.TemplateAdminService.TemplateNameInUseException;
 import com.lynxis.orca.core.domain.TemplateAdminService.TimeZoneUnknownException;
+import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.platform.web.ApiException;
 import com.lynxis.orca.platform.web.ApiResponse;
@@ -56,8 +54,8 @@ public class ShiftTemplateController implements ShiftTemplatesApi {
 	public ResponseEntity<ShiftTemplateEnvelope> createShiftTemplate(CreateShiftTemplateRequest request) {
 		ShiftTemplate created = ScopeContext.callIn(scope(), () -> translating(() ->
 				service.createShiftTemplate(request.getName(), request.getTimeZone(),
-						LocalTime.parse(normalise(request.getStartTime())),
-						LocalTime.parse(normalise(request.getEndTime())))));
+						ApiTime.parseLocalTime(request.getStartTime()),
+						ApiTime.parseLocalTime(request.getEndTime()))));
 		return ResponseEntity.status(HttpStatus.CREATED).body(envelope(created));
 	}
 
@@ -67,13 +65,13 @@ public class ShiftTemplateController implements ShiftTemplatesApi {
 		ShiftTemplate updated = ScopeContext.callIn(scope(), () -> translating(() ->
 				service.updateShiftTemplate(shiftTemplateExternalId,
 						request.getName(), request.getTimeZone(),
-						request.getStartTime() == null ? null : LocalTime.parse(normalise(request.getStartTime())),
-						request.getEndTime() == null ? null : LocalTime.parse(normalise(request.getEndTime())),
+						ApiTime.parseLocalTime(request.getStartTime()),
+						ApiTime.parseLocalTime(request.getEndTime()),
 						request.getRetired())));
 		return ResponseEntity.ok(envelope(updated));
 	}
 
-	private static ShiftTemplate translating(java.util.function.Supplier<ShiftTemplate> work) {
+	private static ShiftTemplate translating(Supplier<ShiftTemplate> work) {
 		try {
 			return work.get();
 		}
@@ -94,7 +92,7 @@ public class ShiftTemplateController implements ShiftTemplatesApi {
 		}
 	}
 
-	private com.lynxis.orca.platform.scope.Scope scope() {
+	private Scope scope() {
 		return CoreScopes.installation(siteExternalId);
 	}
 
@@ -117,15 +115,6 @@ public class ShiftTemplateController implements ShiftTemplatesApi {
 				.durationMinutes(TemplateAdminService.durationMinutes(
 						template.startTime(), template.endTime()))
 				.retired(template.retiredAt() != null)
-				.createdAt(offset(template.createdAt()));
-	}
-
-	/** {@code HH:mm} and {@code HH:mm:ss} are both contract-legal; parse both. */
-	private static String normalise(String time) {
-		return time.length() == 5 ? time + ":00" : time;
-	}
-
-	private static OffsetDateTime offset(Instant instant) {
-		return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
+				.createdAt(ApiTime.offset(template.createdAt()));
 	}
 }

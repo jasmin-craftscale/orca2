@@ -1,6 +1,7 @@
 package com.lynxis.orca.core.api;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -12,12 +13,14 @@ import com.lynxis.orca.core.api.generated.model.SiteColorItem;
 import com.lynxis.orca.core.api.generated.model.SiteLanguageItem;
 import com.lynxis.orca.core.api.generated.model.UpdateSiteBrandingRequest;
 import com.lynxis.orca.core.domain.CoreScopes;
+import com.lynxis.orca.core.domain.DuplicateRequestEntryException;
 import com.lynxis.orca.core.domain.RoleAdminService.SiteUnknownException;
 import com.lynxis.orca.core.domain.SiteBrandingService;
 import com.lynxis.orca.core.domain.SiteBrandingService.BrandingView;
 import com.lynxis.orca.core.domain.SiteBrandingService.ColorInvalidException;
 import com.lynxis.orca.core.domain.WorkspaceTables.SiteColor;
 import com.lynxis.orca.core.domain.WorkspaceTables.SiteLanguage;
+import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.platform.web.ApiError;
 import com.lynxis.orca.platform.web.ApiException;
@@ -41,9 +44,8 @@ public class SiteBrandingController implements SiteBrandingApi {
 	@Override
 	public ResponseEntity<SiteBrandingEnvelope> updateSiteBranding(String targetSiteExternalId,
 			UpdateSiteBrandingRequest request) {
-		BrandingView view = ScopeContext.callIn(scope(), () -> {
-			try {
-				return service.replace(targetSiteExternalId,
+		BrandingView view = ScopeContext.callIn(scope(), () -> translating(() ->
+				service.replace(targetSiteExternalId,
 						request.getColors() == null ? null : request.getColors().stream()
 								.map(color -> new SiteColor(0, targetSiteExternalId, color.getCode(),
 										color.getHexValue(), null, null))
@@ -52,18 +54,7 @@ public class SiteBrandingController implements SiteBrandingApi {
 								.map(language -> new SiteLanguage(0, targetSiteExternalId,
 										language.getCode(), language.getName(),
 										language.getResourcePath(), null, null))
-								.toList());
-			}
-			catch (SiteUnknownException unknown) {
-				throw new ApiException(CoreErrorCode.SITE_UNKNOWN,
-						"No active site '" + unknown.siteExternalId() + "' at this installation.");
-			}
-			catch (ColorInvalidException invalid) {
-				throw new ApiException(PlatformErrorCode.VALIDATION_FAILED,
-						"A color value is not hex.",
-						List.of(ApiError.field(PlatformErrorCode.VALIDATION_FAILED, invalid.code(), invalid.reason())));
-			}
-		});
+								.toList())));
 		return ResponseEntity.ok(new SiteBrandingEnvelope()
 				.status(ApiStatus.SUCCESS)
 				.code(ApiResponse.OK)
@@ -83,7 +74,29 @@ public class SiteBrandingController implements SiteBrandingApi {
 								.toList())));
 	}
 
-	private com.lynxis.orca.platform.scope.Scope scope() {
+	private static BrandingView translating(Supplier<BrandingView> work) {
+		try {
+			return work.get();
+		}
+		catch (SiteUnknownException unknown) {
+			throw new ApiException(CoreErrorCode.SITE_UNKNOWN,
+					"No active site '" + unknown.siteExternalId() + "' at this installation.");
+		}
+		catch (ColorInvalidException invalid) {
+			throw new ApiException(PlatformErrorCode.VALIDATION_FAILED,
+					"A color value is not hex.",
+					List.of(ApiError.field(PlatformErrorCode.VALIDATION_FAILED,
+							invalid.code(), invalid.reason())));
+		}
+		catch (DuplicateRequestEntryException repeated) {
+			throw new ApiException(PlatformErrorCode.VALIDATION_FAILED,
+					"The request repeats an entry.",
+					List.of(ApiError.field(PlatformErrorCode.VALIDATION_FAILED,
+							repeated.getField(), "duplicated: " + repeated.getDuplicate())));
+		}
+	}
+
+	private Scope scope() {
 		return CoreScopes.installation(siteExternalId);
 	}
 }

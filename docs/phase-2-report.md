@@ -378,6 +378,140 @@ directory-integration story is (register U3 owns the realm design).
 
 ---
 
+## 9 · Review addendum — the independent pass before handover (9 Aug 2026)
+
+Before handover, three independent adversarial reviews were run over the whole
+phase diff (correctness/concurrency, Spring practices, clean code), every
+finding verified against the code, and the actionable set fixed in one commit.
+The verification suite was re-run in full afterwards. What was found, what was
+fixed, and what is accepted-and-documented:
+
+### Fixed
+
+1. **Duplicate `keycloak_subject` was an uncaught 500 on the user routes** —
+   create, subject patch, and the reinstatement collision (reinstating a user
+   whose subject was meanwhile linked to a new active user re-enters the
+   filtered unique index). Now a typed domain exception → contracted **409**
+   on `POST /users` and `PATCH /users/{id}`; all three paths proven in
+   `IdentityPropertiesIT`.
+2. **A payload repeating a natural key 500'd on six set-replacement routes**
+   (IO layouts, PTZ presets, resource-config entries, break timings, grid
+   column preferences, site colors/languages) — the filtered unique indexes
+   fired and nothing caught them. Now refused **before any row** by
+   `DuplicateRequestEntryException.requireDistinct` in the services →
+   `VALIDATION_FAILED` with the offending field named; the indexes remain the
+   backstop. Proven per surface in the suites.
+3. **The settings first-write upsert race** (two concurrent first writes → one
+   uncaught duplicate → 500) and the **history old-value race** (two writers
+   both recording the same `old_value`). `SettingRepository.write` now reads
+   the current row under `UPDLOCK` (`lockMatchedRows` — the seam feature built
+   for read-decide-write), retries the lost first-write race as the update it
+   has become, and returns the value it really replaced, which also makes the
+   CREATED/UPDATED audit action truthful.
+4. **`@Transactional` was wired but unproven** — every suite constructed
+   services with `new`, so a broken proxy would have passed everything (the
+   corpus's own known blind-spot class). `TransactionalityPropertiesIT` now
+   builds the services through a transaction-managing context and proves the
+   property: a failure between a multi-statement mutation's writes leaves
+   nothing behind.
+5. **`orca.installation.site-external-id` defaulted to `SITE-DEMO` in every
+   profile** — a deployment that forgot the env var would boot green, silently
+   scoped to a site that does not exist. `InstallationSiteValidator` now
+   refuses startup on the fixture value outside the `local` profile — the
+   `InternalCredentialValidator` pattern, applied to the second committed
+   fixture. The property arrives as validated `InstallationProperties`
+   (`@ConfigurationProperties`), replacing thirteen `@Value` copies.
+6. **The filter default-race was mislabeled**: the one-default index firing
+   was reported as "name already in use". `createFilter` now diagnoses which
+   constraint fired; a lost default race steps the concurrent winner down and
+   retries (last writer takes the default), a real name clash stays 409.
+7. **`/resource-configurations/{scope}/{id}` answered 422 for a
+   path-identified miss** where every sibling answers 404 — now 404, contract
+   amended, `RESOURCE_UNKNOWN` removed from the code enum.
+8. **`PUT /me/workspace/grids` ran one transaction per grid** — a mid-request
+   failure applied earlier grids. The loop moved into the service under one
+   `@Transactional`; the whole PUT applies or none of it does.
+9. **Per-request full-directory scans**: subject→user resolution on every
+   `/me/**` request and every audit write streamed `users.all()`; now
+   `activeByKeycloakSubject` uses the unique index built for it. The audit
+   actor is defensively clipped to its column width (an IdP subject longer
+   than 200 chars must not fail a mutation).
+10. **Clean code**: two dead no-op helpers and a pointless indirection removed
+    from `DeviceAdminController`; the `Instant→OffsetDateTime` helper
+    consolidated from nine copies into `ApiTime` (with the time-string parsing
+    that had one commented copy and one bare copy); exception translation
+    unified on the `translating()` pattern across all mutating controllers;
+    `CoreConfiguration` rewritten with real imports; contracted error codes
+    that had no negative test (`GRID_UNKNOWN`, the team-side template
+    refusals, the path-miss 404s) now each have one; `email` gained
+    `format: email`; two Javadoc/comment-vs-code mismatches aligned.
+
+### Accepted, documented, deliberately not fixed now
+
+- **Check-then-act liveness guards have no DB backstop**: role-retire vs.
+  concurrent user-assign (and template-retire vs. team-attach) can interleave
+  into an active row referencing a retired one. No schema constraint can say
+  "an active referrer needs an active referent"; closing it means `UPDLOCK`
+  on the referent in every guard. Admin-frequency operations, visible outcome,
+  cheap to harden later — recorded as a hardening candidate.
+- **Two concurrent set-replacements can merge into a union neither admin
+  sent** (retire-scan-then-insert with no parent-row serialization). Same
+  frequency class, same disposition.
+- **`Utc.timestampOf` has a once-a-year DST-gap skew on non-UTC JVMs**
+  (`Timestamp.valueOf` interprets UTC wall-clock fields in the default zone;
+  the spring-forward gap normalizes them an hour forward). **Inherited from
+  edge's copy**, so the fix belongs to both copies at once — a platform-wide
+  sweep, not a phase patch. The H3/H5 lineage's next item.
+- **V106's header nit** ("columns first (nullable)" — `protocol` is added NOT
+  NULL with a default) stays: the migration has shipped to databases in this
+  repository's own runs, and a comment is not worth a checksum break.
+- **Catalog/audit controllers inject repositories directly** where mutating
+  surfaces go through a domain service — read-only routes, harmless, noted.
+
+### The pass on the fixes themselves
+
+A second skeptical review was run over the fix diff before anything was
+committed, and it caught four things **in the fixes** — the reason this
+addendum exists at all:
+
+- **A1**: the resource-configuration 404 amendment had corrected the GET's
+  contract block and missed the PUT's — code answered 404 while the PUT still
+  declared 422, and the new test would have proven the drift. Fixed; nothing
+  mechanical enforces response-code completeness (`ContractInterfaceRule`
+  checks interfaces, not response maps), which is worth a future check.
+- **A2**: the filter-conflict diagnosis compared names with Java's
+  case-sensitive `equals` while the database's unique indexes compare
+  case-insensitively (server collation `SQL_Latin1_General_CP1_CI_AS`,
+  verified empirically) — turning "create `trucks` beside `Trucks`" from the
+  409 it had been into a 500. Fixed: the diagnosis now speaks the index's
+  collation, and a retry that still collides answers as the name conflict it
+  is. Proven by a case-variant test.
+- **A3**: the same Java-vs-collation mismatch in the payload-duplicate guard —
+  `PRIMARY`/`primary` passed the guard and 500'd on the backstop.
+  `requireDistinct` now compares keys the way the CI index does (case-folded,
+  trailing space stripped); the branding test repeats codes case-variantly on
+  purpose.
+- **A4**: the six new `VALIDATION_FAILED` emissions were undeclared in the
+  contract (no `400` blocks); declared. Guard ordering was also normalized —
+  existence and identity checks run before payload checks, so an unknown
+  target answers 404/403, never a verdict on a payload it cannot apply to.
+
+Two residuals from that pass, accepted and stated: the settings first-write
+retry and the filter default-race retry have no deterministic concurrency
+test (the reasoning is recorded in the repository; the reviewer's independent
+interleaving analysis concurred), and `TransactionalityPropertiesIT` proves
+the annotation through a test-built transaction-managing context rather than
+Boot's auto-configuration — the six-service boot below is what covers the
+auto-configured half.
+
+### What the re-run proved
+
+All ten build checks green; **195 integration tests in 25 suites** green;
+the full §4 verification — including the live demo and all six service boots
+— re-executed after the fixes with identical outcomes.
+
+---
+
 *A gap reported is worth more than a gap filled with a guess — this phase
 ships four of them on purpose: four device types, four audio port names,
 nineteen IO device kinds, and thirty grid definitions.*

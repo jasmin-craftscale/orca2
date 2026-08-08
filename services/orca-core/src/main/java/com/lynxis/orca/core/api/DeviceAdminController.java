@@ -1,10 +1,7 @@
 package com.lynxis.orca.core.api;
 
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,10 +25,13 @@ import com.lynxis.orca.core.domain.DeviceAdminService.DeviceView;
 import com.lynxis.orca.core.domain.DeviceAdminService.IoAssignmentDraft;
 import com.lynxis.orca.core.domain.DeviceAdminService.LaneUnknownException;
 import com.lynxis.orca.core.domain.DeviceAdminService.PortNameUnknownException;
+import com.lynxis.orca.core.domain.DuplicateRequestEntryException;
 import com.lynxis.orca.core.domain.DeviceTables.Device;
 import com.lynxis.orca.core.domain.DeviceTables.PtzPreset;
 import com.lynxis.orca.core.persistence.DeviceRepository.DevicePatch;
+import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
+import com.lynxis.orca.platform.web.ApiError;
 import com.lynxis.orca.platform.web.ApiException;
 import com.lynxis.orca.platform.web.ApiResponse;
 import com.lynxis.orca.platform.web.ApiStatus;
@@ -64,7 +64,7 @@ public class DeviceAdminController implements DevicesApi {
 	@Override
 	public ResponseEntity<DeviceEnvelope> registerDevice(String laneExternalId,
 			RegisterDeviceRequest request) {
-		DeviceView registered = ScopeContext.callIn(scope(), () -> translatingOne(() ->
+		DeviceView registered = ScopeContext.callIn(scope(), () -> translating(() ->
 				service.register(laneExternalId, draftOf(request), request.getDeviceTypeCode())));
 		return ResponseEntity.status(HttpStatus.CREATED).body(envelope(registered));
 	}
@@ -72,14 +72,14 @@ public class DeviceAdminController implements DevicesApi {
 	@Override
 	public ResponseEntity<DeviceEnvelope> updateDevice(String deviceExternalId,
 			UpdateDeviceRequest request) {
-		DeviceView updated = ScopeContext.callIn(scope(), () -> translatingOne(() ->
+		DeviceView updated = ScopeContext.callIn(scope(), () -> translating(() ->
 				service.update(deviceExternalId, patchOf(request), request.getDeviceTypeCode())));
 		return ResponseEntity.ok(envelope(updated));
 	}
 
 	@Override
 	public ResponseEntity<DeviceEnvelope> retireDevice(String deviceExternalId) {
-		DeviceView retired = ScopeContext.callIn(scope(), () -> translatingOne(() ->
+		DeviceView retired = ScopeContext.callIn(scope(), () -> translating(() ->
 				service.retire(deviceExternalId)));
 		return ResponseEntity.ok(envelope(retired));
 	}
@@ -87,7 +87,7 @@ public class DeviceAdminController implements DevicesApi {
 	@Override
 	public ResponseEntity<DeviceEnvelope> replaceIoAssignments(String deviceExternalId,
 			List<IoAssignmentItem> layout) {
-		DeviceView updated = ScopeContext.callIn(scope(), () -> translatingOne(() ->
+		DeviceView updated = ScopeContext.callIn(scope(), () -> translating(() ->
 				service.replaceIoAssignments(deviceExternalId, layout.stream()
 						.map(item -> new IoAssignmentDraft(
 								item.getPortType().getValue(),
@@ -108,10 +108,10 @@ public class DeviceAdminController implements DevicesApi {
 	@Override
 	public ResponseEntity<DeviceEnvelope> replacePerspectives(String deviceExternalId,
 			List<PerspectiveItem> presets) {
-		DeviceView updated = ScopeContext.callIn(scope(), () -> translatingOne(() ->
+		DeviceView updated = ScopeContext.callIn(scope(), () -> translating(() ->
 				service.replacePerspectives(deviceExternalId, presets.stream()
 						.map(item -> new PtzPreset(0, 0, null, item.getName(),
-								decimal(item.getPan()), decimal(item.getTilt()), decimal(item.getZoom()),
+								item.getPan(), item.getTilt(), item.getZoom(),
 								null, null))
 						.toList())));
 		return ResponseEntity.ok(envelope(updated));
@@ -119,7 +119,7 @@ public class DeviceAdminController implements DevicesApi {
 
 	// ------------------------------------------------------------------------
 
-	private static <T> T translating(java.util.function.Supplier<T> work) {
+	private static <T> T translating(Supplier<T> work) {
 		try {
 			return work.get();
 		}
@@ -137,13 +137,15 @@ public class DeviceAdminController implements DevicesApi {
 			throw new ApiException(CoreErrorCode.PORT_NAME_UNKNOWN,
 					"No IO port name '" + unknown.code() + "' in the catalog.");
 		}
+		catch (DuplicateRequestEntryException repeated) {
+			throw new ApiException(PlatformErrorCode.VALIDATION_FAILED,
+					"The request repeats an entry.",
+					List.of(ApiError.field(PlatformErrorCode.VALIDATION_FAILED,
+							repeated.getField(), "duplicated: " + repeated.getDuplicate())));
+		}
 	}
 
-	private static DeviceView translatingOne(java.util.function.Supplier<DeviceView> work) {
-		return translating(work);
-	}
-
-	private com.lynxis.orca.platform.scope.Scope scope() {
+	private Scope scope() {
 		return CoreScopes.installation(siteExternalId);
 	}
 
@@ -205,7 +207,7 @@ public class DeviceAdminController implements DevicesApi {
 				.dataCaptureMode(device.dataCaptureMode())
 				.waitTime(device.waitTime())
 				.retired(device.retiredAt() != null)
-				.createdAt(offset(device.createdAt()));
+				.createdAt(ApiTime.offset(device.createdAt()));
 		for (int i = 0; i < view.ioAssignments().size(); i++) {
 			var assignment = view.ioAssignments().get(i);
 			summary.addIoAssignmentsItem(new IoAssignmentItem()
@@ -224,25 +226,13 @@ public class DeviceAdminController implements DevicesApi {
 		summary.perspectives(view.perspectives().stream()
 				.map(preset -> new PerspectiveItem()
 						.name(preset.name())
-						.pan(number(preset.pan()))
-						.tilt(number(preset.tilt()))
-						.zoom(number(preset.zoom())))
+						.pan(preset.pan())
+						.tilt(preset.tilt())
+						.zoom(preset.zoom()))
 				.toList());
 		if (summary.getIoAssignments() == null) {
 			summary.ioAssignments(List.of());
 		}
 		return summary;
-	}
-
-	private static BigDecimal decimal(BigDecimal value) {
-		return value;
-	}
-
-	private static BigDecimal number(BigDecimal value) {
-		return value;
-	}
-
-	private static OffsetDateTime offset(Instant instant) {
-		return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
 	}
 }

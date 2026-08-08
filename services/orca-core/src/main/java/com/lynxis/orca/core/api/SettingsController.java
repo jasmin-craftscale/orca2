@@ -1,9 +1,7 @@
 package com.lynxis.orca.core.api;
 
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,6 +17,7 @@ import com.lynxis.orca.core.domain.SettingsService.SecretSettingRejectedExceptio
 import com.lynxis.orca.core.domain.SettingsService.SettingInvalidException;
 import com.lynxis.orca.core.domain.SettingsService.SettingUnknownException;
 import com.lynxis.orca.core.domain.SettingsService.SettingView;
+import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.platform.web.ApiError;
 import com.lynxis.orca.platform.web.ApiException;
@@ -51,25 +50,8 @@ public class SettingsController implements SettingsApi {
 
 	@Override
 	public ResponseEntity<SettingEnvelope> writeSetting(String settingKey, WriteSettingRequest request) {
-		SettingView written = ScopeContext.callIn(scope(), () -> {
-			try {
-				return service.write(settingKey, request.getValue());
-			}
-			catch (SecretSettingRejectedException secret) {
-				throw new ApiException(CoreErrorCode.SETTING_SECRET_REJECTED,
-						"Secrets never enter the settings table. Route '" + secret.settingKey()
-								+ "' to the installation's configuration or keystore.");
-			}
-			catch (SettingUnknownException unknown) {
-				throw new ApiException(CoreErrorCode.SETTING_UNKNOWN,
-						"No setting '" + unknown.settingKey() + "' in the registry of known keys.");
-			}
-			catch (SettingInvalidException invalid) {
-				throw new ApiException(PlatformErrorCode.VALIDATION_FAILED,
-						"The value does not fit the key's type.",
-						List.of(ApiError.field(PlatformErrorCode.VALIDATION_FAILED, "value", invalid.reason())));
-			}
-		});
+		SettingView written = ScopeContext.callIn(scope(), () -> translating(() ->
+				service.write(settingKey, request.getValue())));
 		return ResponseEntity.ok(new SettingEnvelope()
 				.status(ApiStatus.SUCCESS)
 				.code(ApiResponse.OK)
@@ -77,7 +59,27 @@ public class SettingsController implements SettingsApi {
 				.data(summary(written)));
 	}
 
-	private com.lynxis.orca.platform.scope.Scope scope() {
+	private static SettingView translating(Supplier<SettingView> work) {
+		try {
+			return work.get();
+		}
+		catch (SecretSettingRejectedException secret) {
+			throw new ApiException(CoreErrorCode.SETTING_SECRET_REJECTED,
+					"Secrets never enter the settings table. Route '" + secret.settingKey()
+							+ "' to the installation's configuration or keystore.");
+		}
+		catch (SettingUnknownException unknown) {
+			throw new ApiException(CoreErrorCode.SETTING_UNKNOWN,
+					"No setting '" + unknown.settingKey() + "' in the registry of known keys.");
+		}
+		catch (SettingInvalidException invalid) {
+			throw new ApiException(PlatformErrorCode.VALIDATION_FAILED,
+					"The value does not fit the key's type.",
+					List.of(ApiError.field(PlatformErrorCode.VALIDATION_FAILED, "value", invalid.reason())));
+		}
+	}
+
+	private Scope scope() {
 		return CoreScopes.installation(siteExternalId);
 	}
 
@@ -91,12 +93,8 @@ public class SettingsController implements SettingsApi {
 		if (view.current() != null) {
 			summary.value(view.current().settingValue())
 					.updatedBy(view.current().updatedBy())
-					.updatedAt(offset(view.current().updatedAt()));
+					.updatedAt(ApiTime.offset(view.current().updatedAt()));
 		}
 		return summary;
-	}
-
-	private static OffsetDateTime offset(Instant instant) {
-		return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
 	}
 }

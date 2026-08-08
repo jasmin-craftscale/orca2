@@ -44,9 +44,6 @@ public enum CoreErrorCode implements ErrorCode {
 	/** An IO port name code is not in the seeded catalog. */
 	PORT_NAME_UNKNOWN("PORT_NAME_UNKNOWN", 422),
 
-	/** A scoped resource (site/area/lane/device) does not exist at this installation. */
-	RESOURCE_UNKNOWN("RESOURCE_UNKNOWN", 422),
-
 	/** A settings key is not in the registry of known keys. */
 	SETTING_UNKNOWN("SETTING_UNKNOWN", 422),
 

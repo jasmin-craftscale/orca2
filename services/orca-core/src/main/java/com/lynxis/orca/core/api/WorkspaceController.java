@@ -1,9 +1,7 @@
 package com.lynxis.orca.core.api;
 
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,15 +17,19 @@ import com.lynxis.orca.core.api.generated.model.SavedFiltersEnvelope;
 import com.lynxis.orca.core.api.generated.model.WorkspaceGrid;
 import com.lynxis.orca.core.api.generated.model.WorkspaceGridsEnvelope;
 import com.lynxis.orca.core.domain.CoreScopes;
+import com.lynxis.orca.core.domain.DuplicateRequestEntryException;
 import com.lynxis.orca.core.domain.WorkspaceService;
 import com.lynxis.orca.core.domain.WorkspaceService.FilterNameInUseException;
 import com.lynxis.orca.core.domain.WorkspaceService.FilterUnknownException;
 import com.lynxis.orca.core.domain.WorkspaceService.FilterView;
+import com.lynxis.orca.core.domain.WorkspaceService.GridReplacement;
 import com.lynxis.orca.core.domain.WorkspaceService.GridUnknownException;
 import com.lynxis.orca.core.domain.WorkspaceService.GridView;
 import com.lynxis.orca.core.domain.WorkspaceService.UserNotLinkedException;
 import com.lynxis.orca.core.domain.WorkspaceTables.UserGridColumnPreference;
+import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
+import com.lynxis.orca.platform.web.ApiError;
 import com.lynxis.orca.platform.web.ApiException;
 import com.lynxis.orca.platform.web.ApiResponse;
 import com.lynxis.orca.platform.web.ApiStatus;
@@ -55,20 +57,19 @@ public class WorkspaceController implements WorkspaceApi {
 	@Override
 	public ResponseEntity<WorkspaceGridsEnvelope> replaceMyGridPreferences(
 			List<GridPreferences> request) {
-		List<GridView> grids = ScopeContext.callIn(scope(), () -> translating(() -> {
-			List<GridView> latest = null;
-			for (GridPreferences preferences : request) {
-				latest = service.replacePreferences(preferences.getGridCode(),
-						preferences.getColumns().stream()
-								.map(column -> new UserGridColumnPreference(0, 0, 0, null,
-										column.getColumnCode(), column.getDisplayOrder(),
-										column.getWidthPx(),
-										column.getVisible() == null || column.getVisible(),
-										null, null))
-								.toList());
-			}
-			return latest == null ? service.grids() : latest;
-		}));
+		// One service call, one transaction — the whole PUT applies or none of
+		// it does (review finding: the per-grid loop was N transactions).
+		List<GridView> grids = ScopeContext.callIn(scope(), () -> translating(() ->
+				service.replacePreferences(request.stream()
+						.map(preferences -> new GridReplacement(preferences.getGridCode(),
+								preferences.getColumns().stream()
+										.map(column -> new UserGridColumnPreference(0, 0, 0, null,
+												column.getColumnCode(), column.getDisplayOrder(),
+												column.getWidthPx(),
+												column.getVisible() == null || column.getVisible(),
+												null, null))
+										.toList()))
+						.toList())));
 		return ResponseEntity.ok(gridsEnvelope(grids));
 	}
 
@@ -101,7 +102,7 @@ public class WorkspaceController implements WorkspaceApi {
 
 	// ------------------------------------------------------------------------
 
-	private static <T> T translating(java.util.function.Supplier<T> work) {
+	private static <T> T translating(Supplier<T> work) {
 		try {
 			return work.get();
 		}
@@ -121,9 +122,15 @@ public class WorkspaceController implements WorkspaceApi {
 			throw new ApiException(PlatformErrorCode.NOT_FOUND,
 					"No such filter owned by the caller.");
 		}
+		catch (DuplicateRequestEntryException repeated) {
+			throw new ApiException(PlatformErrorCode.VALIDATION_FAILED,
+					"The request repeats an entry.",
+					List.of(ApiError.field(PlatformErrorCode.VALIDATION_FAILED,
+							repeated.getField(), "duplicated: " + repeated.getDuplicate())));
+		}
 	}
 
-	private com.lynxis.orca.platform.scope.Scope scope() {
+	private Scope scope() {
 		return CoreScopes.installation(siteExternalId);
 	}
 
@@ -163,10 +170,6 @@ public class WorkspaceController implements WorkspaceApi {
 				.filterJson(view.filter().filterJson())
 				.filterSchemaVersion(view.filter().filterSchemaVersion())
 				.isDefault(view.filter().isDefault())
-				.createdAt(offset(view.filter().createdAt()));
-	}
-
-	private static OffsetDateTime offset(Instant instant) {
-		return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
+				.createdAt(ApiTime.offset(view.filter().createdAt()));
 	}
 }

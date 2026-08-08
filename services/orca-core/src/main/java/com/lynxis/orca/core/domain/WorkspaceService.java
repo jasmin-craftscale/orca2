@@ -46,11 +46,27 @@ public class WorkspaceService {
 				.toList();
 	}
 
+	/** One grid's replacement, described. */
+	public record GridReplacement(String gridCode, List<UserGridColumnPreference> columns) {
+	}
+
+	/**
+	 * Replaces the caller's preferences for every listed grid in ONE
+	 * transaction — the PUT is atomic as the contract presents it, rather than
+	 * one transaction per grid with a failure leaving earlier grids applied
+	 * (review finding, Phase 2 addendum).
+	 */
 	@Transactional
-	public List<GridView> replacePreferences(String gridCode, List<UserGridColumnPreference> columns) {
+	public List<GridView> replacePreferences(List<GridReplacement> replacements) {
 		UserAccount user = callingUser();
-		GridDefinition grid = gridByCode(gridCode);
-		workspace.replacePreferences(user.userId(), grid.gridDefinitionId(), columns);
+		DuplicateRequestEntryException.requireDistinct(replacements, "gridCode",
+				GridReplacement::gridCode);
+		for (GridReplacement replacement : replacements) {
+			DuplicateRequestEntryException.requireDistinct(replacement.columns(), "columnCode",
+					UserGridColumnPreference::columnCode);
+			GridDefinition grid = gridByCode(replacement.gridCode());
+			workspace.replacePreferences(user.userId(), grid.gridDefinitionId(), replacement.columns());
+		}
 		return grids();
 	}
 
@@ -78,8 +94,33 @@ public class WorkspaceService {
 			workspace.insertFilter(externalId, user.userId(), grid.gridDefinitionId(), name,
 					filterJson, 1, isDefault);
 		}
-		catch (DuplicateKeyException nameTaken) {
-			throw new FilterNameInUseException(name);
+		catch (DuplicateKeyException constraint) {
+			// TWO indexes can fire here, and they mean different things: the
+			// name index (this user already filters this grid by that name),
+			// or the one-default index (a concurrent tab won the default race
+			// after our clearDefault). Diagnose rather than assume — and
+			// diagnose in the INDEX's collation: the database compares names
+			// case-insensitively, so 'trucks' vs 'Trucks' is the name index
+			// firing, not the default race (skeptical review, finding A2).
+			String wanted = DuplicateRequestEntryException.collationKey(name);
+			boolean nameTaken = workspace.filtersOf(user.userId()).stream()
+					.anyMatch(filter -> filter.gridDefinitionId() == grid.gridDefinitionId()
+							&& wanted.equals(DuplicateRequestEntryException.collationKey(filter.name())));
+			if (nameTaken) {
+				throw new FilterNameInUseException(name);
+			}
+			// The default race: step the concurrent winner down and take the
+			// default deliberately — the caller asked for it last. If even the
+			// retry collides, the cause left is a name variant the collation
+			// approximation missed — answer it as the name conflict it is.
+			workspace.clearDefault(user.userId(), grid.gridDefinitionId());
+			try {
+				workspace.insertFilter(externalId, user.userId(), grid.gridDefinitionId(), name,
+						filterJson, 1, isDefault);
+			}
+			catch (DuplicateKeyException stillColliding) {
+				throw new FilterNameInUseException(name);
+			}
 		}
 		return new FilterView(workspace.filterByExternalId(externalId).orElseThrow(), gridCode);
 	}
@@ -98,10 +139,7 @@ public class WorkspaceService {
 
 	private UserAccount callingUser() {
 		String subject = caller.subject().orElseThrow(UserNotLinkedException::new);
-		return users.all().stream()
-				.filter(user -> subject.equals(user.keycloakSubject()) && user.retiredAt() == null)
-				.findFirst()
-				.orElseThrow(UserNotLinkedException::new);
+		return users.activeByKeycloakSubject(subject).orElseThrow(UserNotLinkedException::new);
 	}
 
 	private GridDefinition gridByCode(String gridCode) {

@@ -257,6 +257,58 @@ class IdentityPropertiesIT {
 	}
 
 	@Test
+	@DisplayName("a duplicate identity-provider subject is 409 on create, on patch, and on reinstatement — never a 500")
+	void duplicateKeycloakSubjectIsAConflictEverywhere() {
+		RoleSummary role = inScope(() -> roleApi.createRole(
+				new CreateRoleRequest().name("Clerks")).getBody().getData());
+		UserSummary first = inScope(() -> userApi.createUser(new CreateUserRequest()
+				.displayName("First").email("first@example.test")
+				.roleExternalId(role.getExternalId()).keycloakSubject("kc-taken"))
+				.getBody().getData());
+
+		// Create with a subject an active user holds.
+		assertThatThrownBy(() -> inScope(() -> userApi.createUser(new CreateUserRequest()
+				.displayName("Second").email("second@example.test")
+				.roleExternalId(role.getExternalId()).keycloakSubject("kc-taken"))))
+				.as("the review's must-fix: this was an uncaught DuplicateKeyException and a 500")
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("CONFLICT"));
+
+		// Patch another user's subject onto the taken one.
+		UserSummary other = inScope(() -> userApi.createUser(new CreateUserRequest()
+				.displayName("Other").email("other@example.test")
+				.roleExternalId(role.getExternalId())).getBody().getData());
+		assertThatThrownBy(() -> inScope(() -> userApi.updateUser(other.getExternalId(),
+				new UpdateUserRequest().keycloakSubject("kc-taken"))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("CONFLICT"));
+
+		// The reinstatement collision: retire the holder, give the subject to a
+		// new active user, then reinstate the retired one — its row re-enters
+		// the filtered unique index and must be refused, not 500.
+		inScope(() -> userApi.updateUser(first.getExternalId(), new UpdateUserRequest().retired(true)));
+		inScope(() -> userApi.updateUser(other.getExternalId(),
+				new UpdateUserRequest().keycloakSubject("kc-taken")));
+		assertThatThrownBy(() -> inScope(() -> userApi.updateUser(first.getExternalId(),
+				new UpdateUserRequest().retired(false))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("CONFLICT"));
+	}
+
+	@Test
+	@DisplayName("patching a user or role nobody has is 404, by external id")
+	void unknownTargetsAre404() {
+		assertThatThrownBy(() -> inScope(() -> userApi.updateUser("usr-ghost",
+				new UpdateUserRequest().displayName("X"))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("NOT_FOUND"));
+		assertThatThrownBy(() -> inScope(() -> roleApi.updateRole("rol-ghost",
+				new UpdateRoleRequest().name("X"))))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("NOT_FOUND"));
+	}
+
+	@Test
 	@DisplayName("creating a user against an unknown role is 422 ROLE_UNKNOWN, not a stack trace")
 	void unknownRoleIsATypedRefusal() {
 		assertThatThrownBy(() -> inScope(() -> userApi.createUser(new CreateUserRequest()

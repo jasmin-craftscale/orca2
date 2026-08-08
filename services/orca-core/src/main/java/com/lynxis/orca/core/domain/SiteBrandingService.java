@@ -43,6 +43,12 @@ public class SiteBrandingService {
 	public BrandingView replace(String siteExternalId, List<SiteColor> colors, List<SiteLanguage> languages) {
 		requireSite(siteExternalId);
 		if (colors != null) {
+			DuplicateRequestEntryException.requireDistinct(colors, "code", SiteColor::code);
+		}
+		if (languages != null) {
+			DuplicateRequestEntryException.requireDistinct(languages, "code", SiteLanguage::code);
+		}
+		if (colors != null) {
 			branding.replaceColors(siteExternalId, colors.stream()
 					.map(color -> new SiteColor(0, siteExternalId, color.code(),
 							normalizeHex(color.code(), color.hexValue()), null, null))

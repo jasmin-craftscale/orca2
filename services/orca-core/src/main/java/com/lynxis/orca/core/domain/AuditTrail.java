@@ -31,6 +31,9 @@ public class AuditTrail {
 	private final CallerIdentity caller;
 	private final String siteExternalId;
 
+	/** The actor column's width — an over-long IdP subject is clipped, never a 500. */
+	private static final int ACTOR_WIDTH = 200;
+
 	public void record(String entityType, String entityExternalId, String action, String detail) {
 		events.append(siteExternalId, currentActor(), entityType, entityExternalId, action, detail);
 	}
@@ -38,11 +41,12 @@ public class AuditTrail {
 	public String currentActor() {
 		Optional<String> subject = caller.subject();
 		if (subject.isPresent()) {
-			return users.all().stream()
-					.filter(user -> subject.get().equals(user.keycloakSubject()))
-					.findFirst()
+			String actor = users.activeByKeycloakSubject(subject.get())
 					.map(UserAccount::externalId)
 					.orElse("subject:" + subject.get());
+			// An IdP is free to mint subjects longer than the column; an audit
+			// write must not fail over a caller-shaped string.
+			return actor.length() > ACTOR_WIDTH ? actor.substring(0, ACTOR_WIDTH) : actor;
 		}
 		if (SystemContext.isSystem()) {
 			return SystemContext.require().toString();

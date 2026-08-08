@@ -106,6 +106,12 @@ paths:
             application/json:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: That identity-provider subject is already linked to an active user
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "422":
           description: The named role does not exist
           content:
@@ -148,6 +154,15 @@ paths:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "404":
           description: No such user
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: |
+            That identity-provider subject is already linked to an active user —
+            on a subject change, or on reinstating a user whose subject was
+            meanwhile linked elsewhere
           content:
             application/json:
               schema:
@@ -520,6 +535,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BreakTemplateEnvelope"
+        "400":
+          description: The request repeats a break start time
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "401":
           description: No credential, or one that did not verify
           content:
@@ -561,6 +582,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BreakTemplateEnvelope"
+        "400":
+          description: The request repeats a break start time
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "401":
           description: No credential, or one that did not verify
           content:
@@ -756,6 +783,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeviceEnvelope"
+        "400":
+          description: The request repeats a port
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "401":
           description: No credential, or one that did not verify
           content:
@@ -804,6 +837,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeviceEnvelope"
+        "400":
+          description: The request repeats a preset name
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "401":
           description: No credential, or one that did not verify
           content:
@@ -907,7 +946,7 @@ paths:
             application/json:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
-        "422":
+        "404":
           description: No such resource at this installation
           content:
             application/json:
@@ -950,7 +989,13 @@ paths:
             application/json:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
-        "422":
+        "400":
+          description: The request repeats an entry
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
           description: No such resource at this installation
           content:
             application/json:
@@ -1068,6 +1113,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkspaceGridsEnvelope"
+        "400":
+          description: The request repeats a grid or a column
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "401":
           description: No credential, or one that did not verify
           content:
@@ -1387,6 +1438,7 @@ components:
           maxLength: 100
         email:
           type: string
+          format: email
           maxLength: 320
         profileImageUrl:
           type: string
@@ -1418,6 +1470,7 @@ components:
           maxLength: 100
         email:
           type: string
+          format: email
           maxLength: 320
         profileImageUrl:
           type: string
