@@ -431,7 +431,7 @@ This is a deliberate narrowing of "OpenID Connect everywhere", and the reason is
 
 **Every entry point that runs without a user — a relay, a scheduled job, a reconciler — enters an explicit system context.** There is no path that runs with no identity at all. This is internal attribution and is independent of Keycloak: it is what names the actor in an audit trail, where the shared credential only establishes that the caller is one of ours.
 
-**Licensing.** A licence is a signed artifact issued by Lynxis operations, verified at startup. It records what the installation is entitled to run, including how many instances may be active at a site.
+**Licensing.** A licence is a signed artifact issued by Lynxis operations, verified **locally** at startup — no runtime path ever calls a Lynxis service to validate it. It records what the installation is entitled to run, including how many instances may be active at a site — and that limit is the enforcement: instances arbitrate through the database lease, an instance beyond the licenced count cannot acquire the right to work, and a cold standby on other hardware is a supported arrangement rather than a violation. **Machine identity is telemetry carried by the heartbeat, never an enforcement input.** Renewal follows the deployment: a connected site pulls its renewed licence from fleet; an offline site receives a file and installs it through the console. *(Enforcement model ruled 8 Aug 2026 — register item 20.)*
 
 ## B7 · Deployment view
 
@@ -1380,6 +1380,8 @@ Fleet issues the signed licence that an installation verifies at startup. It hol
 **The signing half never leaves the cloud.** Only the public verification half ships to a site. This is the reason fleet is a separate service rather than a module of core: the boundary is what keeps the private key off customer hardware.
 
 **Sites pull; fleet does not push.** An installation reports its heartbeat and pulls what it is entitled to. Nothing in the cloud initiates a connection into a customer's network.
+
+**The registry is also where duplication becomes visible.** Each heartbeat carries the reporting machine's identity as telemetry. Enforcement never depends on it — a licence is enforced at the site, by signature and instance count — but one licence reporting from two different identities is flagged in the fleet view, so a cloned installation is a detected fact and a commercial conversation rather than a silent loss. *(Ruled 8 Aug 2026 — register item 20.)*
 
 ### Inside orca-fleet
 
