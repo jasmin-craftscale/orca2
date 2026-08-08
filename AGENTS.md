@@ -13,7 +13,10 @@ Gradle modules, six bootable services, five platform primitives, seven build
 checks. **Phase 1 built the first vertical slice on top of them and it runs end to
 end**: a plate read in over the camera's wire format, one visit, a connector call,
 a barrier commanded and confirmed, and the visit's fact recorded in one
-transaction. Everything else is still deliberately absent.
+transaction. **Phase 2 made orca-core's configuration world real** — identity and
+the entitlement catalog, teams and templates, the completed device registry,
+settings/workspace/audit — translated from 1.x, never copied. Everything else is
+still deliberately absent.
 
 Two laws shape everything else:
 
@@ -34,6 +37,7 @@ This file is a map. It does not restate the architecture — follow the link.
 | What did Phase 0 build, decide, and fail to settle? | `docs/phase-0-report.md` |
 | What did Phase 1 build, and what is still guessed? | `docs/phase-1-report.md` — **§3, §5 and §7** |
 | What did the hardening after it change? | `docs/phase-1-hardening-report.md` — **§5 is what it found and did not fix** |
+| What did Phase 2 build, decide, and leave as named gaps? | `docs/phase-2-report.md` — **§5.1 (the realm dimension), §6 (three PROPOSED security designs), §7** |
 | How do I run the slice end to end? | `docs/phase-1-demo.md` |
 | What does the camera actually put on the wire? | `docs/lpr-wire-format-from-1x.md` — DERIVED-FROM-1X, not a vendor spec |
 | What does ORCA send a device host to move a barrier? | `docs/device-host-outbound-from-1x.md` — DERIVED-FROM-1X; **§3 is an open question, not a design** |
