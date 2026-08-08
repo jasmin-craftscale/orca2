@@ -19,13 +19,26 @@ set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 deploy_dir="$(dirname "$here")"
 
-set -a
-# shellcheck disable=SC1091
-source "$deploy_dir/.env"
-set +a
+# Dual-mode: host wraps sqlcmd in `docker exec`; the tools container
+# (ORCA_IN_CONTAINER=1, passwords passed by compose) calls sqlcmd directly.
+if [[ -z "${ORCA_IN_CONTAINER:-}" ]]; then
+	set -a
+	# shellcheck disable=SC1091
+	source "$deploy_dir/.env"
+	set +a
+fi
 
 container="${ORCA_SQLSERVER_CONTAINER:-orca-sqlserver}"
 sqlcmd="/opt/mssql-tools18/bin/sqlcmd"
+db_host="${ORCA_DB_HOST:-sqlserver}"
+
+run_sqlcmd() {
+	if [[ -n "${ORCA_IN_CONTAINER:-}" ]]; then
+		"$sqlcmd" -S "$db_host" "$@"
+	else
+		docker exec -i "$container" "$sqlcmd" -S localhost "$@"
+	fi
+}
 
 services=(core runtime edge portal sync fleet)
 
@@ -42,8 +55,8 @@ password_for() {
 
 as_service() {
 	local svc="$1" sql="$2"
-	docker exec -i "$container" "$sqlcmd" \
-		-S localhost -U "orca_$svc" -P "$(password_for "$svc")" \
+	run_sqlcmd \
+		-U "orca_$svc" -P "$(password_for "$svc")" \
 		-C -No -b -d orca -h -1 -W -Q "$sql" 2>&1
 }
 

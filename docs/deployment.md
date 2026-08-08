@@ -18,20 +18,23 @@ next implementation plan after Phase 2), with its execution transcript included.
 - **Docker**, running (Docker Desktop, Rancher Desktop, or equivalent).
 - **A JDK** — any recent one; the Java 25 toolchain auto-provisions via the Gradle
   foojay resolver.
-- That's it. Windows note: until the bootstrap/seed scripts are converted to
-  one-shot Compose services (ticket 0 of the Phase 2 batch), the `deploy/*.sh`
-  scripts need WSL2 or Git Bash; the Gradle build and services themselves are
-  fully cross-platform (`gradlew.bat` ships).
+- That's it — **including on Windows**: the setup and demo tools run as one-shot
+  Compose services (`docker compose run --rm …`), so the host needs nothing but
+  Docker and a JDK. The `deploy/*.sh` scripts remain as Unix-host conveniences;
+  both paths run the same script, in container or host mode.
 
 ### First-time setup
 
 ```bash
 cd deploy
-cp .env.example .env        # ONCE — never overwrite an existing .env (machine-local values)
-docker compose up -d        # SQL Server 2022 + Keycloak + the TOS and device-host stubs
-./bootstrap/run.sh          # the one-time privileged step: 7 schemas, 7 logins, grants,
-                            # then V004 asserts the isolation (36 checks). No-op afterwards.
+cp .env.example .env                 # ONCE — never overwrite an existing .env (machine-local values)
+docker compose up -d                 # SQL Server 2022 + Keycloak + the TOS and device-host stubs
+docker compose run --rm bootstrap    # the one-time privileged step: 7 schemas, 7 logins, grants,
+                                     # then V004 asserts the isolation. No-op afterwards.
 ```
+
+Isolation can be re-proven any time: `docker compose run --rm verify-isolation`
+(36 checks: every login writes its own schema, every cross-schema read refused).
 
 What the bootstrap is and why it exists: each service's login can only reach its own
 schema — that wall is the isolation model (ADR-004). Creating the wall (database,
@@ -67,9 +70,11 @@ perform, so it lives here and runs once. No application ever holds admin credent
 ### See it work — one truck through the gate
 
 ```bash
-cd deploy && ./demo/seed.sh                          # one demo site/lane/camera/barrier — a
+cd deploy
+docker compose run --rm demo-seed                    # one demo site/lane/camera/barrier — a
                                                      # deliberate act, never a profile or migration
-./demo/send-plate.py --port 9100 --plate T-DEMO-01   # speaks the real camera wire format
+docker compose run --rm send-plate --plate T-DEMO-01 # speaks the real camera wire format at the
+                                                     # host's edge listener (append --port for offsets)
 ```
 
 Full walkthrough, inspection queries and the four deliberate demonstrations

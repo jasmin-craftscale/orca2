@@ -4,7 +4,8 @@
 cd deploy
 cp .env.example .env
 docker compose up -d          # SQL Server + Keycloak, both with health checks
-./bootstrap/run.sh            # ONCE, against a fresh database: schemas, logins, grants
+docker compose run --rm bootstrap   # ONCE, against a fresh database: schemas, logins, grants
+                                    # (./bootstrap/run.sh does the same from a Unix host)
 ```
 
 Then start any service **with the `local` profile** — each migrates its own

@@ -123,10 +123,10 @@ existing `.env`** — it is gitignored precisely because it holds machine-local
 values. Once it exists:
 
 ```bash
-cd deploy && docker compose up -d && ./bootstrap/run.sh
+cd deploy && docker compose up -d && docker compose run --rm bootstrap
 ```
 
-`bootstrap/run.sh` is the privileged half — schemas, logins, grants. It runs once
+The bootstrap is the privileged half — schemas, logins, grants. It runs once
 against a fresh database and is a no-op afterwards. Run one service:
 
 ```bash

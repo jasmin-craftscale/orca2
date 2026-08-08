@@ -15,30 +15,45 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 deploy_dir="$(dirname "$here")"
 
-if [[ ! -f "$deploy_dir/.env" ]]; then
-	echo "deploy/.env not found. Run: cp .env.example .env" >&2
-	exit 1
+# Dual-mode. On a developer host: source .env and wrap sqlcmd in `docker exec`.
+# Inside the tools container (ORCA_IN_CONTAINER=1 — see the `bootstrap` service
+# in docker-compose.yml, which passes the passwords from .env itself): call
+# sqlcmd directly against the `sqlserver` service. Same logic either way; the
+# container path is what makes a Windows host need nothing but Docker.
+if [[ -z "${ORCA_IN_CONTAINER:-}" ]]; then
+	if [[ ! -f "$deploy_dir/.env" ]]; then
+		echo "deploy/.env not found. Run: cp .env.example .env" >&2
+		exit 1
+	fi
+	set -a
+	# shellcheck disable=SC1091
+	source "$deploy_dir/.env"
+	set +a
 fi
-
-set -a
-# shellcheck disable=SC1091
-source "$deploy_dir/.env"
-set +a
 
 container="${ORCA_SQLSERVER_CONTAINER:-orca-sqlserver}"
 sqlcmd="/opt/mssql-tools18/bin/sqlcmd"
+db_host="${ORCA_DB_HOST:-sqlserver}"
 
-if ! docker inspect --format '{{.State.Running}}' "$container" 2>/dev/null | grep -q true; then
+if [[ -z "${ORCA_IN_CONTAINER:-}" ]] && ! docker inspect --format '{{.State.Running}}' "$container" 2>/dev/null | grep -q true; then
 	echo "Container '$container' is not running. Run: docker compose up -d" >&2
 	exit 1
 fi
+
+run_sqlcmd() {
+	if [[ -n "${ORCA_IN_CONTAINER:-}" ]]; then
+		"$sqlcmd" -S "$db_host" "$@"
+	else
+		docker exec -i "$container" "$sqlcmd" -S localhost "$@"
+	fi
+}
 
 run_file() {
 	local file="$1"
 	local db="${2:-master}"
 	echo "── $(basename "$file")"
-	docker exec -i "$container" "$sqlcmd" \
-		-S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -No -b \
+	run_sqlcmd \
+		-U sa -P "$MSSQL_SA_PASSWORD" -C -No -b \
 		-d "$db" \
 		-v CORE_PASSWORD="$ORCA_CORE_DB_PASSWORD" \
 		-v RUNTIME_PASSWORD="$ORCA_RUNTIME_DB_PASSWORD" \
