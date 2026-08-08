@@ -33,6 +33,7 @@ public final class ScopedSelect {
 	private String filter;
 	private final List<Object> filterParameters = new ArrayList<>();
 	private String orderBy;
+	private boolean orderDescending;
 	private Integer limit;
 	private boolean lockRows;
 
@@ -78,6 +79,21 @@ public final class ScopedSelect {
 
 	public ScopedSelect orderBy(String column) {
 		this.orderBy = identifier(column, "order-by column");
+		this.orderDescending = false;
+		return this;
+	}
+
+	/**
+	 * Orders newest-first, for "the latest N of a growing table" — the read
+	 * that, without a direction, forces a caller to fetch everything and
+	 * reverse in memory, which on a traffic-growing table is an unbounded read
+	 * wearing a bounded one's clothes. The column goes through the same
+	 * allow-list; the direction is a keyword this type appends, never caller
+	 * text.
+	 */
+	public ScopedSelect orderByDescending(String column) {
+		this.orderBy = identifier(column, "order-by column");
+		this.orderDescending = true;
 		return this;
 	}
 
@@ -149,6 +165,10 @@ public final class ScopedSelect {
 
 	String orderBy() {
 		return orderBy;
+	}
+
+	boolean orderDescending() {
+		return orderDescending;
 	}
 
 	Integer limit() {

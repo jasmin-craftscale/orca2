@@ -48,6 +48,14 @@ tags:
     description: The seeded device catalogs — types, IO port names, IO device kinds.
   - name: resourceConfigurations
     description: Custom variables at site/area/lane/device scope (§C1).
+  - name: settings
+    description: "The platform settings registry (§C1): known keys, validated writes, history appended, secrets rejected."
+  - name: workspace
+    description: The calling user's workspace — grid column preferences and saved filters.
+  - name: siteBranding
+    description: Per-site branding colors and localization languages.
+  - name: audit
+    description: The typed audit trail of configuration mutations.
 
 paths:
   /api/v1/users:
@@ -944,6 +952,316 @@ paths:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "422":
           description: No such resource at this installation
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/settings:
+    get:
+      tags: [settings]
+      operationId: listSettings
+      summary: Every known key, its metadata and its current value
+      responses:
+        "200":
+          description: The registry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/settings/{settingKey}:
+    put:
+      tags: [settings]
+      operationId: writeSetting
+      summary: Write one setting
+      description: |
+        Validated against the registry — an unknown key is refused, a value
+        that fails the key's type is refused, and a SECRET-SHAPED key is
+        refused outright with its own code before the registry is even
+        consulted (1.x stored SMTP passwords and client secrets in this table;
+        2.0 never will). Every accepted write appends to the history.
+      parameters:
+        - name: settingKey
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WriteSettingRequest"
+      responses:
+        "200":
+          description: The setting after the write
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingEnvelope"
+        "400":
+          description: The value fails the key's type
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: Unknown key (SETTING_UNKNOWN), or a secret-shaped key (SETTING_SECRET_REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/me/workspace/grids:
+    get:
+      tags: [workspace]
+      operationId: myGrids
+      summary: The grid catalog with the caller's column preferences
+      responses:
+        "200":
+          description: The caller's workspace grids
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceGridsEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "403":
+          description: The token maps to no active platform user (USER_NOT_LINKED)
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    put:
+      tags: [workspace]
+      operationId: replaceMyGridPreferences
+      summary: Replace the caller's column preferences for the listed grids
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/GridPreferences"
+      responses:
+        "200":
+          description: The workspace after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceGridsEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "403":
+          description: The token maps to no active platform user
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: A grid code is not in the catalog
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/me/workspace/filters:
+    get:
+      tags: [workspace]
+      operationId: myFilters
+      summary: The caller's saved filters
+      responses:
+        "200":
+          description: The filters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedFiltersEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "403":
+          description: The token maps to no active platform user
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    post:
+      tags: [workspace]
+      operationId: createMyFilter
+      summary: Save a filter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFilterRequest"
+      responses:
+        "201":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedFilterEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "403":
+          description: The token maps to no active platform user
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: The caller already has a filter by that name on that grid
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: The grid code is not in the catalog
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/me/workspace/filters/{filterExternalId}:
+    delete:
+      tags: [workspace]
+      operationId: deleteMyFilter
+      summary: Delete (retire) one of the caller's filters
+      description: Another user's filter is indistinguishable from a missing one, deliberately.
+      parameters:
+        - name: filterExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The caller's remaining filters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedFiltersEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "403":
+          description: The token maps to no active platform user
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such filter owned by the caller
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/sites/{siteExternalId}:
+    patch:
+      tags: [siteBranding]
+      operationId: updateSiteBranding
+      summary: Update a site's branding colors and localization languages
+      description: |
+        The branding-and-localization slice of §C1's site update — Phase 2
+        builds no other site CRUD, and says so rather than implying it. Sets
+        replace when present.
+      parameters:
+        - name: siteExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSiteBrandingRequest"
+      responses:
+        "200":
+          description: The site's branding after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SiteBrandingEnvelope"
+        "400":
+          description: A color value is not hex
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: No such site at this installation
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/audit-events:
+    get:
+      tags: [audit]
+      operationId: listAuditEvents
+      summary: The latest configuration mutations, newest first
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 100
+            minimum: 1
+            maximum: 1000
+      responses:
+        "200":
+          description: The audit page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEventsEnvelope"
+        "401":
+          description: No credential, or one that did not verify
           content:
             application/json:
               schema:
@@ -1873,6 +2191,256 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/ResourceConfigurationView"
+
+    # --- WP4 · settings · workspace · audit ---------------------------------
+
+    SettingSummary:
+      type: object
+      required: [key, valueType]
+      properties:
+        key:
+          type: string
+        valueType:
+          type: string
+          enum: [STRING, INTEGER, BOOLEAN]
+        description:
+          type: string
+        defaultValue:
+          type: string
+        value:
+          type: string
+          description: The current value, absent when never written (the default applies).
+        updatedBy:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+
+    WriteSettingRequest:
+      type: object
+      required: [value]
+      properties:
+        value:
+          type: string
+          maxLength: 2000
+
+    SettingEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SettingSummary"
+
+    SettingsEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/SettingSummary"
+
+    ColumnPreference:
+      type: object
+      required: [columnCode, displayOrder]
+      properties:
+        columnCode:
+          type: string
+          maxLength: 64
+        displayOrder:
+          type: integer
+          format: int32
+        widthPx:
+          type: integer
+          format: int32
+        visible:
+          type: boolean
+          default: true
+
+    GridPreferences:
+      type: object
+      required: [gridCode, columns]
+      properties:
+        gridCode:
+          type: string
+        columns:
+          type: array
+          items:
+            $ref: "#/components/schemas/ColumnPreference"
+
+    WorkspaceGrid:
+      type: object
+      required: [gridCode, title, columns]
+      properties:
+        gridCode:
+          type: string
+        title:
+          type: string
+        defaultColumns:
+          type: string
+          description: The grid's default layout, as a JSON document (rule 11 — a UI schema).
+        columns:
+          type: array
+          description: The caller's own column preferences; empty when the defaults apply.
+          items:
+            $ref: "#/components/schemas/ColumnPreference"
+
+    WorkspaceGridsEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/WorkspaceGrid"
+
+    SavedFilterSummary:
+      type: object
+      required: [externalId, gridCode, name, filterJson, filterSchemaVersion, isDefault]
+      properties:
+        externalId:
+          type: string
+        gridCode:
+          type: string
+        name:
+          type: string
+        filterJson:
+          type: string
+        filterSchemaVersion:
+          type: integer
+          format: int32
+        isDefault:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateFilterRequest:
+      type: object
+      required: [gridCode, name, filterJson]
+      properties:
+        gridCode:
+          type: string
+        name:
+          type: string
+          maxLength: 200
+        filterJson:
+          type: string
+          maxLength: 4000
+        isDefault:
+          type: boolean
+          default: false
+
+    SavedFilterEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SavedFilterSummary"
+
+    SavedFiltersEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/SavedFilterSummary"
+
+    SiteColorItem:
+      type: object
+      required: [code, hexValue]
+      properties:
+        code:
+          type: string
+          maxLength: 64
+        hexValue:
+          type: string
+          description: "#RRGGBB or #RRGGBBAA; normalized to #RRGGBBAA on write."
+
+    SiteLanguageItem:
+      type: object
+      required: [code, name]
+      properties:
+        code:
+          type: string
+          maxLength: 32
+        name:
+          type: string
+          maxLength: 100
+        resourcePath:
+          type: string
+          maxLength: 512
+
+    UpdateSiteBrandingRequest:
+      type: object
+      description: Sets replace when present; an absent set is unchanged.
+      properties:
+        colors:
+          type: array
+          items:
+            $ref: "#/components/schemas/SiteColorItem"
+        languages:
+          type: array
+          items:
+            $ref: "#/components/schemas/SiteLanguageItem"
+
+    SiteBranding:
+      type: object
+      required: [siteExternalId, colors, languages]
+      properties:
+        siteExternalId:
+          type: string
+        colors:
+          type: array
+          items:
+            $ref: "#/components/schemas/SiteColorItem"
+        languages:
+          type: array
+          items:
+            $ref: "#/components/schemas/SiteLanguageItem"
+
+    SiteBrandingEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SiteBranding"
+
+    AuditEventSummary:
+      type: object
+      required: [occurredAt, actor, entityType, action]
+      properties:
+        occurredAt:
+          type: string
+          format: date-time
+        actor:
+          type: string
+        entityType:
+          type: string
+        entityExternalId:
+          type: string
+        action:
+          type: string
+          enum: [CREATED, UPDATED, RETIRED, REINSTATED, REPLACED]
+        detail:
+          type: string
+
+    AuditEventsEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/AuditEventSummary"
 
     EntitlementActionItem:
       type: object

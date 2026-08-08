@@ -45,7 +45,19 @@ public enum CoreErrorCode implements ErrorCode {
 	PORT_NAME_UNKNOWN("PORT_NAME_UNKNOWN", 422),
 
 	/** A scoped resource (site/area/lane/device) does not exist at this installation. */
-	RESOURCE_UNKNOWN("RESOURCE_UNKNOWN", 422);
+	RESOURCE_UNKNOWN("RESOURCE_UNKNOWN", 422),
+
+	/** A settings key is not in the registry of known keys. */
+	SETTING_UNKNOWN("SETTING_UNKNOWN", 422),
+
+	/** A secret-shaped settings key — secrets never enter the settings table (rule 8). */
+	SETTING_SECRET_REJECTED("SETTING_SECRET_REJECTED", 422),
+
+	/** A grid code is not in the catalog. */
+	GRID_UNKNOWN("GRID_UNKNOWN", 422),
+
+	/** The authenticated token maps to no active platform user. */
+	USER_NOT_LINKED("USER_NOT_LINKED", 403);
 
 	private final String code;
 	private final int httpStatus;

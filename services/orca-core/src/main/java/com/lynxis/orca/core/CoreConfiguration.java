@@ -186,6 +186,110 @@ public class CoreConfiguration {
 		return new DeviceCatalogController(catalogs, siteExternalId);
 	}
 
+	// --- WP4 · settings · workspace · audit ---------------------------------
+
+	/**
+	 * The production caller identity: the JWT's subject when a person is behind
+	 * the request, empty otherwise. An interface so the property suites can
+	 * hand controllers a caller without a security context.
+	 */
+	@Bean
+	public com.lynxis.orca.core.domain.CallerIdentity callerIdentity() {
+		return () -> {
+			var authentication = org.springframework.security.core.context.SecurityContextHolder
+					.getContext().getAuthentication();
+			if (authentication instanceof org.springframework.security.oauth2.server.resource
+					.authentication.JwtAuthenticationToken jwt) {
+				return java.util.Optional.ofNullable(jwt.getToken().getSubject());
+			}
+			return java.util.Optional.empty();
+		};
+	}
+
+	@Bean
+	public com.lynxis.orca.core.persistence.SettingRepository settingRepository(
+			com.lynxis.orca.platform.scope.ScopeSeam seam) {
+		return new com.lynxis.orca.core.persistence.SettingRepository(seam);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.persistence.WorkspaceRepository workspaceRepository(
+			com.lynxis.orca.platform.scope.ScopeSeam seam) {
+		return new com.lynxis.orca.core.persistence.WorkspaceRepository(seam);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.persistence.SiteBrandingRepository siteBrandingRepository(
+			com.lynxis.orca.platform.scope.ScopeSeam seam) {
+		return new com.lynxis.orca.core.persistence.SiteBrandingRepository(seam);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.persistence.AuditEventRepository auditEventRepository(
+			com.lynxis.orca.platform.scope.ScopeSeam seam) {
+		return new com.lynxis.orca.core.persistence.AuditEventRepository(seam);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.domain.AuditTrail auditTrail(
+			com.lynxis.orca.core.persistence.AuditEventRepository events,
+			UserAccountRepository users,
+			com.lynxis.orca.core.domain.CallerIdentity caller,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.core.domain.AuditTrail(events, users, caller, siteExternalId);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.domain.SettingsService settingsService(
+			com.lynxis.orca.core.persistence.SettingRepository settings,
+			com.lynxis.orca.core.domain.AuditTrail audit) {
+		return new com.lynxis.orca.core.domain.SettingsService(settings, audit);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.domain.WorkspaceService workspaceService(
+			com.lynxis.orca.core.persistence.WorkspaceRepository workspace,
+			UserAccountRepository users,
+			com.lynxis.orca.core.domain.CallerIdentity caller) {
+		return new com.lynxis.orca.core.domain.WorkspaceService(workspace, users, caller);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.domain.SiteBrandingService siteBrandingService(
+			com.lynxis.orca.core.persistence.SiteBrandingRepository branding,
+			SiteDirectoryRepository sites,
+			com.lynxis.orca.core.domain.AuditTrail audit) {
+		return new com.lynxis.orca.core.domain.SiteBrandingService(branding, sites, audit);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.api.SettingsController settingsController(
+			com.lynxis.orca.core.domain.SettingsService service,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.core.api.SettingsController(service, siteExternalId);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.api.WorkspaceController workspaceController(
+			com.lynxis.orca.core.domain.WorkspaceService service,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.core.api.WorkspaceController(service, siteExternalId);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.api.SiteBrandingController siteBrandingController(
+			com.lynxis.orca.core.domain.SiteBrandingService service,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.core.api.SiteBrandingController(service, siteExternalId);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.api.AuditEventController auditEventController(
+			com.lynxis.orca.core.persistence.AuditEventRepository events,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.core.api.AuditEventController(events, siteExternalId);
+	}
+
 	@Bean
 	public ResourceConfigurationController resourceConfigurationController(
 			ResourceConfigurationService service,

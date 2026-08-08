@@ -181,6 +181,11 @@ public class JdbcScopeSeam implements ScopeSeam {
 		}
 		if (allowOrderAndLimit && select.orderBy() != null) {
 			sql.append(" ORDER BY ").append(select.orderBy());
+			if (select.orderDescending()) {
+				// A fixed keyword this class appends — the caller never supplies
+				// direction text, so the identifier allow-list stays the whole story.
+				sql.append(" DESC");
+			}
 		}
 		return new Statement(sql.toString(), parameters);
 	}

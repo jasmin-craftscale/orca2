@@ -113,6 +113,30 @@ class ScopeSeamPropertiesIT {
 	}
 
 	@Test
+	@DisplayName("orderByDescending is the bounded 'latest N' read — direction is the seam's keyword, never caller text")
+	void descendingOrderIsBoundedAndScoped() {
+		ScopeContext.runIn(Scope.of("site_id", Set.of("site-1")), () -> {
+			// Newest-first with a limit: the read Phase 2's audit trail needs.
+			// Without a direction the caller would fetch a growing table whole
+			// and reverse in memory — an unbounded read dressed as a bounded one.
+			List<Integer> newestFirst = seam.select(
+					ScopedSelect.from("work_item").columns("id", "site_id").scopedBy("site_id")
+							.orderByDescending("id").limit(1),
+					(rs, n) -> rs.getInt("id"));
+			List<Integer> all = seam.select(
+					ScopedSelect.from("work_item").columns("id", "site_id").scopedBy("site_id")
+							.orderBy("id"),
+					(rs, n) -> rs.getInt("id"));
+
+			assertThat(newestFirst).hasSize(1);
+			assertThat(newestFirst.getFirst())
+					.as("TOP + DESC returns the LATEST row, not the first")
+					.isEqualTo(all.getLast());
+			assertThat(all).as("the scope predicate still applies to a descending read").hasSize(2);
+		});
+	}
+
+	@Test
 	@DisplayName("the caller's own filter narrows the scope; it can never widen it")
 	void aCallerFilterCannotWidenTheScope() {
 		ScopeContext.runIn(Scope.of("site_id", Set.of("site-1")), () -> {
