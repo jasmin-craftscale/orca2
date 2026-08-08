@@ -191,6 +191,24 @@ class FlowableAdoptionIT {
 
 	@Test
 	@Timeout(value = 20, unit = TimeUnit.MINUTES)
+	@DisplayName("engine tables WITHOUT the version marker are refused — an unrecognisable state is not adopted")
+	void aPartialSchemaWithoutThePropertyTableIsRefused() {
+		// Not a state Flowable self-migration produces; a hand-cleared machine could
+		// be in it. Neither the version nor completeness can be established, and a
+		// script that drops tables does not proceed through what it cannot recognise.
+		jdbc.execute("DROP TABLE ACT_GE_PROPERTY");
+
+		assertThatThrownBy(FlowableAdoptionIT::adopt)
+				.hasMessageContaining("REFUSING to adopt")
+				.hasMessageContaining("ACT_GE_PROPERTY does not");
+
+		assertThat(engineTables())
+				.as("refused means untouched, minus only the table this test itself dropped")
+				.isGreaterThan(40);
+	}
+
+	@Test
+	@Timeout(value = 20, unit = TimeUnit.MINUTES)
 	@DisplayName("adoption is a no-op where none is needed — running it in doubt cannot hurt")
 	void adoptingATwiceAdoptedSchemaDoesNothing() {
 		adopt();

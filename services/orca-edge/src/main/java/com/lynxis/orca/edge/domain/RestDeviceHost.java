@@ -11,8 +11,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -104,7 +105,12 @@ public class RestDeviceHost implements DeviceHostPort {
 	static final String PRINT = "PRINT";
 	static final String SET_IO = "SET_IO";
 
-	private static final ObjectMapper JSON = new ObjectMapper();
+	/**
+	 * Jackson 3 — the same generation the rest of this service speaks. Jackson 2 is
+	 * also on the classpath, but only as Flyway's transitive; parsing the answer that
+	 * decides whether a barrier moved should not lean on another library's baggage.
+	 */
+	private static final JsonMapper JSON = JsonMapper.builder().build();
 
 	@Override
 	public Outcome issue(String deviceHostUrl, HostCommand command) {
@@ -278,7 +284,7 @@ public class RestDeviceHost implements DeviceHostPort {
 					+ "params carry no boolean 'state'");
 		}
 		String url = base + "/api/io/" + segment(device) + "/" + segment(port) + "/"
-				+ (state.isBoolean() ? state.booleanValue() : Boolean.parseBoolean(state.asText()));
+				+ (state.isBoolean() ? state.booleanValue() : Boolean.parseBoolean(state.asString()));
 
 		String portName = text(params, "ioPortName");
 		if (portName != null) {
@@ -329,7 +335,7 @@ public class RestDeviceHost implements DeviceHostPort {
 		try {
 			return JSON.readTree(answer).isObject();
 		}
-		catch (com.fasterxml.jackson.core.JacksonException notJson) {
+		catch (JacksonException notJson) {
 			return false;
 		}
 	}
@@ -340,14 +346,22 @@ public class RestDeviceHost implements DeviceHostPort {
 		if (command.params() == null || command.params().isBlank()) {
 			return JSON.createObjectNode();
 		}
+		JsonNode parsed;
 		try {
-			JsonNode parsed = JSON.readTree(command.params());
-			return parsed.isObject() ? parsed : JSON.createObjectNode();
+			parsed = JSON.readTree(command.params());
 		}
-		catch (com.fasterxml.jackson.core.JacksonException notJson) {
+		catch (JacksonException notJson) {
 			throw new UnroutableCommand("this command's params are not a JSON object, so the "
 					+ "device-host URL cannot be built from them");
 		}
+		if (!parsed.isObject()) {
+			// An array or a scalar refuses with the SAME message as non-JSON, rather
+			// than silently reading as empty — which would blame a missing 'format'
+			// for what is actually a malformed params document.
+			throw new UnroutableCommand("this command's params are not a JSON object, so the "
+					+ "device-host URL cannot be built from them");
+		}
+		return parsed;
 	}
 
 	private static String text(JsonNode params, String field) {
@@ -355,13 +369,13 @@ public class RestDeviceHost implements DeviceHostPort {
 		if (value == null || value.isNull()) {
 			return null;
 		}
-		String text = value.asText();
+		String text = value.isString() ? value.asString() : value.toString();
 		return text.isBlank() ? null : text;
 	}
 
 	private static boolean isBooleanText(JsonNode state) {
-		return state.isTextual()
-				&& ("true".equalsIgnoreCase(state.asText()) || "false".equalsIgnoreCase(state.asText()));
+		return state.isString()
+				&& ("true".equalsIgnoreCase(state.asString()) || "false".equalsIgnoreCase(state.asString()));
 	}
 
 	/** Percent-encodes one path segment. A device id is a token; this is the seatbelt. */

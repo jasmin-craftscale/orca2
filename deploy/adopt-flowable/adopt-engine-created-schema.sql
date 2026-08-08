@@ -58,6 +58,19 @@ PRINT N'Flowable adoption: inspecting schema [' + @schema + N']';
 
 IF OBJECT_ID(QUOTENAME(@schema) + N'.ACT_GE_PROPERTY', 'U') IS NULL
 BEGIN
+	-- No property table. Either there is nothing here at all, or — worse — engine
+	-- tables exist WITHOUT the one that carries the version marker. The second is
+	-- an unrecognisable state, and a script that drops tables does not proceed
+	-- through a state it cannot recognise.
+	DECLARE @strays int = (SELECT COUNT(*) FROM sys.tables t
+		WHERE t.schema_id = SCHEMA_ID(@schema)
+		  AND (t.name LIKE 'ACT[_]%' OR t.name LIKE 'FLW[_]%'));
+	IF @strays > 0
+	BEGIN
+		RAISERROR (N'REFUSING to adopt: %d ACT_/FLW_ tables exist but ACT_GE_PROPERTY does not, so neither the engine version nor the schema''s completeness can be established. This is not a state Flowable self-migration produces; investigate by hand before running anything destructive.',
+			16, 1, @strays);
+		RETURN;
+	END
 	PRINT N'  Nothing to adopt: this schema has no engine-created Flowable tables.';
 	PRINT N'  A fresh installation needs no adoption — Flyway will build them.';
 	RETURN;

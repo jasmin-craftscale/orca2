@@ -1,7 +1,6 @@
 package com.lynxis.orca.edge.domain;
 
 import java.util.List;
-import java.util.Map;
 
 import com.lynxis.orca.edge.domain.EdgeTables.BufferedEvent;
 import com.lynxis.orca.edge.persistence.EventBufferRepository;
@@ -103,9 +102,5 @@ public class DeliveryPump {
 		 *                          dropped and nothing is skipped
 		 */
 		void deliver(String laneExternalId, List<BufferedEvent> batch);
-	}
-
-	/** What {@code /internal/buffer/stats} reports (§C3). */
-	public record BufferStats(String siteExternalId, Map<String, Long> byStatus, Map<String, Long> depthByLane) {
 	}
 }

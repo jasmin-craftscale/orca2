@@ -16,7 +16,7 @@ corrected.**
 | | |
 |---|---|
 | `./gradlew check` | **Green.** 60 unit tests and build-check assertions |
-| `./gradlew integrationTest` | **Green. 136 property tests across 18 suites**, up from 113 across 15 |
+| `./gradlew integrationTest` | **Green. 138 property tests across 18 suites**, up from 113 across 15 |
 | Build checks | **Seven → ten**, each new one watched to fail before it was committed |
 | The demo | **Re-run end to end**, on the corrected device-host contract — transcript in `phase-1-demo.md` §11 |
 
@@ -253,7 +253,7 @@ went.
 | # | Run | Result |
 |---|---|---|
 | 1 | `./gradlew check` | **Pass.** 60 unit tests and build-check assertions |
-| 2 | `./gradlew check integrationTest` | **Pass. 136/136** across 18 suites |
+| 2 | `./gradlew check integrationTest` | **Pass. 138/138** across 18 suites — re-run from `clean --rerun-tasks` during the QA pass |
 | 3 | Deliberately violate `ScopeIndexRule` | **Build stopped**, naming the table, its key and what its indexes lead with. Reverted |
 | 4 | Deliberately violate `ContractInterfaceRule` | **Build stopped**, naming the controller. Reverted |
 | 5 | Deliberately violate `InternalSurfaceRule`, both directions | **Build stopped** with three violations from one edit. Reverted |
@@ -265,10 +265,9 @@ went.
 | 11 | Expired command through the live endpoint | **`FAILED`, "Nothing was sent"**, and `0` device-host calls mentioning it |
 | 12 | `PTZ_PRESET` through the live endpoint | **`FAILED`**, naming the missing route. Nothing sent |
 
-**Not run:** `deploy/bootstrap/verify-isolation.sh`. No schema, login or grant changed
-in any of the six packages, and the two new tables are none — H3 and H5 added no table
-at all. **An unrun command is not a passing one**, and this one is named rather than
-implied.
+**`deploy/bootstrap/verify-isolation.sh` was initially declared unrun** (no schema,
+login or grant changed in any package). The QA pass ran it anyway: **36/36**, the
+declaration was correct, and the run replaces the declaration.
 
 ---
 
@@ -463,6 +462,56 @@ Unchanged from `phase-1-report.md` §3 except where noted, and none of it was in
    need to see.
 6. **Who owns `platform/`** (`REPOSITORY_GUIDE.md` §7.4) — the one question from that
    list with no proxy anywhere else.
+
+---
+
+## 7 · The review-and-QA pass, before handover
+
+A dedicated pass after the six commits: a code review over the full diff hunting for
+defects rather than confirming intent, then verification that re-ran everything from a
+forced clean build and probed the parts the hardening did **not** touch.
+
+### 7.1 · Four findings, all fixed, two of them with tests attached
+
+1. **`RestDeviceHost` parsed with Jackson 2, which reaches edge only as Flyway's
+   transitive dependency.** The rest of the service speaks Jackson 3 (`tools.jackson`
+   — Boot 4's serving stack), so the code that decides whether a barrier moved was
+   leaning on another library's baggage: drop Flyway's Jackson 2 need in some future
+   upgrade and the barrier path stops compiling. Ported to Jackson 3; behaviour
+   identical; `DeviceHostWireIT`'s nine wire tests cover it.
+2. **A JSON-array `params` document was silently read as empty**, so a malformed
+   `SET_IO` was refused with *"carries no 'ioPort'"* — blaming a missing field for
+   what is actually a malformed document — while non-JSON was refused with the right
+   message. Both now refuse identically, verified live against the running service.
+3. **`DeliveryPump.BufferStats` was dead code with a false Javadoc** — it claimed to
+   be *"what `/internal/buffer/stats` reports"*, was never wired to anything, and H3
+   built the real shape elsewhere. Two records claiming to be the endpoint's answer,
+   one of them a lie to the next reader. Deleted.
+4. **The adoption script had an unrecognisable state it walked past**: engine tables
+   present but `ACT_GE_PROPERTY` absent (a hand-cleared machine can be in it) read as
+   *"nothing to adopt"*, and the next start failed later in Flyway instead. A script
+   that drops tables now **refuses** what it cannot recognise. New test in
+   `FlowableAdoptionIT` (6 properties now).
+
+**One incidental fix found by reading, kept and pinned by a test:** the old
+`ScopedUpdate` went through `Map.copyOf`, which rejects null *values* — so
+`set(column, null)` threw `NullPointerException` at execution, and a real caller hits
+it (the pump records `exception.getMessage()`, which can be null). H5's assignment
+rework fixed this without noticing; `ScopeWritePropertiesIT` now asserts a null SET
+lands as `NULL`, so the fix cannot silently regress.
+
+### 7.2 · What QA ran, beyond the phase's own verification
+
+| Run | Result |
+|---|---|
+| `./gradlew clean check --rerun-tasks` | Green — nothing was riding an up-to-date check |
+| `./gradlew integrationTest`, all 18 suites | **138/138** |
+| `deploy/bootstrap/verify-isolation.sh` | **36/36** — closing the one declared-unrun item |
+| **All six services booted**, including the three the hardening never touched | `core` `runtime` `edge` `portal` `sync` `fleet` — all healthy. This is the regression this repository has actually shipped once (an edge that passed every check and could not boot), probed on the services most likely to break silently |
+| One truck end to end on the reviewed code | `COMPLETED`, `RAISE_GATE` `EXECUTED` — the Jackson 3 decode exercised against a real answer |
+| `SET_IO` against the refusing stub | `POST /api/io/DEV-DEMO-BARRIER/3/true?ioPortName=loop+A`, empty body, on the wire verbatim; 503 → `FAILED` |
+| Array `params` against the live endpoint | Refused before the socket, with the corrected message |
+| `/internal/buffer/stats` live | Healthy lane, owned, age fields absent-not-zero |
 
 ---
 

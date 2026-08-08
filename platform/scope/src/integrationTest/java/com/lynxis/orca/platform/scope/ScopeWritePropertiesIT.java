@@ -59,6 +59,12 @@ class ScopeWritePropertiesIT {
 				IF COL_LENGTH('%s.work_item', 'attempts') IS NULL
 				ALTER TABLE work_item ADD attempts INT NOT NULL CONSTRAINT df_wi_attempts DEFAULT 0
 				""".formatted(SCHEMA));
+		// A nullable column, standing in for edge's last_error: the column a caller
+		// legitimately sets to null.
+		new JdbcTemplate(dataSource).execute("""
+				IF COL_LENGTH('%s.work_item', 'note') IS NULL
+				ALTER TABLE work_item ADD note VARCHAR(50) NULL
+				""".formatted(SCHEMA));
 	}
 
 	@BeforeEach
@@ -484,6 +490,30 @@ class ScopeWritePropertiesIT {
 
 		assertThat(statusOf("site-1")).isEqualTo("RETRYING");
 		assertThat(attemptsOf("site-1")).isEqualTo(3);
+	}
+
+	@Test
+	@DisplayName("a SET to null lands as NULL — the pump's error message is allowed to be absent")
+	void aNullValueCanBeSet() {
+		// Found in review, fixed incidentally by H5: the previous assignments map went
+		// through Map.copyOf, which rejects null VALUES — so set(column, null) threw
+		// NullPointerException at execution. A real caller hits this: the pump records
+		// a failure with exception.getMessage(), and a message can be null. This test
+		// is what keeps the fix from regressing if the assignment plumbing changes.
+		ScopeContext.runIn(Scope.of("site_id", Set.of("site-1")), () -> {
+			seam.update(ScopedUpdate.table("work_item")
+					.set("note", "an error from last time")
+					.scopedBy("site_id"));
+			seam.update(ScopedUpdate.table("work_item")
+					.set("note", null)
+					.scopedBy("site_id"));
+		});
+
+		assertThat(jdbc.queryForObject(
+				"SELECT COUNT(*) FROM work_item WHERE site_id = 'site-1' AND note IS NULL",
+				Long.class))
+				.as("null was WRITTEN, clearing the earlier value — not refused and not skipped")
+				.isEqualTo(1);
 	}
 
 	@Test
