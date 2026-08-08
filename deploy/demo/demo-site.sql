@@ -82,18 +82,23 @@ WHERE external_id = N'LANE-DEMO-01'
   AND (device_host_url IS NULL OR device_host_url <> N'$(deviceHostUrl)');
 GO
 
--- ⚠️ PROVISIONAL device-type vocabulary. Nothing in the architecture enumerates
--- device types; these two values are this phase's, and are named as provisional
--- in V101 and in the phase report rather than presented as settled.
+-- The device-type vocabulary was provisional in Phase 1 ('LPR_CAMERA' and
+-- 'BARRIER' as free strings); Phase 2's WP3 settled it with the seeded 1.x
+-- catalog (core.device_type). The camera keeps its word; the barrier is the
+-- catalog's GATE_ARM. Devices now carry their site scope explicitly.
 IF NOT EXISTS (SELECT 1 FROM core.device WHERE external_id = N'DEV-DEMO-CAMERA')
-	INSERT INTO core.device (external_id, lane_id, device_type, name, address)
-	SELECT N'DEV-DEMO-CAMERA', l.lane_id, N'LPR_CAMERA', N'Lane 1 plate camera', NULL
+	INSERT INTO core.device (external_id, lane_id, site_external_id, device_type_id, name, address)
+	SELECT N'DEV-DEMO-CAMERA', l.lane_id, N'SITE-DEMO',
+		(SELECT device_type_id FROM core.device_type WHERE code = 'LPR_CAMERA'),
+		N'Lane 1 plate camera', NULL
 	FROM core.lane l WHERE l.external_id = N'LANE-DEMO-01';
 GO
 
 IF NOT EXISTS (SELECT 1 FROM core.device WHERE external_id = N'DEV-DEMO-BARRIER')
-	INSERT INTO core.device (external_id, lane_id, device_type, name, address)
-	SELECT N'DEV-DEMO-BARRIER', l.lane_id, N'BARRIER', N'Lane 1 barrier', NULL
+	INSERT INTO core.device (external_id, lane_id, site_external_id, device_type_id, name, address)
+	SELECT N'DEV-DEMO-BARRIER', l.lane_id, N'SITE-DEMO',
+		(SELECT device_type_id FROM core.device_type WHERE code = 'GATE_ARM'),
+		N'Lane 1 barrier', NULL
 	FROM core.lane l WHERE l.external_id = N'LANE-DEMO-01';
 GO
 

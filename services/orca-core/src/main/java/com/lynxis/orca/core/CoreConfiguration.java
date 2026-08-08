@@ -4,6 +4,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.lynxis.orca.core.api.DeviceAdminController;
+import com.lynxis.orca.core.api.DeviceCatalogController;
+import com.lynxis.orca.core.api.ResourceConfigurationController;
+import com.lynxis.orca.core.domain.DeviceAdminService;
+import com.lynxis.orca.core.domain.ResourceConfigurationService;
+import com.lynxis.orca.core.persistence.DeviceCatalogRepository;
+import com.lynxis.orca.core.persistence.DeviceRepository;
+import com.lynxis.orca.core.persistence.ResourceConfigurationRepository;
 import com.lynxis.orca.core.api.EntitlementCatalogController;
 import com.lynxis.orca.core.api.RoleAdminController;
 import com.lynxis.orca.core.api.UserAdminController;
@@ -133,5 +141,55 @@ public class CoreConfiguration {
 	public TeamAdminController teamAdminController(TeamAdminService service,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
 		return new TeamAdminController(service, siteExternalId);
+	}
+
+	// --- WP3 · device registry ----------------------------------------------
+
+	@Bean
+	public DeviceCatalogRepository deviceCatalogRepository(com.lynxis.orca.platform.scope.ScopeSeam seam) {
+		return new DeviceCatalogRepository(seam);
+	}
+
+	@Bean
+	public DeviceRepository deviceRepository(com.lynxis.orca.platform.scope.ScopeSeam seam) {
+		return new DeviceRepository(seam);
+	}
+
+	@Bean
+	public ResourceConfigurationRepository resourceConfigurationRepository(
+			com.lynxis.orca.platform.scope.ScopeSeam seam) {
+		return new ResourceConfigurationRepository(seam);
+	}
+
+	@Bean
+	public DeviceAdminService deviceAdminService(DeviceRepository devices,
+			DeviceCatalogRepository catalogs) {
+		return new DeviceAdminService(devices, catalogs);
+	}
+
+	@Bean
+	public ResourceConfigurationService resourceConfigurationService(
+			ResourceConfigurationRepository configurations, SiteDirectoryRepository sites,
+			DeviceRepository devices) {
+		return new ResourceConfigurationService(configurations, sites, devices);
+	}
+
+	@Bean
+	public DeviceAdminController deviceAdminController(DeviceAdminService service,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new DeviceAdminController(service, siteExternalId);
+	}
+
+	@Bean
+	public DeviceCatalogController deviceCatalogController(DeviceCatalogRepository catalogs,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new DeviceCatalogController(catalogs, siteExternalId);
+	}
+
+	@Bean
+	public ResourceConfigurationController resourceConfigurationController(
+			ResourceConfigurationService service,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new ResourceConfigurationController(service, siteExternalId);
 	}
 }

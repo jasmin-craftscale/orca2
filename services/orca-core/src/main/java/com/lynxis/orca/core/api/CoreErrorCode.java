@@ -36,7 +36,16 @@ public enum CoreErrorCode implements ErrorCode {
 	USER_UNKNOWN("USER_UNKNOWN", 422),
 
 	/** A template cannot be retired while active teams reference it. */
-	TEMPLATE_IN_USE("TEMPLATE_IN_USE", 409);
+	TEMPLATE_IN_USE("TEMPLATE_IN_USE", 409),
+
+	/** A device type code is not in the seeded catalog. */
+	DEVICE_TYPE_UNKNOWN("DEVICE_TYPE_UNKNOWN", 422),
+
+	/** An IO port name code is not in the seeded catalog. */
+	PORT_NAME_UNKNOWN("PORT_NAME_UNKNOWN", 422),
+
+	/** A scoped resource (site/area/lane/device) does not exist at this installation. */
+	RESOURCE_UNKNOWN("RESOURCE_UNKNOWN", 422);
 
 	private final String code;
 	private final int httpStatus;

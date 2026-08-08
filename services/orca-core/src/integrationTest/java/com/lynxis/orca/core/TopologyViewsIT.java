@@ -174,9 +174,11 @@ class TopologyViewsIT {
 		seedOneLaneWithTwoDevices();
 
 		JdbcTemplate runtime = new JdbcTemplate(asRuntime);
+		// GATE_ARM since WP3: the provisional 'BARRIER' string was settled by the
+		// seeded 1.x device-type catalog, and the view now serves the catalog code.
 		String barrier = runtime.queryForObject(
 				"SELECT device_external_id FROM core.topology_device "
-						+ "WHERE lane_external_id = 'LANE-IT-01' AND device_type = 'BARRIER'", String.class);
+						+ "WHERE lane_external_id = 'LANE-IT-01' AND device_type = 'GATE_ARM'", String.class);
 
 		assertThat(barrier).isEqualTo("DEV-IT-BARRIER");
 	}
@@ -215,11 +217,13 @@ class TopologyViewsIT {
 		core.update("INSERT INTO lane (external_id, area_id, code, name, device_host_url) "
 				+ "SELECT 'LANE-IT-01', area_id, 'L01', 'Lane 1', 'http://device-host.invalid:9000' "
 				+ "FROM area WHERE external_id = 'AREA-IT'");
-		core.update("INSERT INTO device (external_id, lane_id, device_type, name) "
-				+ "SELECT 'DEV-IT-CAMERA', lane_id, 'LPR_CAMERA', 'Plate camera' "
+		core.update("INSERT INTO device (external_id, lane_id, site_external_id, device_type_id, name) "
+				+ "SELECT 'DEV-IT-CAMERA', lane_id, 'SITE-IT', "
+				+ "(SELECT device_type_id FROM device_type WHERE code = 'LPR_CAMERA'), 'Plate camera' "
 				+ "FROM lane WHERE external_id = 'LANE-IT-01'");
-		core.update("INSERT INTO device (external_id, lane_id, device_type, name) "
-				+ "SELECT 'DEV-IT-BARRIER', lane_id, 'BARRIER', 'Barrier' "
+		core.update("INSERT INTO device (external_id, lane_id, site_external_id, device_type_id, name) "
+				+ "SELECT 'DEV-IT-BARRIER', lane_id, 'SITE-IT', "
+				+ "(SELECT device_type_id FROM device_type WHERE code = 'GATE_ARM'), 'Barrier' "
 				+ "FROM lane WHERE external_id = 'LANE-IT-01'");
 	}
 }

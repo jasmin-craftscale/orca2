@@ -79,27 +79,7 @@ public final class WorldModelTables {
 			Instant createdAt) {
 	}
 
-	/**
-	 * A piece of equipment at a lane.
-	 *
-	 * @param deviceType ⚠️ <strong>provisional vocabulary.</strong> Nothing in the
-	 *                   architecture enumerates device types — §C3 enumerates
-	 *                   command <em>actions</em>, not device kinds — so this is a
-	 *                   free string rather than an enum, and the values this phase
-	 *                   uses ({@code LPR_CAMERA}, {@code BARRIER}) are named as
-	 *                   provisional in the migration and in the phase report. An
-	 *                   enum here would publish a vocabulary the corpus has not
-	 *                   settled
-	 */
-	@PersistentTable(name = "device", growth = Growth.BOUNDED)
-	public record Device(
-			long deviceId,
-			String externalId,
-			long laneId,
-			String deviceType,
-			String name,
-			String address,
-			Instant retiredAt,
-			Instant createdAt) {
-	}
+	// The device record moved to DeviceTables when WP3 (V106) completed the
+	// registry: V101's provisional free-VARCHAR device_type was settled by the
+	// seeded catalog, and the table outgrew this file's slice-sized shape.
 }

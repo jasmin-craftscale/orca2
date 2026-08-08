@@ -61,21 +61,35 @@ class CatalogSeedPropertiesIT {
 	}
 
 	@Test
-	@DisplayName("two clean migrations produce identical rows, including every UUID — the seed is pinned, not minted")
+	@DisplayName("two clean migrations produce identical rows, including every UUID — every catalog seed is pinned, not minted")
 	void theSeedIsByteStableAcrossCleanMigrations() {
-		List<Map<String, Object>> firstRun = new JdbcTemplate(owner).queryForList(CATALOG_ROWS);
+		String deviceTypes = "SELECT external_id, code, name FROM device_type ORDER BY device_type_id";
+		String portNames = "SELECT external_id, port_type, code, name FROM device_io_port_name ORDER BY port_name_id";
+
+		JdbcTemplate first = new JdbcTemplate(owner);
+		List<Map<String, Object>> entitlementsFirst = first.queryForList(CATALOG_ROWS);
+		List<Map<String, Object>> typesFirst = first.queryForList(deviceTypes);
+		List<Map<String, Object>> portsFirst = first.queryForList(portNames);
 
 		// A second clean database: migratedSchema drops everything and re-runs
-		// V100–V104 from nothing. If any UUID were minted at migration time
+		// V100 onward from nothing. If any UUID were minted at migration time
 		// rather than pinned in the file, this comparison is where it dies.
 		owner = PlatformDatabase.migratedSchema(SCHEMA,
 				"db/migration", "db/platform/outbox", "db/platform/lease");
-		List<Map<String, Object>> secondRun = new JdbcTemplate(owner).queryForList(CATALOG_ROWS);
+		JdbcTemplate second = new JdbcTemplate(owner);
 
-		assertThat(secondRun)
+		assertThat(second.queryForList(CATALOG_ROWS))
 				.as("identical rows including UUIDs — verification item 4 of the plan")
-				.isEqualTo(firstRun);
-		assertThat(secondRun).hasSize(174);
+				.isEqualTo(entitlementsFirst)
+				.hasSize(174);
+		assertThat(second.queryForList(deviceTypes))
+				.as("the WP3 device-type catalog is pinned the same way")
+				.isEqualTo(typesFirst)
+				.hasSize(12);
+		assertThat(second.queryForList(portNames))
+				.as("and the port-name catalog — 36 of 40, the four unextracted audio names excluded")
+				.isEqualTo(portsFirst)
+				.hasSize(36);
 	}
 
 	@Test

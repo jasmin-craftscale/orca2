@@ -42,6 +42,12 @@ tags:
     description: The shift template catalog. One validated IANA timezone per template.
   - name: breakTemplates
     description: The break template catalog and its timings.
+  - name: devices
+    description: The device registry (§C1) — identity, addressing, IO port layout, PTZ presets, plugin-load parameters. Never credentials.
+  - name: deviceCatalogs
+    description: The seeded device catalogs — types, IO port names, IO device kinds.
+  - name: resourceConfigurations
+    description: Custom variables at site/area/lane/device scope (§C1).
 
 paths:
   /api/v1/users:
@@ -561,6 +567,383 @@ paths:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "409":
           description: Name in use, or the template is still referenced by an active team
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/lanes/{laneExternalId}/devices:
+    get:
+      tags: [devices]
+      operationId: listLaneDevices
+      summary: The device inventory of a lane, port layout and presets included
+      parameters:
+        - name: laneExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The devices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevicesEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such lane
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    post:
+      tags: [devices]
+      operationId: registerDevice
+      summary: Register a device at a lane
+      description: |
+        The type is a catalog code — the vocabulary is the seeded catalog, not a
+        free string. No credential field exists on this surface: device-credential
+        storage is a proposed design awaiting the product owner (WP3 report).
+      parameters:
+        - name: laneExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterDeviceRequest"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such lane
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: The device type code is not in the catalog
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/devices/{deviceExternalId}:
+    patch:
+      tags: [devices]
+      operationId: updateDevice
+      summary: Update a device
+      parameters:
+        - name: deviceExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDeviceRequest"
+      responses:
+        "200":
+          description: The device after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such device
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: The device type code is not in the catalog
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    delete:
+      tags: [devices]
+      operationId: retireDevice
+      summary: Retire a device
+      description: Retirement, not deletion (§D3) — the device leaves every published view and its history stays.
+      parameters:
+        - name: deviceExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The retired device
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such device
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/devices/{deviceExternalId}/io-assignments:
+    put:
+      tags: [devices]
+      operationId: replaceIoAssignments
+      summary: Replace the device's IO port layout
+      description: Declarative — the request's layout is the whole layout.
+      parameters:
+        - name: deviceExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/IoAssignmentItem"
+      responses:
+        "200":
+          description: The device with its new layout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such device
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: A port name code is not in the catalog
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/devices/{deviceExternalId}/perspectives:
+    put:
+      tags: [devices]
+      operationId: replacePerspectives
+      summary: Replace the device's named PTZ presets
+      description: |
+        Preset STORAGE only. Execution is a direct camera call and belongs to
+        the hardware boundary (register NEW-5, narrowed 7 Aug 2026).
+      parameters:
+        - name: deviceExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/PerspectiveItem"
+      responses:
+        "200":
+          description: The device with its new presets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such device
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/device-types:
+    get:
+      tags: [deviceCatalogs]
+      operationId: listDeviceTypes
+      summary: The device type catalog
+      responses:
+        "200":
+          description: The catalog
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceTypesEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/io-port-names:
+    get:
+      tags: [deviceCatalogs]
+      operationId: listIoPortNames
+      summary: The IO port name catalog
+      responses:
+        "200":
+          description: The catalog
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IoPortNamesEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/io-device-kinds:
+    get:
+      tags: [deviceCatalogs]
+      operationId: listIoDeviceKinds
+      summary: The IO device kind catalog
+      description: |
+        Empty until the 1.x row-level extraction lands — the reference sheet
+        carries the count (19) but not the rows, and this platform does not
+        seed from memory.
+      responses:
+        "200":
+          description: The catalog
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IoDeviceKindsEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/resource-configurations/{scopeType}/{resourceExternalId}:
+    get:
+      tags: [resourceConfigurations]
+      operationId: readResourceConfiguration
+      summary: The custom variables of one scoped resource
+      parameters:
+        - name: scopeType
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/ResourceScopeType"
+        - name: resourceExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The variables
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceConfigurationEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: No such resource at this installation
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    put:
+      tags: [resourceConfigurations]
+      operationId: replaceResourceConfiguration
+      summary: Replace the custom variables of one scoped resource
+      description: Declarative — the request's set is the whole set for that resource.
+      parameters:
+        - name: scopeType
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/ResourceScopeType"
+        - name: resourceExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/ResourceConfigurationEntry"
+      responses:
+        "200":
+          description: The variables after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceConfigurationEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: No such resource at this installation
           content:
             application/json:
               schema:
@@ -1107,6 +1490,389 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/TeamSummary"
+
+    # --- WP3 · device registry ----------------------------------------------
+
+    DeviceMode:
+      type: string
+      description: 1.x compared this with LOWER(?) and leaned on collation; here it is one casing.
+      enum: [IO, DATA_CAPTURE]
+
+    PortType:
+      type: string
+      description: The unified port-type enum — TitleCase in one 1.x table, lowercase in another; one casing here.
+      enum: [INPUT, OUTPUT, RELAY, AUDIO, TONE]
+
+    ResourceScopeType:
+      type: string
+      enum: [SITE, AREA, LANE, DEVICE]
+
+    IoAssignmentItem:
+      type: object
+      required: [portType, ioPort]
+      properties:
+        portType:
+          $ref: "#/components/schemas/PortType"
+        ioPort:
+          type: integer
+          format: int32
+        portNameCode:
+          type: string
+          description: A code from the IO port name catalog (DI1 … DO3 … R2 … FRONT_MIC).
+        portAliasName:
+          type: string
+          maxLength: 200
+        reverseState:
+          type: boolean
+          default: false
+        initialHigh:
+          type: boolean
+          default: false
+        dataCapture:
+          type: boolean
+          default: false
+        gosAudio:
+          type: boolean
+          default: false
+        produceTrueMessage:
+          type: boolean
+          default: true
+          description: Edge-suppression semantics — edge reads these; silence is configured, never accidental.
+        produceFalseMessage:
+          type: boolean
+          default: true
+        waitTime:
+          type: integer
+          format: int32
+
+    PerspectiveItem:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        pan:
+          type: number
+        tilt:
+          type: number
+        zoom:
+          type: number
+
+    DeviceSummary:
+      type: object
+      required: [externalId, laneExternalId, siteExternalId, deviceTypeCode, name, protocol,
+                 ioAssignments, perspectives, retired]
+      properties:
+        externalId:
+          type: string
+        laneExternalId:
+          type: string
+        siteExternalId:
+          type: string
+        deviceTypeCode:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        mode:
+          $ref: "#/components/schemas/DeviceMode"
+        alias:
+          type: string
+        model:
+          type: string
+        firmwareVersion:
+          type: string
+        description:
+          type: string
+        resolution:
+          type: string
+        ipAddress:
+          type: string
+        streamType:
+          type: string
+        port:
+          type: integer
+          format: int32
+        protocol:
+          type: string
+        manufacturer:
+          type: string
+        deviceUrl:
+          type: string
+        devicePortalUrl:
+          type: string
+        assemblyName:
+          type: string
+          description: .NET plugin-load parameter — load-bearing for the frozen config poll (§D2).
+        className:
+          type: string
+        dataCaptureMode:
+          type: string
+        waitTime:
+          type: integer
+          format: int32
+        ioAssignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/IoAssignmentItem"
+        perspectives:
+          type: array
+          items:
+            $ref: "#/components/schemas/PerspectiveItem"
+        retired:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    RegisterDeviceRequest:
+      type: object
+      required: [name, deviceTypeCode]
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        deviceTypeCode:
+          type: string
+        address:
+          type: string
+          maxLength: 512
+        mode:
+          $ref: "#/components/schemas/DeviceMode"
+        alias:
+          type: string
+          maxLength: 200
+        model:
+          type: string
+          maxLength: 200
+        firmwareVersion:
+          type: string
+          maxLength: 20
+        description:
+          type: string
+          maxLength: 500
+        resolution:
+          type: string
+          maxLength: 50
+        ipAddress:
+          type: string
+          maxLength: 45
+        streamType:
+          type: string
+          maxLength: 50
+        port:
+          type: integer
+          format: int32
+        protocol:
+          type: string
+          maxLength: 10
+        manufacturer:
+          type: string
+          maxLength: 200
+        deviceUrl:
+          type: string
+          maxLength: 512
+        devicePortalUrl:
+          type: string
+          maxLength: 512
+        assemblyName:
+          type: string
+          maxLength: 200
+        className:
+          type: string
+          maxLength: 255
+        dataCaptureMode:
+          type: string
+          maxLength: 25
+        waitTime:
+          type: integer
+          format: int32
+
+    UpdateDeviceRequest:
+      type: object
+      description: Absent fields are unchanged.
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        deviceTypeCode:
+          type: string
+        address:
+          type: string
+          maxLength: 512
+        mode:
+          $ref: "#/components/schemas/DeviceMode"
+        alias:
+          type: string
+          maxLength: 200
+        model:
+          type: string
+          maxLength: 200
+        firmwareVersion:
+          type: string
+          maxLength: 20
+        description:
+          type: string
+          maxLength: 500
+        resolution:
+          type: string
+          maxLength: 50
+        ipAddress:
+          type: string
+          maxLength: 45
+        streamType:
+          type: string
+          maxLength: 50
+        port:
+          type: integer
+          format: int32
+        protocol:
+          type: string
+          maxLength: 10
+        manufacturer:
+          type: string
+          maxLength: 200
+        deviceUrl:
+          type: string
+          maxLength: 512
+        devicePortalUrl:
+          type: string
+          maxLength: 512
+        assemblyName:
+          type: string
+          maxLength: 200
+        className:
+          type: string
+          maxLength: 255
+        dataCaptureMode:
+          type: string
+          maxLength: 25
+        waitTime:
+          type: integer
+          format: int32
+
+    DeviceEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/DeviceSummary"
+
+    DevicesEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/DeviceSummary"
+
+    DeviceTypeSummary:
+      type: object
+      required: [externalId, code, name]
+      properties:
+        externalId:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+          description: Display-only.
+        formSchema:
+          type: string
+          description: The per-type JSON form-schema driving the admin UI. Deliberately a JSON document (translation rule 11).
+
+    IoPortNameSummary:
+      type: object
+      required: [externalId, portType, code, name]
+      properties:
+        externalId:
+          type: string
+        portType:
+          $ref: "#/components/schemas/PortType"
+        code:
+          type: string
+        name:
+          type: string
+
+    IoDeviceKindSummary:
+      type: object
+      required: [externalId, portType, code, name]
+      properties:
+        externalId:
+          type: string
+        portType:
+          $ref: "#/components/schemas/PortType"
+        code:
+          type: string
+        name:
+          type: string
+
+    DeviceTypesEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/DeviceTypeSummary"
+
+    IoPortNamesEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/IoPortNameSummary"
+
+    IoDeviceKindsEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/IoDeviceKindSummary"
+
+    ResourceConfigurationEntry:
+      type: object
+      required: [key]
+      properties:
+        key:
+          type: string
+          maxLength: 200
+        value:
+          type: string
+          maxLength: 2000
+
+    ResourceConfigurationView:
+      type: object
+      required: [scopeType, resourceExternalId, entries]
+      properties:
+        scopeType:
+          $ref: "#/components/schemas/ResourceScopeType"
+        resourceExternalId:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResourceConfigurationEntry"
+
+    ResourceConfigurationEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/ResourceConfigurationView"
 
     EntitlementActionItem:
       type: object
