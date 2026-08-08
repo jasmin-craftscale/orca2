@@ -21,7 +21,22 @@ public enum CoreErrorCode implements ErrorCode {
 	SITE_UNKNOWN("SITE_UNKNOWN", 422),
 
 	/** A role cannot be retired while active users hold it. */
-	ROLE_IN_USE("ROLE_IN_USE", 409);
+	ROLE_IN_USE("ROLE_IN_USE", 409),
+
+	/** A timezone is not an IANA zone id the platform's tz database knows. */
+	TIME_ZONE_UNKNOWN("TIME_ZONE_UNKNOWN", 422),
+
+	/** A named shift template does not exist or is retired. */
+	SHIFT_TEMPLATE_UNKNOWN("SHIFT_TEMPLATE_UNKNOWN", 422),
+
+	/** A named break template does not exist or is retired. */
+	BREAK_TEMPLATE_UNKNOWN("BREAK_TEMPLATE_UNKNOWN", 422),
+
+	/** A named user does not exist or is retired. */
+	USER_UNKNOWN("USER_UNKNOWN", 422),
+
+	/** A template cannot be retired while active teams reference it. */
+	TEMPLATE_IN_USE("TEMPLATE_IN_USE", 409);
 
 	private final String code;
 	private final int httpStatus;

@@ -36,6 +36,12 @@ tags:
     description: Customer-defined roles, their entitlement grants and site scoping (§C1).
   - name: entitlements
     description: The four-level entitlement catalog (application → module → sub-module → action item).
+  - name: teams
+    description: Clerk teams — members, handling method (PUSH/PROMPT), shift & break templates (§C1).
+  - name: shiftTemplates
+    description: The shift template catalog. One validated IANA timezone per template.
+  - name: breakTemplates
+    description: The break template catalog and its timings.
 
 paths:
   /api/v1/users:
@@ -242,6 +248,319 @@ paths:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "422":
           description: An entitlement code or site is unknown
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/teams:
+    get:
+      tags: [teams]
+      operationId: listTeams
+      summary: List the installation's teams, members included
+      responses:
+        "200":
+          description: The teams
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamsEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    post:
+      tags: [teams]
+      operationId: createTeam
+      summary: Create a team
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTeamRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: An active team at that site already carries that name
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: The site, a template or a member user is unknown
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/teams/{teamExternalId}:
+    patch:
+      tags: [teams]
+      operationId: updateTeam
+      summary: Update a team, its members or its templates
+      description: |
+        Absent fields are unchanged. `memberUserExternalIds` REPLACES the
+        membership when present. An empty string for a template external id
+        clears that template reference.
+      parameters:
+        - name: teamExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTeamRequest"
+      responses:
+        "200":
+          description: The team after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such team
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: An active team at that site already carries that name
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: A template or a member user is unknown
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/shift-templates:
+    get:
+      tags: [shiftTemplates]
+      operationId: listShiftTemplates
+      summary: The shift template catalog
+      responses:
+        "200":
+          description: The templates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShiftTemplatesEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    post:
+      tags: [shiftTemplates]
+      operationId: createShiftTemplate
+      summary: Create a shift template
+      description: |
+        `overnight` and `durationMinutes` are computed, never accepted: a shift
+        whose end is at or before its start crosses midnight, and equal times
+        are the 24-hour shift. The timezone must be an IANA zone id the JVM
+        knows.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateShiftTemplateRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShiftTemplateEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: An active template already carries that name
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: The timezone is not an IANA zone this platform knows
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/shift-templates/{shiftTemplateExternalId}:
+    patch:
+      tags: [shiftTemplates]
+      operationId: updateShiftTemplate
+      summary: Update or retire a shift template
+      description: |
+        Absent fields are unchanged. A template still referenced by an active
+        team cannot be retired.
+      parameters:
+        - name: shiftTemplateExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateShiftTemplateRequest"
+      responses:
+        "200":
+          description: The template after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShiftTemplateEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such template
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: Name in use, or the template is still referenced by an active team
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: The timezone is not an IANA zone this platform knows
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/break-templates:
+    get:
+      tags: [breakTemplates]
+      operationId: listBreakTemplates
+      summary: The break template catalog, timings included
+      responses:
+        "200":
+          description: The templates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BreakTemplatesEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    post:
+      tags: [breakTemplates]
+      operationId: createBreakTemplate
+      summary: Create a break template with its timings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBreakTemplateRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BreakTemplateEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: An active template already carries that name
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/break-templates/{breakTemplateExternalId}:
+    patch:
+      tags: [breakTemplates]
+      operationId: updateBreakTemplate
+      summary: Update or retire a break template
+      description: |
+        Absent fields are unchanged; `timings`, when present, REPLACES the
+        timing set. A template still referenced by an active team cannot be
+        retired.
+      parameters:
+        - name: breakTemplateExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBreakTemplateRequest"
+      responses:
+        "200":
+          description: The template after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BreakTemplateEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such template
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: Name in use, or the template is still referenced by an active team
           content:
             application/json:
               schema:
@@ -522,6 +841,272 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/RoleSummary"
+
+    # --- WP2 · teams & templates --------------------------------------------
+
+    HandlingMethod:
+      type: string
+      description: How work reaches this team's members (§C1). One casing — the database checks it.
+      enum: [PUSH, PROMPT]
+
+    LocalTimeString:
+      type: string
+      description: A wall-clock time of day, HH:mm or HH:mm:ss.
+      pattern: "^([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
+      example: "06:00"
+
+    ShiftTemplateSummary:
+      type: object
+      required: [externalId, name, timeZone, startTime, endTime, overnight, durationMinutes, retired]
+      properties:
+        externalId:
+          type: string
+        name:
+          type: string
+        timeZone:
+          type: string
+          description: IANA zone id, validated against the JVM's tz database.
+        startTime:
+          $ref: "#/components/schemas/LocalTimeString"
+        endTime:
+          $ref: "#/components/schemas/LocalTimeString"
+        overnight:
+          type: boolean
+          description: Computed — end at or before start crosses midnight; equal times are the 24-hour shift.
+        durationMinutes:
+          type: integer
+          format: int32
+          description: Computed, never stored — 1.x stored a duration in a TIME column and that defect does not port.
+        retired:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateShiftTemplateRequest:
+      type: object
+      required: [name, timeZone, startTime, endTime]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        timeZone:
+          type: string
+          maxLength: 64
+        startTime:
+          $ref: "#/components/schemas/LocalTimeString"
+        endTime:
+          $ref: "#/components/schemas/LocalTimeString"
+
+    UpdateShiftTemplateRequest:
+      type: object
+      description: Absent fields are unchanged.
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        timeZone:
+          type: string
+          maxLength: 64
+        startTime:
+          $ref: "#/components/schemas/LocalTimeString"
+        endTime:
+          $ref: "#/components/schemas/LocalTimeString"
+        retired:
+          type: boolean
+
+    ShiftTemplateEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/ShiftTemplateSummary"
+
+    ShiftTemplatesEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/ShiftTemplateSummary"
+
+    BreakTimingItem:
+      type: object
+      required: [startTime, durationMinutes]
+      properties:
+        startTime:
+          $ref: "#/components/schemas/LocalTimeString"
+        durationMinutes:
+          type: integer
+          format: int32
+          minimum: 1
+
+    BreakTemplateSummary:
+      type: object
+      required: [externalId, name, timings, retired]
+      properties:
+        externalId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        timings:
+          type: array
+          items:
+            $ref: "#/components/schemas/BreakTimingItem"
+        retired:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateBreakTemplateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        timings:
+          type: array
+          items:
+            $ref: "#/components/schemas/BreakTimingItem"
+
+    UpdateBreakTemplateRequest:
+      type: object
+      description: Absent fields are unchanged; `timings` replaces the set when present.
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        timings:
+          type: array
+          items:
+            $ref: "#/components/schemas/BreakTimingItem"
+        retired:
+          type: boolean
+
+    BreakTemplateEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/BreakTemplateSummary"
+
+    BreakTemplatesEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/BreakTemplateSummary"
+
+    TeamSummary:
+      type: object
+      required: [externalId, siteExternalId, name, handlingMethod, memberUserExternalIds, retired]
+      properties:
+        externalId:
+          type: string
+        siteExternalId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        handlingMethod:
+          $ref: "#/components/schemas/HandlingMethod"
+        shiftTemplateExternalId:
+          type: string
+        breakTemplateExternalId:
+          type: string
+        memberUserExternalIds:
+          type: array
+          items:
+            type: string
+        retired:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateTeamRequest:
+      type: object
+      required: [siteExternalId, name, handlingMethod]
+      properties:
+        siteExternalId:
+          type: string
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 3000
+        handlingMethod:
+          $ref: "#/components/schemas/HandlingMethod"
+        shiftTemplateExternalId:
+          type: string
+        breakTemplateExternalId:
+          type: string
+        memberUserExternalIds:
+          type: array
+          items:
+            type: string
+
+    UpdateTeamRequest:
+      type: object
+      description: |
+        Absent fields are unchanged; `memberUserExternalIds` replaces the
+        membership when present; an empty string clears a template reference.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 3000
+        handlingMethod:
+          $ref: "#/components/schemas/HandlingMethod"
+        shiftTemplateExternalId:
+          type: string
+        breakTemplateExternalId:
+          type: string
+        memberUserExternalIds:
+          type: array
+          items:
+            type: string
+        retired:
+          type: boolean
+
+    TeamEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/TeamSummary"
+
+    TeamsEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/TeamSummary"
 
     EntitlementActionItem:
       type: object

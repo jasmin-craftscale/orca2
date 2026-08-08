@@ -9,7 +9,15 @@ import com.lynxis.orca.core.api.RoleAdminController;
 import com.lynxis.orca.core.api.UserAdminController;
 import com.lynxis.orca.core.domain.RoleAdminService;
 import com.lynxis.orca.core.domain.UserAdminService;
+import com.lynxis.orca.core.api.BreakTemplateController;
+import com.lynxis.orca.core.api.ShiftTemplateController;
+import com.lynxis.orca.core.api.TeamAdminController;
+import com.lynxis.orca.core.domain.TeamAdminService;
+import com.lynxis.orca.core.domain.TemplateAdminService;
+import com.lynxis.orca.core.persistence.BreakTemplateRepository;
 import com.lynxis.orca.core.persistence.EntitlementCatalogRepository;
+import com.lynxis.orca.core.persistence.ShiftTemplateRepository;
+import com.lynxis.orca.core.persistence.TeamRepository;
 import com.lynxis.orca.core.persistence.RoleRepository;
 import com.lynxis.orca.core.persistence.SiteDirectoryRepository;
 import com.lynxis.orca.core.persistence.UserAccountRepository;
@@ -77,5 +85,53 @@ public class CoreConfiguration {
 	public EntitlementCatalogController entitlementCatalogController(EntitlementCatalogRepository catalog,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
 		return new EntitlementCatalogController(catalog, siteExternalId);
+	}
+
+	// --- WP2 · teams & templates --------------------------------------------
+
+	@Bean
+	public ShiftTemplateRepository shiftTemplateRepository(com.lynxis.orca.platform.scope.ScopeSeam seam) {
+		return new ShiftTemplateRepository(seam);
+	}
+
+	@Bean
+	public BreakTemplateRepository breakTemplateRepository(com.lynxis.orca.platform.scope.ScopeSeam seam) {
+		return new BreakTemplateRepository(seam);
+	}
+
+	@Bean
+	public TeamRepository teamRepository(com.lynxis.orca.platform.scope.ScopeSeam seam) {
+		return new TeamRepository(seam);
+	}
+
+	@Bean
+	public TemplateAdminService templateAdminService(ShiftTemplateRepository shiftTemplates,
+			BreakTemplateRepository breakTemplates, TeamRepository teams) {
+		return new TemplateAdminService(shiftTemplates, breakTemplates, teams);
+	}
+
+	@Bean
+	public TeamAdminService teamAdminService(TeamRepository teams, UserAccountRepository users,
+			ShiftTemplateRepository shiftTemplates, BreakTemplateRepository breakTemplates,
+			SiteDirectoryRepository sites) {
+		return new TeamAdminService(teams, users, shiftTemplates, breakTemplates, sites);
+	}
+
+	@Bean
+	public ShiftTemplateController shiftTemplateController(TemplateAdminService service,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new ShiftTemplateController(service, siteExternalId);
+	}
+
+	@Bean
+	public BreakTemplateController breakTemplateController(TemplateAdminService service,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new BreakTemplateController(service, siteExternalId);
+	}
+
+	@Bean
+	public TeamAdminController teamAdminController(TeamAdminService service,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new TeamAdminController(service, siteExternalId);
 	}
 }
