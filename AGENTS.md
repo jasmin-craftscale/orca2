@@ -39,6 +39,7 @@ This file is a map. It does not restate the architecture — follow the link.
 | What is deliberately unsettled? | `docs/ORCA_OPEN_QUESTIONS_REGISTER.md` |
 | What are the five primitives, and what pattern is each? | `docs/PLATFORM_PRIMITIVES.md` |
 | Where does anything live in this repository? | `docs/REPOSITORY_GUIDE.md` |
+| What shape does a change take here — the patterns that repeat? | `docs/CODE_PATTERNS.md` |
 | What was built in each phase, what was NOT, and every decision the plan did not dictate | `docs/phase-*-report.md`, newest first. Each one's "what was not built", "decisions the plan did not dictate" and "found wrong" sections are where the value is |
 | What does 1.x's work-item world actually contain? | `docs/work-items-schema-from-1x.md` — DERIVED-FROM-1X; **§0's three inversions are the acceptance criteria Phase 3 built** |
 | How do I run the slice end to end? | `docs/phase-1-demo.md` |

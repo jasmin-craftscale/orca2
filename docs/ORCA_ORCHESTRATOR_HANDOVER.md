@@ -133,7 +133,7 @@ The ones that gate work:
 5. **`README.md`** (repository root) — the front door: what it is, how the gate path works, how to run it locally.
 6. **`AGENTS.md`** (root, plus the nested ones in `platform/`, `services/orca-runtime/`, `build-checks/`) — the rules that are **enforced by ten build checks**. They bind you as much as any build agent.
 7. **The four phase reports, newest first** — `phase-3-report.md`, `phase-2-report.md`, `phase-1-hardening-report.md`, `phase-1-report.md`, then `phase-0-report.md`. **These are the real state of the build.** Each carries: what was built, what was *not* (named gaps), every decision the plan did not dictate, what was found wrong, and an adversarial review addendum. Read each one's "decisions the plan did not dictate" and "found wrong" sections — that is where the value is.
-8. **`REPOSITORY_GUIDE.md`** (layout) · **`PLATFORM_PRIMITIVES.md`** (what each primitive prevents) · **`deployment.md`** (local dev and the production gap) · **`phase-1-demo.md`** (drive a truck through the gate — the standing regression canary).
+8. **`CODE_PATTERNS.md`** (**the shape a change takes — read before writing or planning any code**) · **`REPOSITORY_GUIDE.md`** (layout) · **`PLATFORM_PRIMITIVES.md`** (what each primitive prevents) · **`deployment.md`** (local dev and the production gap) · **`phase-1-demo.md`** (drive a truck through the gate — the standing regression canary).
 
 **For the existing system — ORCA 1.x — you need both the manual and the extractions:**
 
