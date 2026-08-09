@@ -1,9 +1,13 @@
 package com.lynxis.orca.platform.lease;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.TimeZone;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -63,6 +67,44 @@ class LeasePropertiesIT {
 				SERVICE);
 		jdbc.execute("DELETE FROM service_lease");
 		jdbc.execute("DELETE FROM capture");
+	}
+
+	// ------------------------------------------------------------------------
+	// Property 0 — a reported expiry is the instant the DATABASE stored, whatever
+	// zone this machine happens to be in.
+	// ------------------------------------------------------------------------
+
+	@Test
+	@DisplayName("the expiry a lease reports is correct on a machine that is not in UTC")
+	void theReportedExpiryDoesNotDependOnTheMachinesTimeZone() {
+		// The zone is forced rather than inherited, because this defect is INVISIBLE
+		// on a machine already running in UTC — which a build server usually is. Read
+		// through the zone-less path, a value the database wrote comes back skewed by
+		// exactly this offset: fourteen hours here, so an assertion in minutes cannot
+		// pass by accident.
+		TimeZone original = TimeZone.getDefault();
+		try {
+			TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Kiritimati")); // UTC+14
+
+			Instant before = Instant.now();
+			Lease lease = leases.acquire(LANE_LEASE, "holder-a", Duration.ofMinutes(5)).orElseThrow();
+			Instant after = Instant.now();
+
+			// The database set expires_at to its own UTC clock plus five minutes, so
+			// the true answer sits inside the window this call spanned.
+			assertThat(lease.expiresAt())
+					.as("expiry reported by acquire(), on a JVM at UTC+14")
+					.isAfter(before.plus(Duration.ofMinutes(5)).minusSeconds(90))
+					.isBefore(after.plus(Duration.ofMinutes(5)).plusSeconds(90));
+
+			// And the same value read back by a different call path.
+			assertThat(leases.find(LANE_LEASE).orElseThrow().expiresAt())
+					.as("the same expiry, read back through find()")
+					.isCloseTo(lease.expiresAt(), within(1, ChronoUnit.SECONDS));
+		}
+		finally {
+			TimeZone.setDefault(original);
+		}
 	}
 
 	// ------------------------------------------------------------------------

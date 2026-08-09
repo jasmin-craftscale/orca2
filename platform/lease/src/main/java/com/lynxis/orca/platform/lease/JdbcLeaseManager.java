@@ -1,7 +1,10 @@
 package com.lynxis.orca.platform.lease;
 
-import java.sql.Timestamp;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -130,17 +133,39 @@ public class JdbcLeaseManager implements LeaseManager {
 				rs.getString("lease_name"),
 				rs.getString("holder_id"),
 				rs.getLong("fence_token"),
-				toInstant(rs.getTimestamp("expires_at"))), service, leaseName);
+				utcInstant(rs, "expires_at")), service, leaseName);
 		return found.isEmpty() ? Optional.empty() : Optional.of(found.getFirst());
 	}
 
 	private RowMapper<Lease> grant(String leaseName, String holderId) {
 		return (rs, rowNum) -> new Lease(service, leaseName, holderId,
-				rs.getLong("fence_token"), toInstant(rs.getTimestamp("expires_at")));
+				rs.getLong("fence_token"), utcInstant(rs, "expires_at"));
 	}
 
-	private static java.time.Instant toInstant(Timestamp timestamp) {
-		return timestamp == null ? null : timestamp.toInstant();
+	/**
+	 * Reads a timestamp column the DATABASE wrote, as the UTC instant it holds.
+	 *
+	 * <p><strong>Why this is not {@code rs.getTimestamp(column).toInstant()}.</strong>
+	 * A {@code java.sql.Timestamp} carries no zone, so that call reads the stored
+	 * value as wall-clock time <em>in whatever zone the JVM happens to be set to</em>.
+	 * For a value Java itself wrote the error cancels out on the way back; for one the
+	 * database wrote it does not. Every timestamp on this table is written by SQL
+	 * Server — {@code SYSUTCDATETIME()} and {@code DATEADD} — so they are all of the
+	 * second kind.
+	 *
+	 * <p>The same mistake in {@code orca-edge} made an event buffered one second
+	 * earlier report as two hours old on a machine at UTC+2.
+	 *
+	 * <p><strong>This does not change how expiry is decided</strong>, and that is worth
+	 * being clear about. Whether a lease has expired is settled inside the guarded SQL
+	 * statement, against the database's own clock, and never against a JVM clock — see
+	 * the comments on the statements above. The instant read here is <em>reported</em>
+	 * to a caller, not compared. Fixing it means a caller that ever does compare it
+	 * gets a true answer instead of one skewed by the machine's offset.
+	 */
+	private static java.time.Instant utcInstant(ResultSet rs, String column) throws SQLException {
+		LocalDateTime stored = rs.getObject(column, LocalDateTime.class);
+		return stored == null ? null : stored.toInstant(ZoneOffset.UTC);
 	}
 
 	private static void validate(String leaseName, String holderId, Duration duration) {

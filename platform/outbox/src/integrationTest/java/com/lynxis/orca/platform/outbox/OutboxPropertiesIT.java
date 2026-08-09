@@ -8,9 +8,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -138,6 +140,45 @@ class OutboxPropertiesIT {
 	// ------------------------------------------------------------------------
 	// Property 2 — deliver the same batch twice; ONE effect.
 	// ------------------------------------------------------------------------
+
+	@Test
+	@DisplayName("a fact's recorded time is correct on a machine that is not in UTC")
+	void theRecordedTimeDoesNotDependOnTheMachinesTimeZone() {
+		// Forced rather than inherited: this defect is INVISIBLE on a machine already
+		// in UTC, which a build server usually is. `outbox.created_at` defaults to
+		// SYSUTCDATETIME(), so it is written by the database — and read through the
+		// zone-less path it comes back skewed by exactly this offset.
+		TimeZone original = TimeZone.getDefault();
+		try {
+			TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Kiritimati")); // UTC+14
+
+			Instant before = Instant.now();
+			writeFacts("lane:tz", 1);
+			Instant after = Instant.now();
+
+			List<OutboxRecord> captured = new CopyOnWriteArrayList<>();
+			OutboxConsumer capture = new OutboxConsumer() {
+				@Override
+				public String name() {
+					return CONSUMER_A;
+				}
+
+				@Override
+				public void accept(OutboxRecord record) {
+					captured.add(record);
+				}
+			};
+			relay(List.of(capture), "instance-tz").deliverPending(10);
+
+			assertThat(captured).hasSize(1);
+			assertThat(captured.getFirst().createdAt())
+					.as("the time the database stamped on the fact, read on a JVM at UTC+14")
+					.isBetween(before.minusSeconds(90), after.plusSeconds(90));
+		}
+		finally {
+			TimeZone.setDefault(original);
+		}
+	}
 
 	@Test
 	@DisplayName("re-running the relay over an acknowledged batch delivers nothing a second time")

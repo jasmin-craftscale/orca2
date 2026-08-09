@@ -1,7 +1,11 @@
 package com.lynxis.orca.platform.outbox;
 
-import java.sql.Timestamp;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -191,15 +195,39 @@ public class OutboxRelay {
 	}
 
 	private OutboxRecord load(long publishSeq) {
-		return jdbc.queryForObject(LOAD, (rs, rowNum) -> {
-			Timestamp createdAt = rs.getTimestamp("created_at");
-			return new OutboxRecord(
-					rs.getLong("publish_seq"),
-					rs.getString("ordering_key"),
-					rs.getString("event_type"),
-					rs.getString("payload"),
-					createdAt == null ? null : createdAt.toInstant());
-		}, publishSeq);
+		return jdbc.queryForObject(LOAD, (rs, rowNum) -> new OutboxRecord(
+				rs.getLong("publish_seq"),
+				rs.getString("ordering_key"),
+				rs.getString("event_type"),
+				rs.getString("payload"),
+				utcInstant(rs, "created_at")), publishSeq);
+	}
+
+	/**
+	 * Reads a timestamp column the DATABASE wrote, as the UTC instant it holds.
+	 *
+	 * <p><strong>Why this is not {@code rs.getTimestamp(column).toInstant()}.</strong>
+	 * A {@code java.sql.Timestamp} carries no zone, so that call reads the stored
+	 * value as wall-clock time <em>in whatever zone the JVM happens to be set to</em>.
+	 * For a value Java itself wrote that error cancels out on the way back. For a
+	 * value the database wrote it does not — and {@code outbox.created_at} defaults
+	 * to {@code SYSUTCDATETIME()}, so it is one of those.
+	 *
+	 * <p>The same mistake, in the equivalent place in {@code orca-edge}, made a
+	 * capture buffered one second earlier report as <strong>two hours old</strong> on
+	 * a machine at UTC+2 — and an operator reading that concludes the network link is
+	 * severed and starts investigating something that is fine.
+	 *
+	 * <p>Reading through {@link LocalDateTime} states the zone instead of inheriting
+	 * it, so the answer does not depend on where the appliance is installed.
+	 *
+	 * <p>Only the read direction needs this. Every timestamp this module stores is
+	 * written by SQL Server itself — {@code SYSUTCDATETIME()} and {@code DATEADD} —
+	 * so nothing here ever binds a {@code Timestamp} on the way in.
+	 */
+	private static Instant utcInstant(ResultSet rs, String column) throws SQLException {
+		LocalDateTime stored = rs.getObject(column, LocalDateTime.class);
+		return stored == null ? null : stored.toInstant(ZoneOffset.UTC);
 	}
 
 	/**

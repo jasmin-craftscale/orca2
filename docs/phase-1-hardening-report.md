@@ -369,6 +369,12 @@ declaration was correct, and the run replaces the declaration.
 
 ### 5.1 · ⚠️ The zone-less timestamp conversion exists in two primitives, and is not fixed
 
+> **CLOSED 10 August 2026.** Both were fixed in `platform/outbox` and `platform/lease`,
+> each with a property test that forces the JVM to UTC+14 — because the defect is
+> invisible on a machine already in UTC — and each watched to fail against the old
+> code before the fix was kept. The original finding follows.
+
+
 `platform/outbox`'s `created_at` and `platform/lease`'s `expires_at` are
 database-written and read through the same zone-less `rs.getTimestamp(…)` path H3
 fixed in edge.
