@@ -1,52 +1,84 @@
--- P1 · The transactional outbox and its per-consumer acknowledgement.
+-- The two tables behind the transactional outbox: how one service tells another
+-- that something happened, without a message broker and without ever losing or
+-- duplicating the news.
 --
--- Defined ONCE, here, by the primitive that implements it. Applied into each
--- owning service's own schema by THAT service's own Flyway, with THAT service's
--- own credentials — so `core`, `runtime`, `edge` and `portal` each get their own
--- pair and nobody migrates anybody else's schema.
+-- WHAT PROBLEM THIS SOLVES
+-- A service records a fact — a visit completed — and something elsewhere needs to
+-- know. Send the message first and the recording can fail: news of something that
+-- never happened. Record first and send after, and the send can fail: something
+-- happened that nobody was told about. There is no ordering of two separate
+-- systems that fixes this.
 --
--- This is deliberately not a shared migrations module. A shared module would
--- centralise schema definition away from the services that own it and would not
--- remove the ordering dependency — it would only hide it behind one runner.
+-- So the fact and the row saying "this needs publishing" are written in ONE
+-- database transaction. They commit together or not at all. A relay then reads
+-- this table and offers each row to every registered consumer until each one
+-- acknowledges. That gives the same guarantee a message broker would — delivered
+-- at least once, in order per key — at the cost of a table instead of a server to
+-- run, patch and monitor.
 --
--- Object names are UNQUALIFIED on purpose. Each service's database user has its
--- own DEFAULT_SCHEMA, set by the bootstrap and asserted by V004__verify.sql, so
--- the same file lands in a different schema for each service. That is the whole
--- mechanism; if a default schema is ever wrong, tables silently land in `dbo`
--- where the next service can read them, which is why the bootstrap checks it.
+-- WHERE THIS FILE ACTUALLY RUNS
+-- It is written once, here, beside the code that implements the mechanism. It is
+-- then applied SEPARATELY into each owning service's own schema, by that
+-- service's own migration run, using that service's own database credentials — so
+-- several services each end up with their own pair of these tables, and no
+-- service ever migrates another's schema.
+--
+-- That is deliberately not a shared migrations module. A shared module would move
+-- schema definition away from the services that own it, and it would not remove
+-- the ordering dependency between them — only hide it behind a single runner.
+--
+-- ⚠️ THE TABLE NAMES ARE UNQUALIFIED, AND THAT IS THE WHOLE MECHANISM. Each
+-- service's database login has its own default schema, set up by the scripts
+-- under deploy/bootstrap and checked by the last of them. The same file therefore
+-- lands in a different schema for each service that applies it. If a default
+-- schema is ever wrong, these tables land silently in the database's own default
+-- schema — where the next service to run can see them — which is precisely why
+-- the bootstrap verifies it rather than assuming it.
 
 -- ---------------------------------------------------------------------------
--- outbox — the fact, recorded in the same transaction as the fact itself.
+-- outbox — the news itself, one row per fact, written in the same transaction as
+-- the fact it describes.
 -- ---------------------------------------------------------------------------
 CREATE TABLE outbox (
-	-- The monotonic sequence. Consumers and the replication feed advance a
-	-- cursor over it (§C1, §C2: "outbox feed by publish_seq cursor").
+	-- An always-increasing number, assigned by the database. It is what a
+	-- consumer's position is expressed in: each one remembers the last number it
+	-- has taken and asks for what came after.
 	publish_seq   BIGINT         IDENTITY(1,1) NOT NULL,
 
-	-- Facts are ordered PER KEY, never globally (§D3, Ordering). A consumer that
-	-- needs global order is using the wrong mechanism.
+	-- What this fact is about — a lane, a visit, a device. Facts are delivered in
+	-- order WITHIN one key, and deliberately not in order across keys, so two
+	-- lanes never wait for each other.
+	--
+	-- ⚠️ A consumer that genuinely needs a single global order is using the wrong
+	-- mechanism, not this one with a constant key.
 	ordering_key  VARCHAR(200)   NOT NULL,
 
 	event_type    VARCHAR(120)   NOT NULL,
 	payload       NVARCHAR(MAX)  NOT NULL,
 
-	-- The database's clock, never an instance's (§D3, Time).
+	-- Stamped by the database's own clock, never by the machine that inserted the
+	-- row. Anything two instances have to agree on is timed by the database here.
 	created_at    DATETIME2(3)   NOT NULL CONSTRAINT df_outbox_created_at DEFAULT SYSUTCDATETIME(),
 
 	CONSTRAINT pk_outbox PRIMARY KEY (publish_seq)
 );
 
--- The relay claims the oldest unacknowledged row per ordering key. Without this
--- index that claim is a scan, and it runs on the gate path.
+-- The relay takes the oldest unacknowledged row for each ordering key. Without
+-- this index that is a table scan — and it happens on the path a truck is waiting
+-- on.
 CREATE INDEX ix_outbox_ordering_key_seq ON outbox (ordering_key, publish_seq);
 
 -- ---------------------------------------------------------------------------
--- outbox_delivery — one row per (fact, registered consumer).
+-- outbox_delivery — one row per fact per registered consumer. Three consumers
+-- means three rows, acknowledged independently.
 --
--- A fact is acknowledged by EACH registered consumer separately, which is what
--- makes "a row is deletable only when every consumer has acknowledged it"
--- expressible as a query rather than as a hope. It is also what stops retention
--- from destroying data a peer has not taken (§B10, §C5).
+-- WHY THE ACKNOWLEDGEMENT IS PER CONSUMER RATHER THAN PER FACT
+-- Because it turns "this row may be deleted once EVERY consumer has taken it"
+-- into a question the database can answer, instead of something the code hopes is
+-- true. That matters most for the sweep that deletes old rows: retention must
+-- never destroy a fact that a peer — a replicating tier, a slow consumer that has
+-- been offline for a day — has not yet taken. With one flag per fact there would
+-- be no way to know.
 -- ---------------------------------------------------------------------------
 CREATE TABLE outbox_delivery (
 	publish_seq   BIGINT         NOT NULL,
@@ -59,9 +91,13 @@ CREATE TABLE outbox_delivery (
 
 	attempts      INT            NOT NULL CONSTRAINT df_outbox_delivery_attempts DEFAULT 0,
 
-	-- Who currently holds the claim, and until when. The relay's claim is a
-	-- skip-locked read, so two instances never contend for the same row; these
-	-- columns are what makes an abandoned claim recoverable rather than stuck.
+	-- Who is currently working on this delivery, and until when.
+	--
+	-- Two relay instances never fight over the same row: each claims work with a
+	-- read that skips rows another instance already holds. These two columns are
+	-- what makes a claim RECOVERABLE — an instance that dies mid-delivery leaves a
+	-- claim that expires, and the next instance picks it up. Without an expiry the
+	-- row would be held forever by a process that no longer exists.
 	claimed_by    VARCHAR(200)   NULL,
 	claimed_until DATETIME2(3)   NULL,
 
@@ -72,14 +108,17 @@ CREATE TABLE outbox_delivery (
 	CONSTRAINT fk_outbox_delivery_outbox FOREIGN KEY (publish_seq)
 		REFERENCES outbox (publish_seq),
 	CONSTRAINT ck_outbox_delivery_status CHECK (status IN ('PENDING', 'ACKED', 'PARKED')),
-	-- An ACKED row without a timestamp is a row nobody can audit, and an
-	-- un-acked row with one is a lie. Neither is allowed to exist.
+	-- The status and the acknowledgement time cannot contradict each other. An
+	-- acknowledged row with no timestamp is one nobody can audit; an
+	-- unacknowledged row with a timestamp is simply false. Neither can be written.
 	CONSTRAINT ck_outbox_delivery_acked_at
 		CHECK ((status = 'ACKED' AND acked_at IS NOT NULL)
 		    OR (status <> 'ACKED' AND acked_at IS NULL))
 );
 
--- The relay's claim query: pending work for one consumer, oldest first.
+-- The relay's claim query, as an index: outstanding work for one consumer, oldest
+-- first, with the claim expiry carried along so the relay can tell an abandoned
+-- claim from a live one without fetching the row.
 CREATE INDEX ix_outbox_delivery_claim
 	ON outbox_delivery (consumer, status, publish_seq)
 	INCLUDE (claimed_until);

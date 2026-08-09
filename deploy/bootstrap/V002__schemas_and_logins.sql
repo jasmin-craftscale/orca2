@@ -1,20 +1,44 @@
--- ORCA bootstrap · V002 · seven schemas, seven logins, one owner each.
+-- Step two of four: seven schemas, seven logins, and each schema owned by exactly
+-- one of them.
 --
--- This is ADR-004 made real. Schema ownership is enforced by DATABASE
--- CREDENTIALS, not by convention: `orca_core` owns the `core` schema and has no
--- permission of any kind on `runtime`, and neither a code review nor a build
--- check is what stops it — the database does.
+-- ⚠️ THIS FILE IS THE ENTIRE DATA-OWNERSHIP BOUNDARY OF THE PLATFORM. Each
+-- service connects to the shared database as itself, is granted nothing on any
+-- other service's schema, and has its own schema as its default. So the service
+-- that runs the gate physically cannot read the configuration service's tables —
+-- not because a review would catch it, and not because a build check forbids it,
+-- but because the database refuses.
 --
--- Seven, not six. The six JVM services each get a schema and a login. The
--- seventh pair, `media`, exists for the telephony engine, which reads its own
--- configuration tables directly in its own format (§B5, §C7). ORCA does not
--- read, write or model those tables; the login exists so that Asterisk connects
--- as itself rather than as an administrator, and it is confined the same way
--- every other login is.
+-- Nothing in Java enforces this. If you are looking for where cross-schema access
+-- is prevented, it is here and in the file after it, and nowhere else.
 --
--- Passwords arrive as sqlcmd variables from run.sh, which reads them from .env.
--- Nothing here has a default: a bootstrap that silently invents a password is a
--- bootstrap that creates a login nobody can use and nobody can find.
+-- WHY SEVEN AND NOT SIX
+-- Six of the pairs belong to the Java services. The seventh, `media`, belongs to
+-- the telephony engine — a separate, non-Java component that reads its own
+-- configuration tables directly, in its own format. This platform does not read,
+-- write or model those tables. The login exists purely so that the engine
+-- connects as itself instead of as an administrator, and is confined exactly like
+-- everything else.
+--
+-- WHERE THE PASSWORDS COME FROM
+-- They are supplied as variables by the script that runs this file, which reads
+-- them from the deployment's own environment file.
+--
+-- ⚠️ NOTHING HERE HAS A DEFAULT PASSWORD, DELIBERATELY. A bootstrap that quietly
+-- invents one creates a login nobody can use and nobody can find — and, far
+-- worse, one whose password is whatever this file happened to say.
+--
+-- THE SHAPE REPEATED SEVEN TIMES BELOW
+-- Create the login if it does not exist; create the database user for it; create
+-- the schema owned BY that user; then set that schema as the user's default. The
+-- last step is what lets every migration write unqualified table names and still
+-- land in the right place, and the fourth bootstrap file checks it rather than
+-- assuming it.
+--
+-- Each statement is wrapped in `EXEC` so that it is compiled only when it
+-- actually runs. Without that, the database would try to compile a CREATE USER
+-- naming a login that does not exist yet, and fail before the guard above it
+-- could prevent it. The `GO` lines are batch separators for the same reason: each
+-- step must be compiled after the previous one has taken effect.
 
 SET NOCOUNT ON;
 GO
@@ -23,7 +47,7 @@ USE [orca];
 GO
 
 -- ---------------------------------------------------------------------------
--- orca-core — the world as configured (§C1)
+-- orca-core — owns all configuration: sites, lanes, devices, users, permissions
 -- ---------------------------------------------------------------------------
 IF SUSER_ID(N'orca_core') IS NULL
 	EXEC (N'CREATE LOGIN [orca_core] WITH PASSWORD = ''$(CORE_PASSWORD)'', CHECK_POLICY = OFF');
@@ -38,7 +62,7 @@ EXEC (N'ALTER USER [orca_core] WITH DEFAULT_SCHEMA = [core]');
 GO
 
 -- ---------------------------------------------------------------------------
--- orca-runtime — the gate brain (§C2)
+-- orca-runtime — runs the gate: visits, processes, work items, connector calls
 -- ---------------------------------------------------------------------------
 IF SUSER_ID(N'orca_runtime') IS NULL
 	EXEC (N'CREATE LOGIN [orca_runtime] WITH PASSWORD = ''$(RUNTIME_PASSWORD)'', CHECK_POLICY = OFF');
@@ -53,7 +77,7 @@ EXEC (N'ALTER USER [orca_runtime] WITH DEFAULT_SCHEMA = [runtime]');
 GO
 
 -- ---------------------------------------------------------------------------
--- orca-edge — the hardware boundary (§C3)
+-- orca-edge — talks to the hardware: the capture buffer, device state, commands
 -- ---------------------------------------------------------------------------
 IF SUSER_ID(N'orca_edge') IS NULL
 	EXEC (N'CREATE LOGIN [orca_edge] WITH PASSWORD = ''$(EDGE_PASSWORD)'', CHECK_POLICY = OFF');
@@ -68,7 +92,8 @@ EXEC (N'ALTER USER [orca_edge] WITH DEFAULT_SCHEMA = [edge]');
 GO
 
 -- ---------------------------------------------------------------------------
--- orca-portal — carriers and drivers (§C4)
+-- orca-portal — hauliers, drivers, bookings. An empty skeleton until the hosted
+-- cloud tier is built out; the schema and login exist so it can boot
 -- ---------------------------------------------------------------------------
 IF SUSER_ID(N'orca_portal') IS NULL
 	EXEC (N'CREATE LOGIN [orca_portal] WITH PASSWORD = ''$(PORTAL_PASSWORD)'', CHECK_POLICY = OFF');
@@ -83,7 +108,8 @@ EXEC (N'ALTER USER [orca_portal] WITH DEFAULT_SCHEMA = [portal]');
 GO
 
 -- ---------------------------------------------------------------------------
--- orca-sync — replication (§C5)
+-- orca-sync — replication between a site and the hosted tier. An empty skeleton
+-- until the hosted cloud tier is built out
 -- ---------------------------------------------------------------------------
 IF SUSER_ID(N'orca_sync') IS NULL
 	EXEC (N'CREATE LOGIN [orca_sync] WITH PASSWORD = ''$(SYNC_PASSWORD)'', CHECK_POLICY = OFF');
@@ -98,7 +124,8 @@ EXEC (N'ALTER USER [orca_sync] WITH DEFAULT_SCHEMA = [sync]');
 GO
 
 -- ---------------------------------------------------------------------------
--- orca-fleet — licences and releases (§C6). Cloud only; never at a site.
+-- orca-fleet — licence issuance and software releases. Runs in the cloud only,
+-- never at a customer site. An empty skeleton until that tier is built out
 -- ---------------------------------------------------------------------------
 IF SUSER_ID(N'orca_fleet') IS NULL
 	EXEC (N'CREATE LOGIN [orca_fleet] WITH PASSWORD = ''$(FLEET_PASSWORD)'', CHECK_POLICY = OFF');
@@ -113,12 +140,16 @@ EXEC (N'ALTER USER [orca_fleet] WITH DEFAULT_SCHEMA = [fleet]');
 GO
 
 -- ---------------------------------------------------------------------------
--- media — the telephony engine's own tables (§B5, §C7)
+-- media — the telephony engine's own tables. Video and intercom at the gate.
 --
--- NOT an ORCA application schema and NOT a Gradle module. No ORCA migration
--- writes here, no ORCA code reads it, and it carries no ORCA retention rule.
--- The login exists so that the engine connects as itself and is confined like
--- every other principal.
+-- ⚠️ NOT one of this platform's schemas, and not a module of this repository. No
+-- migration in this repository writes here, no code here reads it, and it carries
+-- none of this platform's retention rules. The engine manages its own tables in
+-- its own format.
+--
+-- The login exists for one reason: so that the engine connects as itself and is
+-- confined exactly like every other principal, rather than connecting as an
+-- administrator because nobody made it an account.
 -- ---------------------------------------------------------------------------
 IF SUSER_ID(N'orca_media') IS NULL
 	EXEC (N'CREATE LOGIN [orca_media] WITH PASSWORD = ''$(MEDIA_PASSWORD)'', CHECK_POLICY = OFF');

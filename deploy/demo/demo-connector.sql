@@ -1,12 +1,15 @@
--- ORCA demo data, part two — the connector the demo process calls, and how its
--- answers are routed.
+-- Demo data, part two: the customer system the demo process calls out to, and
+-- what its answers are taken to mean.
 --
--- Separate from demo-site.sql, and run as a DIFFERENT LOGIN, because these rows
--- live in the `runtime` schema and `orca_core` cannot write it. That is ADR-004
--- working rather than an inconvenience: if one seed script could write both, the
--- database would not be enforcing the confinement `verify-isolation.sh` asserts.
+-- ⚠️ WHY THIS IS A SEPARATE FILE FROM demo-site.sql, RUN AS A DIFFERENT LOGIN
+-- These rows live in the gate service's schema, and the configuration service's
+-- login has no permission to write there. That is the platform's data-ownership
+-- boundary working exactly as designed, not an inconvenience to be worked around:
+-- if a single script could write both schemas, the database would not be
+-- enforcing the confinement that deploy/verify-isolation.sh goes on to assert.
 --
--- Idempotent: re-running changes nothing but the endpoint, which follows .env.
+-- Re-running changes nothing except the endpoint address, which follows whatever
+-- the deployment's environment file currently says.
 
 SET NOCOUNT ON;
 GO
@@ -18,14 +21,18 @@ GO
 USE [orca];
 GO
 
--- The Terminal Operating System, as far as the demo is concerned: the WireMock
--- stub in deploy/stubs/tos. The URL comes in from seed.sh so that .env stays the
--- one place the port is written down.
+-- The customer's terminal operating system — the software that knows which
+-- containers may be collected — as far as this demo is concerned: a canned-answer
+-- stub under deploy/stubs/tos.
 --
--- ⚠️ `deadline_ms` is a LOCAL value. §B8 requires a deadline and says nothing
--- about its size, and it should not: a terminal operating system that is
--- routinely slow at shift change and one that never is want different numbers,
--- and choosing belongs to whoever runs the site.
+-- Its address is passed in by deploy/demo/seed.sh so that the deployment's
+-- environment file stays the one place the port is written down.
+--
+-- ⚠️ THE DEADLINE IS A LOCAL CHOICE, NOT A PLATFORM CONSTANT. Every external call
+-- in this platform must HAVE a deadline; nothing anywhere says how long it should
+-- be, and nothing should. A terminal operating system that goes slow at shift
+-- change and one that never does want different numbers, and picking belongs to
+-- whoever runs the site.
 IF NOT EXISTS (SELECT 1 FROM runtime.connector_config
                WHERE site_external_id = N'SITE-DEMO' AND connector_name = N'tos')
 	INSERT INTO runtime.connector_config
@@ -37,14 +44,17 @@ UPDATE runtime.connector_config SET base_url = N'$(tosUrl)'
 WHERE site_external_id = N'SITE-DEMO' AND connector_name = N'tos' AND base_url <> N'$(tosUrl)';
 GO
 
--- HTTP status -> the branch discriminator the process routes on.
+-- What each answer from that system means, as a word the process can branch on.
 --
--- 200 is the ONLY row here, deliberately. `gate-visit`'s gateway sends APPROVED
--- to the barrier and everything else to a human, and a site that wants 409 to mean
--- something other than "a human looks at it" adds a row — it does not get code
--- changed. A status with no row becomes `HTTP_<status>`, which no branch matches,
--- so the default flow takes it to a human: an answer nobody wrote a branch for
--- must never become an implicit approval.
+-- ⚠️ ONE ROW, AND ONLY ONE, ON PURPOSE. The demo process sends APPROVED to the
+-- barrier and everything else to a human. A site that wants 409 to mean something
+-- other than "a person looks at it" ADDS A ROW HERE; it does not wait for a code
+-- change. That is the whole reason this mapping is data.
+--
+-- A status with no row becomes the literal word `HTTP_<status>` — HTTP_503, say —
+-- which no branch matches, so the process takes its default path to a human. An
+-- answer nobody wrote a branch for must never become an implicit approval and
+-- lift a barrier.
 IF NOT EXISTS (SELECT 1 FROM runtime.connector_route
                WHERE site_external_id = N'SITE-DEMO' AND connector_name = N'tos' AND http_status = 200)
 	INSERT INTO runtime.connector_route (site_external_id, connector_name, http_status, outcome)

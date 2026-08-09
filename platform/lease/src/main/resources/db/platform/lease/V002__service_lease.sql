@@ -1,36 +1,61 @@
--- P2 · The fenced coordination lease.
+-- The lease: how the platform makes sure that only one instance at a time does
+-- something only one instance should do.
 --
--- One per service schema, in the owning service's own schema — `core`,
--- `runtime`, `edge`, `portal`, `sync` and `fleet` — because a service can reach
--- only its own schema by credential, so a single shared lease table would not be
--- writable by the services that must write it (§C2).
+-- WHAT PROBLEM THIS SOLVES
+-- This platform runs several instances of a service at once, and some jobs must
+-- not run twice — sweeping old rows, draining a queue, owning a particular lane.
+-- An instance takes a lease before doing such work, renews it while working, and
+-- loses it if it stalls.
 --
--- The six near-identical copies are a KNOWN COST of ADR-004, not an oversight:
--- the ADR says so in as many words ("coordination state is duplicated per
--- schema"), and the open-questions register carries it as item S2. It is not
--- resolved here.
+-- ⚠️ THE HARD PART IS NOT WHO GETS THE LEASE. IT IS WHAT HAPPENS TO A HOLDER THAT
+-- STALLED. A process paused long enough for its lease to expire does not know it
+-- has stopped being the owner, and will happily finish the write it began. You
+-- cannot guarantee that a stalled process is dead — so this design does not try.
+-- It guarantees that its writes are REFUSED, using the fence token below.
+--
+-- WHERE THIS FILE ACTUALLY RUNS
+-- Once per service, in that service's own schema. Every service has its own copy,
+-- because each service's database login can reach only its own schema — a single
+-- shared lease table would not be writable by the services that have to write it.
+--
+-- Those near-identical copies are a known and accepted cost of giving each
+-- service its own schema in one database, not an oversight. That trade was made
+-- deliberately and is written down as a cost of the decision: coordination state
+-- is duplicated per schema. Whether it should stay that way is still an open
+-- question, and it is not settled here.
 
 CREATE TABLE service_lease (
-	-- The natural key. Per-client, per-site-pair and per-lane scope RIDES IN
-	-- `lease_name` — which is how one mechanism covers a retention job, a feed
-	-- reader and a per-lane owner election alike
-	-- (e.g. 'edge.ingest:lane:<lane_id>').
+	-- What is being leased: the service, and a name within it. There is no third
+	-- column for "which lane" or "which pair of sites" — that detail is part of
+	-- the NAME, written into it by the caller, as in 'edge.ingest:lane:47'.
+	--
+	-- That is what lets one mechanism cover things as different as a nightly
+	-- retention sweep, a replication feed reader, and an election for who owns one
+	-- particular lane. A column per kind of scope would have meant a new column
+	-- every time a new kind of thing needed leasing.
 	service      VARCHAR(60)   NOT NULL,
 	lease_name   VARCHAR(200)  NOT NULL,
 
 	-- The instance identity currently holding it.
 	holder_id    VARCHAR(200)  NOT NULL,
 
-	-- Increments on EVERY acquisition, and is verified INSIDE the claim
-	-- statement, never in a preceding check. A holder presents its token with
-	-- any write the lease protects; a stale token is refused. You cannot
-	-- guarantee a stalled process is dead — you can guarantee its writes are
-	-- refused.
+	-- ⚠️ THE COLUMN THAT MAKES THE WHOLE MECHANISM SAFE. It goes up by one on
+	-- EVERY acquisition, so a new holder always has a higher number than the one
+	-- before it.
+	--
+	-- A holder presents its token with every write the lease protects, and the
+	-- check happens INSIDE that write's own statement — never as a separate
+	-- question asked beforehand. Asking first and writing after leaves a gap
+	-- between the two in which the lease can be lost, which is the exact defect
+	-- this exists to remove. A write arriving with a token lower than the current
+	-- one is refused by the database, so a stalled process that wakes up and
+	-- finishes its work changes nothing.
 	fence_token  BIGINT        NOT NULL,
 
-	-- All three are the DATABASE's clock. Every expiry comparison happens
-	-- server-side inside the guarded UPDATE, so two hosts with disagreeing
-	-- clocks cannot disagree about who holds the lease (§D3, Time).
+	-- All three timestamps are the DATABASE's clock, and every comparison against
+	-- an expiry happens inside the guarded update on the server. Two machines with
+	-- clocks that disagree therefore cannot disagree about who holds a lease —
+	-- neither of their clocks is consulted.
 	acquired_at  DATETIME2(3)  NOT NULL,
 	renewed_at   DATETIME2(3)  NOT NULL,
 	expires_at   DATETIME2(3)  NOT NULL,
@@ -39,22 +64,29 @@ CREATE TABLE service_lease (
 	CONSTRAINT ck_service_lease_fence_token CHECK (fence_token > 0)
 );
 
--- What this table DELIBERATELY LACKS, and why (§C2):
+-- WHAT THIS TABLE DELIBERATELY DOES NOT HAVE. Every other table in this platform
+-- carries most of these, so their absence here is a decision rather than an
+-- omission:
 --
---   site_id and any row-level-security policy — this is process-coordination
---     state, not tenant data. Every holder runs under the system context.
+--   No site column and no access-scoping. This is coordination between processes,
+--     not anybody's data. Whoever holds a lease is a background job running under
+--     a system identity, not a person at a console.
 --
---   the audit quartet — holder_id with the three timestamps IS the record.
+--   No created-by / modified-by / created-at / modified-at set. The holder's
+--     identity plus the three timestamps above ARE the record of who has it and
+--     since when; a second audit set would say the same thing again, differently.
 --
---   soft delete — a lease is released by expiry or by the next acquisition with
---     a higher token. A `deleted_at` would be a second way to get check-then-act
---     wrong on the one table whose entire purpose is to make check-then-act
---     impossible.
+--   No soft delete. A lease is released by expiring, or by the next acquisition
+--     taking it with a higher token. A "deleted" flag would be one more thing to
+--     check before acting — on the one table whose entire purpose is to make
+--     check-then-act impossible.
 --
---   external_id, partitioning, a retention class — none applies.
+--   No external identifier, no partitioning, no retention class. None applies to
+--     a table with one row per thing being coordinated.
 --
--- Nothing here states a lease DURATION, a renewal interval or a clock-skew
--- allowance. Those are profile configuration that must be set explicitly, and a
--- service refuses to start when either is unset or when expiry <= the renewal
--- interval. That startup validation is the specification; this file asserts no
--- number, and neither does the architecture.
+-- AND WHAT IT DELIBERATELY DOES NOT DECIDE
+-- No lease duration, no renewal interval, no allowance for clock skew appears
+-- anywhere in this file. Those are configuration, set per deployment, and a
+-- service REFUSES TO START when either is unset or when the expiry is not longer
+-- than the renewal interval. That startup check is where the rule lives; putting
+-- a number here would make it look settled when it is not.

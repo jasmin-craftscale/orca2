@@ -1,54 +1,69 @@
 -- ============================================================================
--- Adopting a database that let the Flowable engine migrate itself.
+-- Repairs a development database on which the workflow engine created its own
+-- tables before this system took charge of them.
 --
--- RUN AS THE SERVICE'S OWN LOGIN (orca_runtime), NEVER AS sa. The script works
--- on SCHEMA_NAME() — the executing login's default schema — so the database
--- itself is what stops it touching a schema that is not runtime's (ADR-004).
--- That is not a nicety: this script DROPS tables.
+-- ⚠️ RUN IT AS THE GATE SERVICE'S OWN LOGIN, `orca_runtime`, NEVER AS AN
+-- ADMINISTRATOR. THIS SCRIPT DROPS TABLES.
+--
+-- Everything it touches is found through the executing login's DEFAULT SCHEMA
+-- rather than a schema written into the file. Run as the service, the database
+-- itself is what makes it impossible to touch anybody else's schema — the same
+-- confinement that keeps each service inside its own. Run as an administrator,
+-- that protection is simply gone, and the only thing standing between the script
+-- and the wrong schema is whoever typed the command.
+--
+-- The procedure around this file, including how to run it, is
+-- docs/flowable-adoption.md.
 --
 -- ----------------------------------------------------------------------------
--- The situation it exists for
+-- THE SITUATION IT EXISTS FOR
 --
--- Phase 0 shipped `flowable.database-schema-update: true`. On such a database
--- the engine created its own ACT_*/FLW_* tables and Flyway knows nothing about
--- them. WP3 put those 45 tables under Flyway as V110–V114, so the next start
--- runs V110 and fails:
+-- The workflow engine can build its own tables on startup, and early on it was
+-- configured to. On a database where that happened, 45 engine tables exist and
+-- the migration tool knows nothing about them. Those same 45 tables are now
+-- defined as migrations of ours, so the next startup tries to create the first of
+-- them and fails:
 --
 --     There is already an object named 'ACT_GE_PROPERTY' in the database.
 --
--- phase-1-report.md §7.4 records this happening on a developer machine during
--- the demo, where it was cleared by hand. This is that clearing, written down,
--- guarded, and tested.
+-- This happened on a developer's machine during a demonstration and was cleared
+-- by hand under time pressure. This file is that clearing — written down,
+-- guarded, and covered by a test that runs this script rather than a copy of it.
 --
 -- ----------------------------------------------------------------------------
--- What it does, and what it deliberately REFUSES to do
+-- WHAT IT DOES, AND WHAT IT DELIBERATELY REFUSES TO DO
 --
--- It adopts BY REBUILD: it verifies the engine schema holds no process data,
--- drops the engine-created objects, and lets Flyway build them from V110–V114
--- on the next start. No schema-history surgery, no checksums written by hand,
--- nothing that depends on a Flyway internal.
+-- It adopts BY REBUILD: it checks that the engine's schema holds no process data,
+-- drops the engine-created objects, and lets the ordinary migration run rebuild
+-- them on the next startup. There is no editing of migration history, no
+-- hand-written checksums, and nothing that depends on an internal detail of the
+-- migration tool — all of which would work today and break on an upgrade.
 --
--- It REFUSES, loudly and without changing anything, when:
+-- ⚠️ IT REFUSES, LOUDLY AND WITHOUT CHANGING ANYTHING, IN TWO CASES:
 --
---   * the engine schema holds live or historic process data. Dropping then
---     would destroy running visits and the audit trail behind completed ones,
---     and a data-preserving adoption is a different and larger operation —
---     see `docs/flowable-adoption.md` §4, which states what it would need and
---     why it is NOT built here.
---   * the engine tables were built by a Flowable version other than the one
---     V110–V114 were extracted from. The tables would then not be what those
---     migrations build, and rebuilding would silently change the schema under
---     an engine that has been running on the other one.
+--   * The engine's schema holds process data — running or finished. Dropping then
+--     would destroy visits currently in progress and the audit trail behind
+--     completed ones. An adoption that PRESERVES data is a different and much
+--     larger operation; docs/flowable-adoption.md states what it would need and
+--     why it is not built here.
+--   * The tables were built by a different version of the engine from the one our
+--     migrations were extracted from. The existing tables would then not be what
+--     those migrations build, and rebuilding would silently change the schema
+--     underneath an engine that has been running against the other shape. That is
+--     a migration between versions, and this script will not guess at one.
 --
--- A refusal is a RAISERROR with severity 16, so sqlcmd -b stops and the
--- operator sees which precondition failed rather than a half-done schema.
+-- A refusal raises an error at a severity that stops the command-line tool, so an
+-- operator sees exactly which precondition failed instead of a half-dropped
+-- schema and a zero exit code.
 -- ============================================================================
 
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
 DECLARE @schema sysname = SCHEMA_NAME();
-DECLARE @expectedVersion nvarchar(64) = N'8.0.0.0';  -- V110's extraction source
+-- The engine version our own migrations were extracted from. If the tables in
+-- front of us were built by a different one, this script stops.
+DECLARE @expectedVersion nvarchar(64) = N'8.0.0.0';
 
 PRINT N'Flowable adoption: inspecting schema [' + @schema + N']';
 
@@ -58,9 +73,14 @@ PRINT N'Flowable adoption: inspecting schema [' + @schema + N']';
 
 IF OBJECT_ID(QUOTENAME(@schema) + N'.ACT_GE_PROPERTY', 'U') IS NULL
 BEGIN
-	-- No property table. Either there is nothing here at all, or — worse — engine
-	-- tables exist WITHOUT the one that carries the version marker. The second is
-	-- an unrecognisable state, and a script that drops tables does not proceed
+	-- The engine's property table is missing. That means one of two things: this
+	-- schema has no engine tables at all — nothing to adopt, which is the normal
+	-- case on a fresh installation — or, far worse, engine tables exist WITHOUT
+	-- the one that carries the version marker.
+	--
+	-- The second is a state the engine's own self-migration cannot produce, so
+	-- something else made it, and nothing here can establish either the version or
+	-- whether the schema is complete. A script that drops tables does not proceed
 	-- through a state it cannot recognise.
 	DECLARE @strays int = (SELECT COUNT(*) FROM sys.tables t
 		WHERE t.schema_id = SCHEMA_ID(@schema)
@@ -76,8 +96,10 @@ BEGIN
 	RETURN;
 END
 
--- Already under Flyway? Then this has been done, or the schema was built by
--- V110–V114 in the first place. Either way, do not touch it.
+-- Are the engine tables already recorded in the migration history? Then either
+-- this adoption has already been run, or the tables were built by our own
+-- migrations from the start. Either way there is nothing to do, and dropping them
+-- would be destroying a correctly built schema.
 IF OBJECT_ID(QUOTENAME(@schema) + N'.flyway_schema_history', 'U') IS NOT NULL
    AND EXISTS (SELECT 1 FROM sys.objects o
                WHERE o.object_id = OBJECT_ID(QUOTENAME(@schema) + N'.flyway_schema_history'))
@@ -95,13 +117,15 @@ BEGIN
 END
 
 -- --------------------------------------------------------------------------
--- 2 · Refuse unless the engine that built these tables is the one we extracted
+-- 2 · Refuse unless these tables were built by the engine version our own
+--     migrations were extracted from.
 -- --------------------------------------------------------------------------
 --
--- ACT_GE_PROPERTY carries the engine's own schema-version markers. If they do
--- not say 8.0.0.0, these tables are not what V110–V114 build, and rebuilding
--- would change the schema under an engine that has been running against the
--- other one. That is a migration, not an adoption.
+-- The engine records its own schema version in its property table. If it does not
+-- match, these tables are not the tables our migrations build — so rebuilding
+-- them would silently change the schema underneath an engine that has been
+-- running against the other shape. That is a version migration, and this script
+-- will not guess at one.
 
 DECLARE @foundVersion nvarchar(300);
 DECLARE @versionSql nvarchar(max) = N'SELECT @v = VALUE_ FROM '
@@ -121,10 +145,13 @@ PRINT N'  Engine schema version ' + @foundVersion + N' matches the extracted mig
 -- 3 · Refuse if there is process data. This is the safety property.
 -- --------------------------------------------------------------------------
 --
--- ACT_RU_EXECUTION is running work; ACT_HI_PROCINST is the history of finished
--- work. Both are dropped by step 4, so both are checked here. A gate with a
--- truck mid-visit is exactly the installation somebody would run this on in a
--- hurry.
+-- One of the engine's tables holds work currently in progress; the other holds
+-- the history of work already finished. Step 4 drops both, so both are counted
+-- here, and any row in either stops the script.
+--
+-- A gate with a truck sitting mid-visit is precisely the installation somebody
+-- would run this on in a hurry, which is why the check comes before the drop
+-- rather than being left to the operator's judgement.
 
 DECLARE @running bigint, @historic bigint;
 DECLARE @dataSql nvarchar(max) =
@@ -146,8 +173,20 @@ PRINT N'  No process data: 0 running executions, 0 historic process instances.';
 -- 4 · Drop the engine-created objects, foreign keys first
 -- --------------------------------------------------------------------------
 --
--- Generated from sys.tables rather than listed by name. A hand-written list is
--- a second copy of the 45 tables, and it is the copy nobody updates.
+-- The statements are generated by reading the database's own catalog rather than
+-- written out by name. A hand-written list would be a second copy of those 45
+-- table names, and it is always the copy nobody remembers to update.
+--
+-- Foreign keys are dropped first, and they have to be: the engine's tables
+-- reference one another, so dropping them in catalog order without removing the
+-- references first fails partway through and leaves the schema half-gone.
+--
+-- The whole batch runs in one transaction, and `XACT_ABORT` at the top of the
+-- file is what guarantees that any failure rolls the entire thing back. Half a
+-- dropped schema is the one outcome worse than not running at all.
+--
+-- The count afterwards is not decoration: it is the check that the generated
+-- statements actually removed everything they were supposed to.
 
 DECLARE @drop nvarchar(max) = N'';
 
