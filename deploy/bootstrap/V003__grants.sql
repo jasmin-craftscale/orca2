@@ -23,8 +23,8 @@
 --
 -- So the rule is: confinement comes from granting nothing, never from denying.
 -- And it is verified rather than assumed — the next bootstrap file checks it, and
--- deploy/verify-isolation.sh checks it again from outside by actually trying the
--- forbidden reads.
+-- deploy/bootstrap/verify-isolation.sh checks it again from outside, by actually
+-- attempting the forbidden reads.
 
 SET NOCOUNT ON;
 GO

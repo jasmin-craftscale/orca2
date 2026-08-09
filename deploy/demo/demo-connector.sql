@@ -6,7 +6,8 @@
 -- login has no permission to write there. That is the platform's data-ownership
 -- boundary working exactly as designed, not an inconvenience to be worked around:
 -- if a single script could write both schemas, the database would not be
--- enforcing the confinement that deploy/verify-isolation.sh goes on to assert.
+-- enforcing the confinement that deploy/bootstrap/verify-isolation.sh goes on to
+-- assert.
 --
 -- Re-running changes nothing except the endpoint address, which follows whatever
 -- the deployment's environment file currently says.

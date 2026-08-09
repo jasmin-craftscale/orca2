@@ -131,8 +131,8 @@ GO
 -- convenience clients for development, so there is no subject to write here yet.
 -- The walkthrough links whatever token it obtains to this row with a single,
 -- visible UPDATE — which is also the shortest demonstration of the operator
--- directory doing exactly the job it exists for. docs/phase-1-demo.md carries the
--- step.
+-- directory doing exactly the job it exists for. The exact step is written out in
+-- docs/phase-3-report.md, in its walkthrough of the live clerk loop.
 -- --------------------------------------------------------------------------
 IF NOT EXISTS (SELECT 1 FROM core.role WHERE external_id = N'rol-demo-clerk')
 	INSERT INTO core.role (external_id, name, description)
