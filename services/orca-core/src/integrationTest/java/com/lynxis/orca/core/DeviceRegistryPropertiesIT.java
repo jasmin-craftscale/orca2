@@ -229,7 +229,7 @@ class DeviceRegistryPropertiesIT {
 	@DisplayName("PTZ preset names are unique per device, in the database")
 	void presetNamesAreUnique() {
 		DeviceSummary device = inScope(() -> deviceApi.registerDevice("LANE-IT-01",
-				new RegisterDeviceRequest().name("PTZ").deviceTypeCode("PTZ_CAMERA"))
+				new RegisterDeviceRequest().name("PTZ").deviceTypeCode("AXIS_PTZ_CAMERA"))
 				.getBody().getData());
 		Long deviceId = core.queryForObject(
 				"SELECT device_id FROM device WHERE external_id = ?", Long.class, device.getExternalId());

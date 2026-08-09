@@ -65,11 +65,13 @@ class CatalogSeedPropertiesIT {
 	void theSeedIsByteStableAcrossCleanMigrations() {
 		String deviceTypes = "SELECT external_id, code, name FROM device_type ORDER BY device_type_id";
 		String portNames = "SELECT external_id, port_type, code, name FROM device_io_port_name ORDER BY port_name_id";
+		String deviceKinds = "SELECT external_id, port_type, code, name FROM io_device_kind ORDER BY io_device_kind_id";
 
 		JdbcTemplate first = new JdbcTemplate(owner);
 		List<Map<String, Object>> entitlementsFirst = first.queryForList(CATALOG_ROWS);
 		List<Map<String, Object>> typesFirst = first.queryForList(deviceTypes);
 		List<Map<String, Object>> portsFirst = first.queryForList(portNames);
+		List<Map<String, Object>> kindsFirst = first.queryForList(deviceKinds);
 
 		// A second clean database: migratedSchema drops everything and re-runs
 		// V100 onward from nothing. If any UUID were minted at migration time
@@ -83,13 +85,45 @@ class CatalogSeedPropertiesIT {
 				.isEqualTo(entitlementsFirst)
 				.hasSize(174);
 		assertThat(second.queryForList(deviceTypes))
-				.as("the WP3 device-type catalog is pinned the same way")
+				.as("the device-type catalog is pinned the same way — complete at 16 since V108 (Phase 3 WP0)")
 				.isEqualTo(typesFirst)
-				.hasSize(12);
+				.hasSize(16);
 		assertThat(second.queryForList(portNames))
-				.as("and the port-name catalog — 36 of 40, the four unextracted audio names excluded")
+				.as("and the port-name catalog — complete at 40 since V108 seeded the five Audio rows")
 				.isEqualTo(portsFirst)
-				.hasSize(36);
+				.hasSize(40);
+		assertThat(second.queryForList(deviceKinds))
+				.as("and io_device_kind — seeded empty by V106, complete at 19 since V108")
+				.isEqualTo(kindsFirst)
+				.hasSize(19);
+	}
+
+	@Test
+	@DisplayName("WP0 closed the seeded gaps: the three catalogs are complete and the provisional PTZ codes are the 1.x-exact ones")
+	void theDeviceCatalogsAreComplete() {
+		JdbcTemplate core = new JdbcTemplate(owner);
+
+		assertThat(core.queryForObject("SELECT COUNT(*) FROM io_device_kind", Long.class)).isEqualTo(19);
+		assertThat(core.queryForObject("SELECT COUNT(*) FROM device_io_port_name", Long.class)).isEqualTo(40);
+		assertThat(core.queryForObject("SELECT COUNT(*) FROM device_type", Long.class)).isEqualTo(16);
+
+		// The V106 provisional codes are gone, corrected in place by V108 — the
+		// external id followed the code, because the code is the identity (rule 7).
+		assertThat(core.queryForList("SELECT code FROM device_type WHERE code IN "
+				+ "('PTZ_CAMERA', 'PELCO_CAMERA', 'MILESIGHT_CAMERA')", String.class))
+				.as("the provisional codes must not survive V108")
+				.isEmpty();
+		assertThat(core.queryForObject("SELECT external_id FROM device_type WHERE code = 'AXIS_PTZ_CAMERA'",
+				String.class))
+				.as("the corrected row carries the UUID its code always mints in the catalog namespace")
+				.isEqualTo("06d4788b-de8e-5d8c-a7b8-6389bd99841e");
+
+		// The port-name/io-device-kind naming drift the sheet flags (1.x 'FrontMic'
+		// vs 'Front Mic') is unified: the audio kinds and the audio port names
+		// agree on display names where both catalogs carry the same concept.
+		assertThat(core.queryForList("SELECT name FROM io_device_kind WHERE code IN "
+				+ "('FRONT_MIC', 'FRONT_SPEAKER', 'REAR_SPEAKER') ORDER BY code", String.class))
+				.containsExactly("Front Mic", "Front Speaker", "Rear Speaker");
 	}
 
 	@Test
