@@ -25,10 +25,10 @@ import lombok.RequiredArgsConstructor;
  * scope column is the site it maps the role to, so a mapping outside the
  * caller's site scope can be neither written nor read. See {@link IdentityTables}.
  *
- * <p>Replacing a grant set or a site scope retires the old rows and inserts the
- * new (§D3 — retired, never removed; the filtered unique indexes admit a fresh
- * grant after a revoked one). The retired rows are the grant history, bounded by
- * admin activity.
+ * <p>Replacing a grant set or site scope retires the old rows and inserts new
+ * ones. Ordinary records are retired rather than removed, and filtered unique
+ * indexes admit a fresh grant after a revoked one. The retired rows are the grant
+ * history, bounded by administrator activity.
  */
 @RequiredArgsConstructor
 public class RoleRepository {

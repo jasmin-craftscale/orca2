@@ -26,7 +26,7 @@ public final class TeamTables {
 	/**
 	 * A clerk team at a site.
 	 *
-	 * @param handlingMethod {@code PUSH} or {@code PROMPT} (§C1) — one casing,
+	 * @param handlingMethod {@code PUSH} or {@code PROMPT} — one casing,
 	 *                       checked by the database; 1.x's two-row lookup table
 	 *                       with random UUIDs did not port
 	 */

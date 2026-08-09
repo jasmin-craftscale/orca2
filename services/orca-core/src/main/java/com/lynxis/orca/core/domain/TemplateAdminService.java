@@ -21,7 +21,7 @@ import com.lynxis.orca.core.persistence.TeamRepository;
 import lombok.RequiredArgsConstructor;
 
 /**
- * The shift and break template catalogs (§C1).
+ * Manages the shift and break template catalogs.
  *
  * <p>The overnight/duration semantics live here, in one place: a shift whose
  * end is at or before its start crosses midnight, equal times are the 24-hour

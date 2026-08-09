@@ -95,8 +95,8 @@ public class SettingRepository {
 	 * Upserts the current value and APPENDS the change to history, in the
 	 * caller's transaction, and returns the value that was replaced.
 	 *
-	 * <p>Concurrency is handled here, not hoped away (review finding, Phase 2
-	 * addendum): the existing row is read under {@code UPDLOCK}
+	 * <p>Concurrency is handled here, not hoped away: a review found that the
+	 * existing row must be read under {@code UPDLOCK}
 	 * ({@code lockMatchedRows}), so two writers serialize and each history row
 	 * records the old value that was really replaced. The first-ever write has
 	 * no row to lock — two concurrent first writes both insert, the loser hits

@@ -14,20 +14,20 @@ import com.lynxis.orca.core.persistence.SettingRepository;
 import lombok.RequiredArgsConstructor;
 
 /**
- * §C1's settings, in its own words: a registry of known keys, validated
- * writes, history appended, secrets rejected.
+ * Manages a registry of known setting keys with validated writes, appended
+ * history and a hard refusal to store secrets.
  *
  * <p>The secret check runs BEFORE the registry lookup, deliberately: a
  * secret-shaped key must be refused as a secret even when it is also unknown,
  * because "unknown key" invites adding it to the registry and "secrets never
- * enter this table" is the rule that must not erode (sheet rule 8 — 1.x kept
- * Keycloak client secrets, SMTP passwords and VAPID keys in this table).
+ * enter this table" is the rule that must not erode. The legacy 1.x table held
+ * Keycloak client secrets, SMTP passwords and VAPID keys; this one must not.
  */
 @RequiredArgsConstructor
 public class SettingsService {
 
 	/**
-	 * The shapes of the 1.x keys rule 8 excludes: {@code *_CLIENT_SECRET},
+	 * The secret-shaped key families found in 1.x: {@code *_CLIENT_SECRET},
 	 * {@code CLUSTER_PASSWORD}, {@code SMTP_PASSWORD}, {@code AZURE_*_KEY},
 	 * {@code VAPID_PRIVATE_KEY} — generalised to the suffix families, so the
 	 * next secret-shaped key is refused without a list edit.

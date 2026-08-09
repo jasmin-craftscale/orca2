@@ -18,10 +18,9 @@ import com.lynxis.orca.core.persistence.WorkspaceRepository;
 import lombok.RequiredArgsConstructor;
 
 /**
- * The calling user's workspace (§C1): grid column preferences and saved
- * filters. Everything here is keyed off the token's subject — a caller can
- * reach exactly their own rows, which is the ownership check NEW-1a describes,
- * in its simplest on-site form.
+ * Manages the calling user's grid-column preferences and saved filters.
+ * Everything is keyed from the verified token's subject, so a caller can reach
+ * exactly their own rows; this is requester ownership rather than site tenancy.
  */
 @RequiredArgsConstructor
 public class WorkspaceService {
@@ -53,8 +52,8 @@ public class WorkspaceService {
 	/**
 	 * Replaces the caller's preferences for every listed grid in ONE
 	 * transaction — the PUT is atomic as the contract presents it, rather than
-	 * one transaction per grid with a failure leaving earlier grids applied
-	 * (review finding, Phase 2 addendum).
+	 * one transaction per grid with a failure leaving earlier grids applied. A
+	 * review found and removed that partial-application risk.
 	 */
 	@Transactional
 	public List<GridView> replacePreferences(List<GridReplacement> replacements) {

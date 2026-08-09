@@ -9,14 +9,13 @@ import com.lynxis.orca.platform.scope.table.PersistentTable;
  * The four tables {@code V101__world_model.sql} creates, declared where the build
  * check can read them.
  *
- * <p><strong>These are declarations, not a mapping layer.</strong> Nothing in
- * Phase 1 reads core's own tables from core's own Java — the slice reads the
- * published views from other services — so a repository or an entity here would
- * be a persistence design taken before anything needs one. What cannot wait is
- * the growth question: {@code RetentionClassRule} can only see a table that some
- * class declares, and §B10's guarantee is stated over <em>every</em> table that
- * grows with traffic. §C2 records that {@code execution} and
- * {@code execution_context} are how the current system came to miss two.
+ * <p><strong>These are declarations, not a mapping layer.</strong> They were added
+ * before core needed to read its own tables, so introducing repositories or JPA
+ * entities here would have taken a persistence decision prematurely. The growth
+ * question could not wait: {@code RetentionClassRule} can inspect only tables a
+ * class declares, and the current production system missed retention for
+ * {@code execution} and {@code execution_context} precisely because no enforced
+ * declaration made somebody answer that question.
  *
  * <p>All four are {@link Growth#BOUNDED} and therefore carry no retention class.
  * That is not a convenience: a row appears in one of these when an administrator
@@ -34,7 +33,7 @@ public final class WorldModelTables {
 	private WorldModelTables() {
 	}
 
-	/** A customer facility with gates. Exactly one per installation is primary (§C1). */
+	/** A customer facility with gates. Exactly one per installation is primary. */
 	@PersistentTable(name = "site", growth = Growth.BOUNDED)
 	public record Site(
 			long siteId,
@@ -61,9 +60,9 @@ public final class WorldModelTables {
 	/**
 	 * Where a truck is processed and where devices live.
 	 *
-	 * @param deviceHostUrl where this lane's .NET device host answers. Per lane
-	 *                      rather than per site, because the frozen contract (§D2)
-	 *                      is per lane
+	 * @param deviceHostUrl where this lane's .NET device host answers. It is per
+	 *                      lane rather than per site because the frozen device-host
+	 *                      contract addresses hosts by lane
 	 */
 	@PersistentTable(name = "lane", growth = Growth.BOUNDED)
 	public record Lane(
@@ -79,7 +78,7 @@ public final class WorldModelTables {
 			Instant createdAt) {
 	}
 
-	// The device record moved to DeviceTables when WP3 (V106) completed the
-	// registry: V101's provisional free-VARCHAR device_type was settled by the
+	// The device record moved to DeviceTables when V106 completed the registry:
+	// V101's provisional free-VARCHAR device_type was settled by the
 	// seeded catalog, and the table outgrew this file's slice-sized shape.
 }

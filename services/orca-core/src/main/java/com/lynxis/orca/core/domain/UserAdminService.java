@@ -16,7 +16,7 @@ import com.lynxis.orca.core.persistence.UserAccountRepository.UserPatch;
 import lombok.RequiredArgsConstructor;
 
 /**
- * User management (§C1): the directory, creation, and patching.
+ * Manages the user directory, account creation and profile patching.
  *
  * <p>Exactly one role per user is held by the schema; this service's part of
  * that invariant is refusing a role that does not exist or is retired, with a

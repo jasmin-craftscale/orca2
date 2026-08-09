@@ -14,9 +14,9 @@ import com.lynxis.orca.core.persistence.SiteDirectoryRepository;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Site branding and localization — the narrow slice of §C1's
- * {@code PATCH /sites/{id}} this phase owns (colors and languages; full site
- * CRUD is not in Phase 2's scope and is recorded as absent, not implied).
+ * Site branding and localization: the colors-and-languages slice of
+ * {@code PATCH /sites/{id}}. Full site CRUD is not implemented and must not be
+ * inferred from this narrower operation.
  *
  * <p>Hex values are normalized here to {@code #RRGGBBAA} — 1.x mixed 6- and
  * 8-digit values; the CHECK constraint holds the invariant and this is the one

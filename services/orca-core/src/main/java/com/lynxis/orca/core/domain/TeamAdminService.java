@@ -23,7 +23,7 @@ import com.lynxis.orca.core.persistence.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Team management (§C1): members, handling method, shift & break templates.
+ * Manages teams, their members, handling method, and shift/break templates.
  *
  * <p>Membership is declarative — the request's set replaces the stored set —
  * and every reference is validated to a typed refusal: the site against the

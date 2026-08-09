@@ -7,8 +7,8 @@ import com.lynxis.orca.platform.scope.table.PersistentTable;
 import com.lynxis.orca.platform.scope.table.RetentionClass;
 
 /**
- * The settings tables of {@code V107__settings_workspace_audit.sql} — §C1's
- * registry of known keys, the current values, and the appended history.
+ * The settings tables of {@code V107__settings_workspace_audit.sql}: the registry
+ * of known keys, current values and append-only history.
  * Declarations for the build check; never {@code @Entity}.
  */
 public final class SettingsTables {
