@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  WP4 · a probe, not a product process.
+  A probe, not a product process.
 
-  The phase plan asks for "error boundary + timer on each service task". The error
-  boundary is straightforward. The timer is a question about the engine that
+  The error boundary required around a service task is straightforward. Whether
+  its boundary timer can fire is a question about the engine that
   cannot be answered from a document: does a boundary timer on a SERVICE TASK ever
   fire, given the task runs to completion inside one transaction?
 
   This process is the experiment. A one-second boundary timer on a service task
   whose delegate blocks for four. Whatever the engine does with it is recorded in
-  GateVisitProcessIT and in the phase report — reported, not worked around.
+  GateVisitProcessIT — observed and reported, not worked around.
 -->
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
              xmlns:flowable="http://flowable.org/bpmn"

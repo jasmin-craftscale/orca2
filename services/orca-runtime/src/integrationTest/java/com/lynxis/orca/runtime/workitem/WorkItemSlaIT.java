@@ -38,14 +38,11 @@ import com.lynxis.orca.runtime.workitem.domain.WorkItemService;
 import com.sun.net.httpserver.HttpServer;
 
 /**
- * <strong>Phase 3 WP3 · the SLA is a REAL engine timer — the inversion that
- * matters most, proven by firing it.</strong>
+ * <strong>Proves by firing it that the SLA is a real engine timer.</strong>
  *
- * <p>The phase's load-bearing technical claim: a boundary timer on the
- * manual-input <em>wait state</em> fires, where the Phase 1 service-task timer
- * (§7.1) could not — the wait state genuinely parks, so the timer job is
- * committed and visible to the async executor. If these tests cannot be made to
- * pass, the phase stops and reports (plan §5).
+ * <p>A boundary timer on the manual-input <em>wait state</em> fires, where a timer
+ * attached to a synchronous service task could not: the wait state genuinely
+ * parks, so the timer job is committed and visible to the async executor.
  *
  * <ul>
  *   <li><strong>It fires</strong>: an item left past its threshold gets
@@ -53,8 +50,7 @@ import com.sun.net.httpserver.HttpServer;
  *       breach branch does NOT close the visit or disturb the item.</li>
  *   <li><strong>It survives a restart and fires once</strong>: the timer is
  *       engine state in the database; the instance that armed it dies, a
- *       different instance fires it — §B10's "a timer survives a restart",
- *       now for SLA.</li>
+ *       different instance fires it, proving the SLA survives a restart.</li>
  *   <li><strong>It does not fire falsely</strong>: an item completed inside its
  *       threshold never breaches, and the timer job dies with the task.</li>
  * </ul>
@@ -133,8 +129,8 @@ class WorkItemSlaIT {
 			String visit = admitThrough(app);
 			String item = awaitQueuedItem(visit);
 
-			// The engine holds a REAL timer job for the instance — the thing §7.1
-			// proved a service task can never expose.
+			// The engine holds a REAL timer job for the instance, which a synchronous
+			// service task can never expose outside its transaction.
 			assertThat(count("SELECT COUNT(*) FROM ACT_RU_TIMER_JOB"))
 					.as("a committed timer job, visible outside the transaction that armed it "
 							+ "— the precondition §7.1's service-task case could never meet")

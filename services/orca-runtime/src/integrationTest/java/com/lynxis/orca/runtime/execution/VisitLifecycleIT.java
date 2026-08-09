@@ -43,9 +43,9 @@ import com.lynxis.orca.runtime.execution.domain.VisitCompletion;
 import com.sun.net.httpserver.HttpServer;
 
 /**
- * <strong>WP7 · one truck, end to end, and the transaction that closes it.</strong>
+ * <strong>Runs one truck end to end and proves the transaction that closes it.</strong>
  *
- * <p>This is §B9's whole sequence with nothing stubbed inside the platform: a
+ * <p>Nothing inside the platform is stubbed: a
  * device event arrives over HTTP, admission starts {@code gate-visit}, the real
  * {@link com.lynxis.orca.runtime.integration.domain.RestConnector} calls a real
  * socket, the real {@link com.lynxis.orca.runtime.execution.persistence.EdgeDeviceCommandClient}
@@ -69,13 +69,13 @@ import com.sun.net.httpserver.HttpServer;
 				"spring.flyway.default-schema=" + VisitLifecycleIT.SCHEMA,
 				"orca.required-views=",
 				// ON. Both service tasks are flowable:async="true" precisely so that no
-				// outbound call happens inside admission's transaction (§B9), which means
+				// outbound call happens inside admission's transaction, which means
 				// nothing advances at all without a worker.
 				"flowable.async-executor-activate=true",
 				"orca.installation.site-external-id=" + VisitLifecycleIT.SITE,
 				"orca.internal.shared-credential=integration-test-credential-not-a-fixture",
 				// The relay runs, and has nothing to deliver: no consumer is registered.
-				// That is the honest Phase 1 state and the fact is still recorded.
+				// That is the current on-site state and the fact is still recorded.
 				"orca.outbox.relay.interval=500ms",
 		})
 // Same reason as GateVisitProcessIT: this suite runs the async executor, and every
@@ -169,7 +169,7 @@ class VisitLifecycleIT {
 		jdbc.execute("DELETE FROM connector_route");
 		jdbc.execute("DELETE FROM connector_config");
 
-		// Connector configuration as data, not as code (§C2): the endpoint, the
+		// Connector configuration is data rather than code: the endpoint, the
 		// deadline and the status routing are all rows.
 		jdbc.update("INSERT INTO connector_config (site_external_id, connector_name, base_url, "
 						+ "request_path, deadline_ms, is_enabled) VALUES (?, 'tos', ?, '/tos/v1/visits', ?, 1)",
@@ -211,7 +211,7 @@ class VisitLifecycleIT {
 				// field being quietly dropped again.
 				.contains("\"deviceExternalId\":\"DEV-DEMO-BARRIER\"");
 
-		// The fact, in the visit's own transaction. §D3: save the thing then tell
+		// The fact is recorded in the visit's own transaction. Saving the thing and then telling
 		// somebody fails in two directions and neither is detectable.
 		assertThat(jdbc.queryForList(
 				"SELECT ordering_key, event_type, payload FROM outbox ORDER BY publish_seq"))
@@ -225,7 +225,7 @@ class VisitLifecycleIT {
 					assertThat(row.get("payload").toString()).contains(visit).contains("T-DEMO");
 				});
 
-		// ⚠️ Zero delivery rows, and that is the honest Phase 1 state rather than a
+		// ⚠️ Zero delivery rows is the current on-site state rather than a
 		// bug: orca.outbox.consumers is empty because nothing on-site consumes this.
 		assertThat(count("SELECT COUNT(*) FROM outbox_delivery"))
 				.as("the fact is RECORDED; delivery arrives with a destination")
@@ -238,7 +238,7 @@ class VisitLifecycleIT {
 	void anUnmappedConnectorStatusReachesAHumanAndCommandsNothing() {
 		// 409 has no connector_route row, so the outcome token is HTTP_409, which no
 		// branch matches — and gate-visit's default flow takes it to a human. Since
-		// Phase 3 "to a human" means: the process PARKS and a work item queues in
+		// "To a human" means the process PARKS and a work item queues in
 		// the same transaction; the visit stays ACTIVE, because the truck is still
 		// physically standing at the gate.
 		tosStatus.set(409);
@@ -273,7 +273,7 @@ class VisitLifecycleIT {
 	@DisplayName("a customer system slower than its deadline queues a work item rather than holding the lane")
 	void aConnectorSlowerThanItsDeadlineReachesAHuman() {
 		// The connector's deadline is 4 s in configuration; this answers in 6.
-		// §B8: every external call has a deadline AND a defined outcome when it is
+		// Every external call has a deadline AND a defined outcome when it is
 		// exceeded. Here that outcome is routable rather than a hung worker.
 		tosDelayMillis.set(6_000);
 

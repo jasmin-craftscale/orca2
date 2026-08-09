@@ -3,7 +3,7 @@ package com.lynxis.orca.runtime.workitem;
 import java.util.function.Consumer;
 
 /**
- * Stand-ins for core's Phase 3 WP2 published views, as INSERTABLE TABLES under
+ * Stand-ins for core's published routing views, as INSERTABLE TABLES under
  * the names runtime reads (`core.topology_screen`, `core.topology_team_routing`,
  * `core.topology_team_member`, `core.topology_operator`) — the same trick every
  * runtime suite already plays with `core.topology_lane`, widened because a test

@@ -53,7 +53,7 @@ import com.lynxis.orca.runtime.workitem.api.WorkItemErrorCode;
 import com.lynxis.orca.runtime.workitem.domain.WorkItemService;
 
 /**
- * <strong>Phase 3 WP1 · the three inversions, run rather than asserted.</strong>
+ * <strong>Runs the three work-item lifecycle inversions rather than merely asserting them.</strong>
  *
  * <ol>
  *   <li><strong>Creation is the engine's transaction</strong> — the item and the
@@ -157,7 +157,7 @@ class WorkItemLifecycleIT {
 	@Timeout(value = 10, unit = TimeUnit.MINUTES)
 	@DisplayName("a process reaching the manual step queues the item and parks the engine — one transaction, both visible together")
 	void theItemAndTheWaitStateAppearTogether() {
-		// A screen identity fronts the node — creation resolves it (WP2).
+		// A screen identity fronts the node, so creation resolves it transactionally.
 		admin("INSERT INTO core.topology_screen (screen_external_id, screen_name, "
 				+ "process_definition_key, node_reference, max_sec, site_external_id) "
 				+ "VALUES ('scr-manual', N'Manual handling', 'gate-visit', 'manualInput', 300, '"

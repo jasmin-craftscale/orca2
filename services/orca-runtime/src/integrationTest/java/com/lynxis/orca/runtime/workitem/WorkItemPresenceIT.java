@@ -40,7 +40,7 @@ import com.lynxis.orca.runtime.workitem.persistence.RoutingReadRepository;
 import com.lynxis.orca.runtime.workitem.persistence.WorkItemRepository;
 
 /**
- * <strong>Phase 3 WP4 · operator presence, and the Push path that consumes it.</strong>
+ * <strong>Proves operator presence and the Push path that consumes it.</strong>
  *
  * <p>The open activity row is the current status (there is no status column on
  * any user), "at most one open row per operator" holds under a race because the

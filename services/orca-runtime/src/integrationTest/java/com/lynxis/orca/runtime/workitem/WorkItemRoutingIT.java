@@ -32,14 +32,14 @@ import com.lynxis.orca.runtime.workitem.persistence.RoutingReadRepository;
 import com.lynxis.orca.runtime.workitem.persistence.WorkItemRepository;
 
 /**
- * <strong>Phase 3 WP2 · routing as properties</strong>: the claim respects
- * eligibility, and the grid's ordering is the sheet's — set priority before
+ * <strong>Proves routing properties</strong>: a claim respects
+ * eligibility, and the grid puts set priority before
  * unset, lower more urgent, oldest-queued as the tiebreak.
  *
  * <p>No engine here: eligibility and ordering are reads over the item rows and
  * core's published views, so the suite constructs its beans directly against the
  * migrated schema — the same shape as core's property suites. The engine half of
- * WP2 (screen resolution inside the creating transaction) is proven in
+ * Screen resolution inside the creating transaction is proven in
  * {@code WorkItemLifecycleIT}, which runs the real listener.
  */
 class WorkItemRoutingIT {

@@ -36,7 +36,7 @@ import com.lynxis.orca.runtime.execution.domain.ProcessEngineGateway;
 import com.lynxis.orca.runtime.execution.domain.ProcessVariables;
 
 /**
- * <strong>WP4 · the process, its delegates, and one question about the engine.</strong>
+ * <strong>Proves the process, its delegates, and one uncertain engine behaviour.</strong>
  *
  * <p>{@code gate-visit} is written as if it were the visual builder's compiler
  * output, so what is proven here is what that compiler will be able to rely on:
@@ -44,7 +44,7 @@ import com.lynxis.orca.runtime.execution.domain.ProcessVariables;
  * resolve, the gateway branches on the outcome token, and every failure reaches
  * the named "manual handling required" end state rather than a stack trace.
  *
- * <p>The last test answers a question the plan could not: <em>does a boundary
+ * <p>The last test answers an implementation question: <em>does a boundary
  * timer on a service task ever fire?</em> It is asked by running it, and whatever
  * the engine does is what goes in the report.
  */
@@ -58,7 +58,7 @@ import com.lynxis.orca.runtime.execution.domain.ProcessVariables;
 				"orca.required-views=",
 				// The async executor is ON here, unlike in every other suite. It has to
 				// be: both service tasks are flowable:async="true" precisely so that no
-				// outbound call happens inside admission's transaction (§B9), which
+				// outbound call happens inside admission's transaction, which
 				// means nothing runs at all without a worker to run it.
 				"flowable.async-executor-activate=true",
 		})
@@ -125,9 +125,9 @@ class GateVisitProcessIT {
 	@Test
 	@DisplayName("the process deploys from the classpath at startup, under the key the compiler emits")
 	void theProcessIsDeployed() {
-		// Auto-deploy from classpath is Phase 1 scaffolding — the product path is the
-		// publish pipeline pushing to /internal/deployments/v1 — and the profile says
-		// so. What matters now is that the KEY is stable, because a deployment
+		// Auto-deploy from classpath is temporary scaffolding; the product path is the
+		// publish pipeline pushing to /internal/deployments/v1. What matters here is
+		// that the KEY is stable, because a deployment
 		// assigns a version to lanes by key.
 		assertThat(runtimeService.createProcessInstanceQuery().processDefinitionKey(GATE_VISIT).count())
 				.as("no instances yet, but the query resolves — the definition is deployed")
@@ -161,8 +161,8 @@ class GateVisitProcessIT {
 
 		String instanceId = startVisit();
 
-		// Phase 3 inverted this: manual handling is no longer a terminal state but
-		// a genuine WAIT STATE. The process parks; a person advances it.
+		// Manual handling is a genuine WAIT STATE rather than a terminal state. The
+		// process parks; a person advances it.
 		awaitParkedAt(instanceId, "manualInput");
 		assertThat(recorder.deviceCommands)
 				.as("the barrier must not be commanded on an outcome nothing approved")
@@ -179,7 +179,7 @@ class GateVisitProcessIT {
 
 		// a BpmnError is caught by the boundary event; a runtime exception would
 		// have retried into a wall and ended as a dead-letter job nobody at the
-		// gate ever sees. Since Phase 3 the human branch is a wait state.
+		// gate ever sees. The human branch is therefore a wait state.
 		awaitParkedAt(instanceId, "manualInput");
 	}
 
@@ -213,8 +213,8 @@ class GateVisitProcessIT {
 	@Timeout(value = 5, unit = TimeUnit.MINUTES)
 	@DisplayName("the outbound call does NOT happen inside the starting transaction (§B9)")
 	void noOutboundCallHappensInsideTheStartingTransaction() {
-		// §B9 is explicit: "the lane lock is released at commit — no outbound call
-		// happens while holding it". flowable:async="true" is what makes that true,
+		// The lane lock must be released at commit before any outbound call happens.
+		// flowable:async="true" is what makes that true,
 		// and this is what proves it: immediately after the start call returns, the
 		// connector has not been invoked. It is a queued job.
 		recorder.connectorOutcome.set("APPROVED");
@@ -238,8 +238,8 @@ class GateVisitProcessIT {
 	@Timeout(value = 5, unit = TimeUnit.MINUTES)
 	@DisplayName("PROBE: does a boundary timer on a service task fire when the step outlasts it?")
 	void doesABoundaryTimerOnAServiceTaskEverFire() {
-		// Asked by running it. The plan asks for "error boundary + timer on each
-		// service task"; gate-visit ships the error boundary and does NOT ship the
+		// Asked by running it. gate-visit ships an error boundary and deliberately
+		// does NOT ship a boundary timer on each
 		// timer, and this is the evidence for that decision rather than an opinion
 		// about engines.
 		String instanceId = runtimeService.startProcessInstanceByKey("wp4-timer-probe").getId();
@@ -287,7 +287,7 @@ class GateVisitProcessIT {
 
 	/**
 	 * Waits for the async executor to carry the instance to a WAIT STATE and stop
-	 * there — running, parked, with no live job. The Phase 3 shape of the human
+	 * there — running, parked, with no live job. In the shipping human-work shape,
 	 * branch: these processes have no visit row (started straight through the
 	 * gateway), so no work item is raised for them; what this suite proves is the
 	 * PROCESS's behaviour, and the work-item half lives in WorkItemLifecycleIT.
@@ -342,12 +342,12 @@ class GateVisitProcessIT {
 	// ------------------------------------------------------------------------
 
 	/**
-	 * The stub delegates the plan asks WP4 to run against. They replace the ports,
+	 * Stub ports for exercising the real delegates. They replace the ports,
 	 * not the delegates — so what is exercised is the real
 	 * {@code ConnectorCallDelegate} and {@code DeviceCommandDelegate}, under the
 	 * bean names the compiler emits.
 	 *
-	 * <p>⚠️ {@code @Primary} since WP7. Both ports now have real implementations —
+	 * <p>⚠️ {@code @Primary} is required because both ports have real implementations —
 	 * {@code RestConnector} and {@code EdgeDeviceCommandClient} — so a substitution
 	 * has to say which one wins. Without it this suite passed on a real connector
 	 * with no configuration and asserted the failure branch, which is a green test

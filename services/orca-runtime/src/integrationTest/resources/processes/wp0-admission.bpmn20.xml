@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  WP0 · the minimal process the admission proof starts.
+  The minimal process the admission proof starts.
 
   Plain BPMN 2.0 and nothing else — no Flowable extension attribute, no listener,
-  no delegate expression. WP4's `gate-visit` is the process with real steps; this
+  no delegate expression. `gate-visit` is the shipping process with real steps; this
   one exists so that "start a process instance in the same transaction as the
   insert" is exercised against the real engine rather than described.
 

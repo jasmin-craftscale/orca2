@@ -47,16 +47,16 @@ import com.lynxis.orca.runtime.api.generated.model.DeviceEventResult;
 import com.lynxis.orca.runtime.execution.persistence.AdmissionRepository;
 
 /**
- * <strong>WP6 · the thousand-truck test, through HTTP.</strong>
+ * <strong>The thousand-truck admission test, through HTTP.</strong>
  *
- * <p>WP0 proved the admission property at the service call, against real Flowable
+ * <p>{@code AdmissionPropertiesIT} proves admission at the service call against real Flowable
  * and real SQL Server. What it could not prove is that the property survives the
  * <em>path</em>: a controller, a scope established from configuration, an
  * idempotency claim per event, a batch, and Spring's own transaction boundaries.
  * Everything between the socket and the lane lock is new, and every one of those
  * layers is somewhere a read-then-write can reappear.
  *
- * <p><strong>Both lane shapes run.</strong> WP0's suite spread its thousand across
+ * <p><strong>Both lane shapes run.</strong> The service-level suite spreads its thousand across
  * eight lanes, which is more contention but is <em>not</em> the shape a single-lane
  * site has — and the phase report named that as an uncovered case. So:
  *
@@ -158,7 +158,7 @@ class AdmissionThroughHttpIT {
 
 		edge = RestClient.builder()
 				.baseUrl("http://localhost:" + port)
-				// Exactly what orca-edge's delivery pump sends (ADR-011). No token is
+				// Exactly what orca-edge's delivery pump sends. No token is
 				// minted: the identity provider authenticates people, and putting it on
 				// the gate path would make a truck's admission depend on it.
 				.defaultHeader("X-Orca-Internal-Auth", "integration-test-credential-not-a-fixture")
@@ -213,7 +213,7 @@ class AdmissionThroughHttpIT {
 								correlated++;
 							}
 						}
-						// The truck leaves. WP7 does this at the end of the process; here
+						// The truck leaves. Shipping process completion does this; here
 						// it is what frees the lane's filtered unique index for the next.
 						completeVisitOn(laneExternalId);
 					}
@@ -275,7 +275,7 @@ class AdmissionThroughHttpIT {
 	}
 
 	// ------------------------------------------------------------------------
-	// §6 item 9 — redelivery.
+	// Redelivery: the sender did not receive the first acknowledgement.
 	// ------------------------------------------------------------------------
 
 	@Test
@@ -288,7 +288,7 @@ class AdmissionThroughHttpIT {
 		DeviceEventResult first = onlyResult(send(batch));
 		assertThat(first.getStatus()).isEqualTo(DeviceEventResult.StatusEnum.STARTED);
 
-		// Edge resends a batch it never saw acknowledged. §B4 mechanism 4 takes that
+		// Edge resends a batch it never saw acknowledged. This boundary takes that
 		// trade knowingly: a lost event is unrecoverable, a repeated one is not.
 		DeviceEventResult second = onlyResult(send(batch));
 
@@ -398,7 +398,7 @@ class AdmissionThroughHttpIT {
 				.deviceExternalId("DEV-IT-CAMERA")
 				.eventType("lpr.capture")
 				// Exactly the normalised shape edge produces — no ZapPacket crosses this
-				// link, which is what makes edge the hardware boundary (§C3).
+				// link, which is what makes edge the hardware boundary.
 				.attributes("{\"plate\":\"" + plate + "\",\"confidence\":\"0.94\"}");
 	}
 
@@ -413,7 +413,7 @@ class AdmissionThroughHttpIT {
 		return "LANE-IT-%02d".formatted(lane);
 	}
 
-	/** Frees the lane, the way WP7's completion does at the end of the process. */
+	/** Frees the lane the way shipping process completion does. */
 	private void completeVisitOn(String laneExternalId) {
 		ScopeContext.runIn(Scope.of("site_external_id", Set.of(SITE)), () -> {
 			long laneId = repository.laneIdOf(laneExternalId).orElseThrow();
@@ -443,12 +443,12 @@ class AdmissionThroughHttpIT {
 	}
 
 	/**
-	 * Recorded, not thresholded — the register's measurement section.
+	 * Records HTTP admission latency without imposing a threshold.
 	 *
 	 * <p>⚠️ An upper bound and not a site measurement: the SQL Server image is
 	 * amd64-only, so on Apple silicon the engine runs emulated on a two-CPU Docker
 	 * VM. This is end-to-end over HTTP, which is what a site's edge instance
-	 * actually waits for — WP0's number was the service call alone.
+	 * actually waits for; {@code AdmissionPropertiesIT} measures the service call alone.
 	 */
 	private static void recordLatency(String shape, List<Long> micros) {
 		long[] sorted = micros.stream().mapToLong(Long::longValue).sorted().toArray();
@@ -479,8 +479,8 @@ class AdmissionThroughHttpIT {
 	 *
 	 * <p>It publishes both the surrogate key and the external id, exactly as
 	 * {@code V102__topology_views.sql} does — admission locks and indexes on
-	 * {@code lane_id} (§C2) and everything crossing a service boundary uses the
-	 * external one (§B8).
+	 * {@code lane_id}, while everything crossing a service boundary uses the
+	 * external identifier.
 	 */
 	private static void publishTopologyLane() {
 		admin("IF SCHEMA_ID(N'core') IS NULL EXEC('CREATE SCHEMA [core]')");
