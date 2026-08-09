@@ -2,15 +2,15 @@
 
 **Read this first. It is the entry point for a new session working on the ORCA rewrite programme.**
 
-You are picking up an engagement that has been running for some weeks. The architecture is written and signed, the first build phase is about to start, and there is a register of things deliberately left open. **Your job is to help the product owner run the programme — not to redesign it.**
+You are picking up an engagement that has been running for some weeks. The architecture is written and signed, **four build phases are complete and independently verified** (§9), and there is a register of things deliberately left open. **Your job is to help the product owner run the programme — not to redesign it.**
 
-**Concretely, you will be asked to:** review what the build agent produces and find what its own report missed · run or supervise Spike 1 · work the open questions toward decisions · keep the document set honest as things change · and verify claims against the existing codebase when they matter.
+**Concretely, you will be asked to:** prepare the next phase (extract the 1.x reference → write the plan → hand the product owner a kickoff prompt) · review what each build session produces and find what its own report missed · verify by executing, never by trusting a report · work the open questions toward decisions · keep the document set honest as things change · and fact-check claims against the existing codebase when they matter, including for client-facing documents.
 
-**You will also work in the new codebase** at `~/Documents/Projects/orca` — reviewing what the build agent produced, extending it, debugging it, and eventually writing service code as Phase 1 begins. Treat it as yours to work in.
+**You work in both codebases.** `~/Documents/Projects/orca` is yours to work in — review, extend, debug, and write code. `~/Documents/Projects/lynxis/Lynxis-Gate` is **read-only for analysis**: it is the production system being replaced, and it is the evidence base for everything about 1.x.
 
-⚠️ **One boundary, and it is about timing rather than permission.** While the Phase 0 build session is running, stay out of that repository — it is being restructured wholesale and concurrent edits conflict on nearly every commit. Once Phase 0 has landed and been reviewed, the constraint lifts.
+⚠️ **One timing boundary.** While a build session is running in `~/Documents/Projects/orca`, stay out of that repository — concurrent edits conflict on nearly every commit. When it stops, the repository is yours again; that is when you verify.
 
-**When you do write code there:** `docs/phase-0-brief.md` §2 carries the ground rules, and they apply to you too — `platform/` holds no domain types, tests prove properties rather than exercise paths, and build checks land with the code they govern.
+**When you write code there:** the ground rules are in `AGENTS.md` and each phase plan's §2 — `platform/` holds no domain types, tests prove properties rather than exercise paths, and build checks land with the code they govern. **Ten build checks enforce them; they fail the build.**
 
 **Onboard yourself properly before acting.** §7 tells you what to read and in what order. Do not act on this handover alone; it is a map, not the territory.
 
@@ -33,7 +33,7 @@ Two properties shape every decision:
 | Path | What it is |
 |---|---|
 | `~/Documents/Projects/lynxis/Lynxis-Gate` | **The existing system**, in production today — 25 Go microservices, 4 React applications, SQL Server. Also holds the full document corpus for the rewrite. **Read-only for analysis. Never modify production code here** |
-| `~/Documents/Projects/orca` | **The new build.** Spring Boot 4.0.7 / Java 25, branch `phase-0-foundations`. **Phase 0 is built** — twelve Gradle modules, six bootable applications, five primitives, the build checks, per-service migrations and contracts. See §9 |
+| `~/Documents/Projects/orca` | **The new build.** Spring Boot 4.0.7 / Java 25, trunk branch `phase-0-foundations` (kept by PO ruling — there is no `main`). **Four phases built and verified**: foundations, the gate path, the configuration world, the clerk workflow. See §9 |
 
 ---
 
@@ -128,9 +128,24 @@ The ones that gate work:
 3. **`Lynxis-Gate/docs/ORCA_SECURITY_FINDINGS_PRIVATE.md`** 🔒 — five code-verified findings in the existing system. **Product owner and technical lead only.**
 4. **This handover** — the map.
 
-**In `~/Documents/Projects/orca/docs/`**, for the build rather than the programme: `phase-0-brief.md` (what the build agent did), `PLATFORM_PRIMITIVES.md` (what each shared primitive prevents, and the named pattern behind it), `REPOSITORY_GUIDE.md` (the repository layout), `phase-0-report.md` (what was built and verified). Phase work artifacts sit flat in `docs/` with their phase prefix — future phases follow the same pattern (`docs/phase-1-plan.md`); `phase-0-kickoff.md` was the build session's entry point.
+**In `~/Documents/Projects/orca/docs/`**, for the build rather than the programme. Read these in this order — they are how you learn what ORCA 2.0 actually *is* today, as opposed to what it was designed to be:
 
-**For the existing system:** `Lynxis-Gate/CLAUDE.md` — the operating manual for that codebase.
+5. **`README.md`** (repository root) — the front door: what it is, how the gate path works, how to run it locally.
+6. **`AGENTS.md`** (root, plus the nested ones in `platform/`, `services/orca-runtime/`, `build-checks/`) — the rules that are **enforced by ten build checks**. They bind you as much as any build agent.
+7. **The four phase reports, newest first** — `phase-3-report.md`, `phase-2-report.md`, `phase-1-hardening-report.md`, `phase-1-report.md`, then `phase-0-report.md`. **These are the real state of the build.** Each carries: what was built, what was *not* (named gaps), every decision the plan did not dictate, what was found wrong, and an adversarial review addendum. Read each one's "decisions the plan did not dictate" and "found wrong" sections — that is where the value is.
+8. **`REPOSITORY_GUIDE.md`** (layout) · **`PLATFORM_PRIMITIVES.md`** (what each primitive prevents) · **`deployment.md`** (local dev and the production gap) · **`phase-1-demo.md`** (drive a truck through the gate — the standing regression canary).
+
+**For the existing system — ORCA 1.x — you need both the manual and the extractions:**
+
+- **`Lynxis-Gate/CLAUDE.md`** — the operating manual for that codebase: service layout, the multi-module Go structure, the conventions that cause real bugs if missed. **Read it before searching there**, or you will misread what you find.
+- **The DERIVED-FROM-1X reference sheets in `orca/docs/`** — code-verified extractions of what 1.x actually does, produced when each phase needed them. They are the accumulated knowledge of the old system, and they carry both the facts *and* the defects deliberately not carried forward:
+  - `lpr-wire-format-from-1x.md` — the camera protocol (STX/ETX ZapPacket), and the three 1.x behaviours 2.0 refuses to copy.
+  - `device-host-outbound-from-1x.md` — the barrier/print/IO commands, and **§3, the open vendor question (register NEW-4)**.
+  - `core-config-schema-from-1x.md` — the config tables, with **§0's eleven translation rules** that govern any further 1.x→2.0 work.
+  - `entitlement-catalog-from-1x.md` · `device-catalog-completion-from-1x.md` — the exact seed rows, script-extracted.
+  - `work-items-schema-from-1x.md` — the clerk workflow, and **§0's three behaviour inversions** where 2.0 deliberately reverses 1.x.
+
+**The pattern to continue:** when a phase needs to know what 1.x does, extract it read-only into a new `*-from-1x.md` sheet with file:line evidence, state the translation rules, and let the architecture govern behaviour. Never port 1.x blindly; never guess what it does.
 
 ⚠️ **Everything else has been deleted, and that was deliberate.** The earlier corpus included a superseded architecture, a delivery plan, a technical design spec and a data dictionary, all of which had drifted from the decisions of 6 August — the design spec contradicted them in 44 places. **If you find a reference to a document that no longer exists, the document was removed, not lost.** Do not reconstruct it; the architecture and the register carry what survived.
 
