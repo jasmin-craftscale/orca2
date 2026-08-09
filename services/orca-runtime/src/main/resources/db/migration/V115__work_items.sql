@@ -162,6 +162,10 @@ CREATE TABLE work_item (
 -- first, and an index that does not lead with it cannot be used for that
 -- condition, so the table gets scanned instead. The comment on `lane_session` in
 -- V101__execution.sql carries the full account of what that cost.
+--
+-- It is also enforced rather than trusted: a build check named ScopeIndexRule
+-- reads this file and stops the build if a table carrying a site column has no
+-- index leading with it.
 CREATE INDEX ix_work_item_scope_status
 	ON work_item (site_external_id, status, queued_at)
 	INCLUDE (external_id, execution_id, lane_id, lane_external_id, visit_external_id,

@@ -68,5 +68,9 @@ CREATE UNIQUE INDEX ux_user_activity_open ON user_activity (user_external_id)
 -- is, because the shared code every read goes through puts the site condition
 -- first; status and end time are carried along so the answer comes from the index
 -- alone.
+--
+-- Leading with the site column is not a convention you may weigh up: a build
+-- check named ScopeIndexRule reads this file and fails the build if any table
+-- carrying a site column has no index leading with it.
 CREATE INDEX ix_user_activity_scope ON user_activity (site_external_id, user_external_id, started_at)
 	INCLUDE (status, ended_at);

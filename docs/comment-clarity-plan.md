@@ -164,7 +164,11 @@ Two deliverables, landing together — a convention without enforcement decays i
 
 ### WP2 · The SQL — the priority
 
-**30 files**: 24 under `services/*/src/main/resources/db/migration/*.sql` (29 total, minus the five untouchable Flowable ones) and 6 under `platform/*/src/main/resources/db/migration/*.sql`.
+**27 files**: 24 under `services/*/src/main/resources/db/migration/*.sql` (29 total, minus the five untouchable Flowable ones) and **3** under `platform/{outbox,lease,idempotency}/src/main/resources/db/platform/<name>/*.sql`.
+
+⚠️ **Count and path both corrected 9 Aug 2026.** This previously said "6 under `platform/*/src/main/resources/db/migration/`". There are three, and they live under `db/platform/<name>/`, not `db/migration/`. The wrong number came from a `find` that counted compiled copies under `build/` — if you count files, exclude `build/`.
+
+**With the seven files under `deploy/` (work package 3) that makes 34 SQL files in total**, which is the number the "done when" below uses.
 
 These get the most care. A migration is the permanent record of *why the schema looks like this* — it is read years later by someone debugging production, and it is the one file they cannot ask a question about.
 

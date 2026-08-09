@@ -40,8 +40,52 @@ def strip_sql(text: str) -> str:
 
 
 def strip_c_style(text: str) -> str:
-    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    return "\n".join(re.sub(r"//.*$", "", line) for line in text.splitlines())
+    """Remove // and /* */ comments, leaving string literals untouched.
+
+    A naive regex cannot do this. `String u = "http://a";` contains `//` inside a
+    string, so a regex stripper truncates the line at `http:` — and then a real
+    change to that string is invisible to the comparison, which is the one thing
+    this tool exists to prevent. There are 93 such lines in this repository.
+
+    So this walks the text once, tracking whether it is inside a string, a
+    character literal or a Java text block, and only treats `//` and `/*` as
+    comment starts when it is inside none of them.
+    """
+    out = []
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        # Text block: """ ... """ — Java's multi-line string, used here for SQL,
+        # which means it can legitimately contain both -- and // and must survive.
+        if text.startswith('"""', i):
+            end = text.find('"""', i + 3)
+            end = n if end == -1 else end + 3
+            out.append(text[i:end])
+            i = end
+        elif c in '"\'':
+            j = i + 1
+            while j < n:
+                if text[j] == "\\":
+                    j += 2
+                    continue
+                if text[j] == c:
+                    j += 1
+                    break
+                if text[j] == "\n":  # unterminated: do not run past the line
+                    break
+                j += 1
+            out.append(text[i:j])
+            i = j
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j == -1 else j
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j == -1 else j + 2
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
 
 
 def strip_hash(text: str) -> str:

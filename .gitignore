@@ -40,3 +40,7 @@ out/
 ### ORCA ###
 # Local secrets. `.env.example` is committed with working local values; `.env` is not.
 .env
+
+# Python bytecode from the hand-run tools in deploy/tools/
+__pycache__/
+*.pyc
