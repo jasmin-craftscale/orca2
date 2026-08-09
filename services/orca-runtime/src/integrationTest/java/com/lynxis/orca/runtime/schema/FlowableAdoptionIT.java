@@ -30,9 +30,8 @@ import com.lynxis.orca.runtime.RuntimeApplication;
  * <strong>H4 · the migration path off {@code database-schema-update: true},
  * executed rather than described.</strong>
  *
- * <p>{@code phase-1-report.md} §7.4: <em>"There is no migration path off
- * `database-schema-update: true`, and the demo proved it by tripping over it."</em>
- * A database on which the engine created its own tables has them, and Flyway has no
+ * <p>An installation that once used {@code database-schema-update: true} has
+ * engine-created tables but no Flyway history for them, so Flyway has no
  * history for them, so V110 fails on <em>"There is already an object named
  * 'ACT_GE_PROPERTY'"</em>. On this machine that was cleared by hand.
  *
@@ -85,7 +84,7 @@ class FlowableAdoptionIT {
 
 	@BeforeEach
 	void aSchemaTheEngineMigratedItself() {
-		// Rewind to what Phase 0 shipped: no Flyway history for the engine's tables,
+		// Rewind to the earlier self-migrating configuration: no Flyway history for the engine's tables,
 		// and the engine let loose to create them. That is what an installation on
 		// that build has today, and it is the only starting state worth testing from.
 		forgetFlowableEverWentUnderFlyway();
@@ -313,14 +312,14 @@ class FlowableAdoptionIT {
 				WHERE t.schema_id = SCHEMA_ID(?) AND (t.name LIKE 'ACT[_]%' OR t.name LIKE 'FLW[_]%');
 				EXEC sp_executesql @drop;""", SCHEMA, SCHEMA);
 		// Rewinding "before the engine went under Flyway" now means rewinding
-		// EVERYTHING from V110 up, because Phase 3's V115 is numbered after the
+		// EVERYTHING from V110 up, because V115 is numbered after the
 		// engine's five (Flyway refuses out-of-order, so it could not be V103).
 		// A history holding 115 but not 110 is a state Flyway rejects outright —
 		// so V115's tables go too, and re-migration puts all six back.
 		//
 		// ⚠️ This is a standing cost of the numbering: every future runtime
 		// migration ≥ V115 must be droppable here, or this suite's fixture stops
-		// being constructible. Recorded in the phase-3 report.
+		// being constructible.
 		jdbc.update("""
 				IF OBJECT_ID(N'work_item_audit', 'U') IS NOT NULL DROP TABLE work_item_audit;
 				IF OBJECT_ID(N'work_item', 'U') IS NOT NULL DROP TABLE work_item;

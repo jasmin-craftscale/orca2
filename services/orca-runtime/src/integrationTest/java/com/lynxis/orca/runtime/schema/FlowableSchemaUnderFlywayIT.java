@@ -20,7 +20,7 @@ import com.lynxis.orca.platform.outbox.testing.PlatformDatabase;
 import com.lynxis.orca.runtime.RuntimeApplication;
 
 /**
- * <strong>WP3 · Flowable's schema under Flyway, proven rather than assumed.</strong>
+ * <strong>Proves that Flyway owns Flowable's schema completely.</strong>
  *
  * <p>V110–V114 are the engine's own SQL Server DDL, extracted from the jars on the
  * runtime classpath. Extracting is the easy half. The half that can be wrong
@@ -34,13 +34,12 @@ import com.lynxis.orca.runtime.RuntimeApplication;
  *   <li><strong>{@code runtime}</strong> — built by Flyway from the committed
  *       migrations, exactly as a deployment does.</li>
  *   <li><strong>{@code flowable_scratch}</strong> — built by the ENGINE, with
- *       {@code database-schema-update=true}, which is what Phase 0 shipped and
- *       what this replaces.</li>
+ *       {@code database-schema-update=true}, reproducing the earlier
+ *       engine-managed schema that the migrations replace.</li>
  * </ul>
  *
- * <p>Tables, columns, indexes and foreign keys must be identical. The plan asks
- * for {@code sys.tables} and {@code sys.columns}; indexes and foreign keys are
- * included as well because a missing index on {@code ACT_RU_EXECUTION} is a real
+ * <p>Tables, columns, indexes and foreign keys must be identical. Indexes and
+ * foreign keys are included because a missing index on {@code ACT_RU_EXECUTION} is a real
  * defect that a column comparison cannot see, and it would surface as a slow gate
  * rather than as an error.
  *
@@ -76,7 +75,7 @@ class FlowableSchemaUnderFlywayIT {
 		flywayBuilt = new JdbcTemplate(PlatformDatabase.migratedSchema(FLYWAY_BUILT,
 				"db/migration", "db/platform/outbox", "db/platform/lease", "db/platform/idempotency"));
 
-		// --- the way Phase 0 did it ---------------------------------------
+		// --- the earlier engine-managed-schema path -----------------------
 		// Everything except Flowable, then the engine is let loose on it.
 		DriverManagerDataSource scratch = (DriverManagerDataSource) PlatformDatabase.migratedSchema(ENGINE_BUILT,
 				"db/platform/outbox", "db/platform/lease", "db/platform/idempotency");
@@ -129,7 +128,7 @@ class FlowableSchemaUnderFlywayIT {
 	@Test
 	@DisplayName("every index matches — a missing one is a slow gate, not an error")
 	void everyIndexMatches() {
-		// Beyond what the plan asks for, deliberately. An absent index on
+		// An absent index on
 		// ACT_RU_EXECUTION does not fail anything; it just makes every visit slower,
 		// and nothing in a column diff would ever mention it.
 		assertThat(indexes(flywayBuilt)).containsExactlyElementsOf(indexes(engineBuilt));

@@ -42,12 +42,11 @@ import com.lynxis.orca.platform.outbox.testing.PlatformDatabase;
 import com.lynxis.orca.runtime.RuntimeApplication;
 
 /**
- * <strong>WP0 · the admission proof. This is the phase's halt condition.</strong>
+ * <strong>The admission concurrency proof.</strong>
  *
- * <p>§B10: <em>"Two events for one truck in the same millisecond, from two
- * instances, 1,000 times — one visit each time."</em> Everything else in Phase 1
- * is built on the assumption that an embedded engine can be made to satisfy that
- * against SQL Server. If it cannot, the phase stops here.
+ * <p>Two events for one truck arrive in the same millisecond from two instances,
+ * 1,000 times; every pair must produce one visit. The embedded engine must hold
+ * that property against SQL Server before any gate workflow can rely on it.
  *
  * <p><strong>Real Flowable 8, real SQL Server, real Spring transaction manager.</strong>
  * Not a mock and not H2: the property lives entirely in what {@code UPDLOCK} does
@@ -69,8 +68,8 @@ import com.lynxis.orca.runtime.RuntimeApplication;
 				// V100 baseline, which names the `runtime` schema explicitly.
 				"spring.flyway.enabled=false",
 				"spring.jpa.properties.hibernate.default_schema=" + AdmissionPropertiesIT.SCHEMA,
-				// The engine creates its own ~46 tables here. WP3 is what moves that
-				// under Flyway; until then this is Flowable's own default, unchanged.
+				// This isolated fixture lets the engine create its own ~46 tables. The
+				// shipping schema instead keeps those tables under Flyway.
 				"flowable.database-schema-update=true",
 				// No async executor: this test is about one transaction's atomicity,
 				// and a background job thread committing on its own schedule would be
@@ -80,7 +79,7 @@ import com.lynxis.orca.runtime.RuntimeApplication;
 				// The committed value is 10, which would turn the property under test
 				// into a measurement of pool contention.
 				"spring.datasource.hikari.maximum-pool-size=32",
-				// WP1 made this default to core's two published views, and this schema
+				// Runtime normally requires core's two published views, and this schema
 				// is a spike schema with no orca-core in it. RequiredViewsGateIT is
 				// where that gate is proven; here it would only be in the way.
 				"orca.required-views=",
@@ -94,7 +93,7 @@ class AdmissionPropertiesIT {
 	/** A gate with eight lanes. Enough that lanes contend with each other, few enough to be a real site. */
 	private static final int LANES = 8;
 
-	/** §B10 says one thousand times. It says it because a race that fails one time in two hundred passes a test run once. */
+	/** One thousand repetitions keep a race that fails once in two hundred from passing by luck. */
 	private static final int ITERATIONS = 1_000;
 
 	@Autowired
@@ -401,8 +400,8 @@ class AdmissionPropertiesIT {
 		// The thousand-truck run reports ZERO backstop saves, which is the right
 		// answer and a useless one: it means the lane lock serialised every round,
 		// so the index was never reached and its behaviour was never observed. A
-		// check that has never been seen to fire is the failure mode Phase 0's
-		// verification item 8 caught twice. So the lock comes off and the index is
+		// check that has never been seen to fire cannot be trusted. So the lock comes
+		// off and the index is
 		// made to do the work alone.
 		int rounds = 100;
 		long laneId = 61L;
@@ -454,7 +453,7 @@ class AdmissionPropertiesIT {
 	void theIndexAdmitsMapIteratorChildren() {
 		long parent = insertRootVisit(52L, "PARENT");
 
-		// §C2 names this trap by name: a naive unique index on the lane would reject
+		// A naive unique index on the lane would reject
 		// every iterator child and break those workflows at runtime rather than at
 		// the point the index was written.
 		jdbc.update("INSERT INTO execution (external_id, lane_id, parent_execution_id, status, plate) "
@@ -521,8 +520,8 @@ class AdmissionPropertiesIT {
 	}
 
 	/**
-	 * The measurement §11 of the register asks for: recorded, deliberately not
-	 * thresholded. There is no baseline yet, so a threshold invented here would
+	 * Records admission latency without imposing a threshold. There is no baseline
+	 * yet, so a threshold invented here would
 	 * become the number everyone tunes to.
 	 */
 	private void writeLatencyReport(List<Long> startedLatenciesNanos, long wallNanos, int backstopSaves)

@@ -23,13 +23,11 @@ import com.lynxis.orca.platform.scope.readiness.MissingRequiredViewException;
 import com.lynxis.orca.runtime.RuntimeApplication;
 
 /**
- * <strong>WP1 · the deployment ordering, executed rather than documented.</strong>
+ * <strong>Executes the required deployment ordering rather than merely documenting it.</strong>
  *
- * <p>§6 item 10 of the phase plan: start runtime before core has migrated and it
- * must refuse, naming {@code core.topology_lane} and {@code core.topology_device}.
- * Phase 0 proved this by hand against an empty view list; WP1 gave the list two
- * real entries, so it is worth proving again — automatically, and including the
- * case that is easy to get wrong.
+ * <p>If runtime starts before core has migrated, it must refuse to start and name
+ * {@code core.topology_lane} and {@code core.topology_device}. This suite proves
+ * that automatically, including the permission case that is easy to get wrong.
  *
  * <p><strong>The third test is the one worth reading.</strong> The gate does not
  * ask whether a view exists; it asks whether <em>this login can see it</em>,

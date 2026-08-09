@@ -32,7 +32,7 @@ import com.lynxis.orca.runtime.execution.domain.InboundDeviceEvent;
 import com.sun.net.httpserver.HttpServer;
 
 /**
- * <strong>§6 item 4 · kill runtime mid-visit, restart, and the visit finishes.</strong>
+ * <strong>Kills runtime mid-visit and proves that a restarted instance finishes it.</strong>
  *
  * <p>The claim under test is that <em>engine state lives in the database and
  * nowhere else</em>. A process instance halfway through is not an object on a heap

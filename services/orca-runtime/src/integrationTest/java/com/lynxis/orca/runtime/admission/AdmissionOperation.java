@@ -12,8 +12,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * <strong>WP0 · admission.</strong> One truck, one visit — the property the whole
- * design turns on (§B10, §C2).
+ * <strong>Admission.</strong> One truck at a lane has one active visit, even when
+ * duplicate events race across runtime instances.
  *
  * <p>Two device events for the same truck can arrive in the same millisecond,
  * from two instances. Exactly one visit must start. That is not achievable by
@@ -44,14 +44,14 @@ import org.springframework.transaction.support.TransactionTemplate;
  * so the victim retries — and because the whole operation is one transaction,
  * retrying it is safe by construction rather than by argument.
  *
- * <p><strong>This class is WP0 shape, not shipping placement.</strong> It uses
+ * <p><strong>This is an integration-test implementation, not shipping placement.</strong> It uses
  * {@link JdbcTemplate} directly, which a class under {@code src/main} could not:
- * {@code ScopeSeamRule} forbids it, and the seam has no write surface until WP2.
- * WP6 places this operation in {@code runtime.execution} behind the extended seam.
+ * {@code ScopeSeamRule} fails the build for such access in service code. The
+ * shipping operation lives in {@code runtime.execution} behind the scope seam.
  */
 public final class AdmissionOperation {
 
-	/** The process the visit runs. WP4 replaces it with {@code gate-visit}. */
+	/** The minimal process used by this admission proof; shipping visits use {@code gate-visit}. */
 	public static final String PROCESS_KEY = "wp0-admission";
 
 	/**
@@ -132,9 +132,9 @@ public final class AdmissionOperation {
 				"SELECT lane_id FROM lane_session" + lockHint + " WHERE lane_id = ?",
 				(rs, row) -> rs.getLong(1), laneId);
 		if (lane.isEmpty()) {
-			// An event for a lane the world model does not have. §C2 calls this an
-			// unmatched event and says it is made visible rather than dropped; WP6
-			// wires that. Failing loudly here is the honest WP0 behaviour.
+			// An event for a lane the world model does not have is unmatched. Shipping
+			// code makes it visible rather than dropping it; this focused test helper
+			// fails loudly because it has no unmatched-event surface.
 			throw new IllegalStateException(
 					"No lane_session row for lane " + laneId + ". An event arrived for a lane this "
 							+ "installation has no session row for — visible, never silently dropped.");
