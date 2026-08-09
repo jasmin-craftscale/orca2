@@ -42,9 +42,9 @@ import com.lynxis.orca.platform.scope.ScopeContext;
 import com.sun.net.httpserver.HttpServer;
 
 /**
- * <strong>WP7 · the two properties a command that moves a barrier has to hold.</strong>
+ * <strong>The two properties a command that moves a barrier has to hold.</strong>
  *
- * <p>§6 items 7 and 8 of the phase plan, and both are about the physical world:
+ * <p>Both properties concern the physical world:
  *
  * <ul>
  *   <li><em>Replay every command type with the same {@code command_id}</em> → the
@@ -101,7 +101,7 @@ class DeviceCommandPropertiesIT {
 	}
 
 	// ------------------------------------------------------------------------
-	// §6 item 7 — replay every command type.
+	// Replay every command type.
 	// ------------------------------------------------------------------------
 
 	@Test
@@ -157,7 +157,7 @@ class DeviceCommandPropertiesIT {
 	}
 
 	// ------------------------------------------------------------------------
-	// §6 item 8 — the elapsed deadline.
+	// Enforce the elapsed deadline.
 	// ------------------------------------------------------------------------
 
 	@Test
@@ -297,7 +297,7 @@ class DeviceCommandPropertiesIT {
 		host.start();
 
 		try {
-			// §C3: a command completes when the device host confirms it ACTED — an
+			// A command completes when the device host confirms it ACTED: an
 			// acknowledgement AND a body that decodes. Reading an unrecognised body
 			// optimistically is how "the barrier rose" comes to mean "the barrier was
 			// asked to".

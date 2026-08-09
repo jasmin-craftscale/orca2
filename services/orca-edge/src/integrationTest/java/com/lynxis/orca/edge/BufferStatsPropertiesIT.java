@@ -31,10 +31,9 @@ import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.platform.scope.ScopeSeam;
 
 /**
- * <strong>H3 · §C3's buffer diagnostics, and the question it has to be able to
- * answer.</strong>
+ * <strong>Proves the capture-buffer diagnostics answer an operator's real question.</strong>
  *
- * <p>The endpoint exists because of one sentence in {@code phase-1-report.md} §3:
+ * <p>The endpoint exists because an earlier review found that
  * <em>"`DEAD` events are recorded and visible only in the table."</em> An event
  * nobody could deliver is the single event a site operator most needs to see, and
  * until now seeing it required a database login.
@@ -105,7 +104,7 @@ class BufferStatsPropertiesIT {
 			append(BUSY_LANE, "evt-dead-2");
 			append(BUSY_LANE, "evt-alive");
 		});
-		// Two of them exhausted their attempts and were retired. §D3 retires records
+		// Two of them exhausted their attempts and were retired. Failed records are retained
 		// rather than removing them precisely so this stays true.
 		jdbc.update("UPDATE event_buffer SET status = 'DEAD', last_error = 'link never returned' "
 				+ "WHERE event_uuid IN ('evt-dead-1', 'evt-dead-2')");

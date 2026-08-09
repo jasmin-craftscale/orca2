@@ -49,9 +49,9 @@ import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.platform.scope.ScopeSeam;
 
 /**
- * <strong>WP5 · the two properties edge exists to hold.</strong>
+ * <strong>The two ingestion properties edge exists to hold.</strong>
  *
- * <p>§B10, "nothing in flight is lost": <em>sever the link under load, assert zero
+ * <p><em>Sever the link under load, assert zero
  * loss and preserved order.</em> And "exactly one of the things that must be one":
  * <em>one owner of a lane's hardware — expire the lease mid-write, assert the write
  * is rejected.</em>
@@ -85,7 +85,7 @@ class EdgeIngestPropertiesIT {
 		// Then core's published view, standing in for orca-core having migrated.
 		// Edge reads its lane list through it, so LaneOwnership cannot be exercised
 		// without one — and without the grant, edge cannot see it at all, which is
-		// ADR-009 working rather than a test detail.
+		// the published-view integration working rather than a test detail.
 		publishTopologyLane();
 		grantTopologyLaneTo("it_" + SCHEMA);
 	}
@@ -218,7 +218,7 @@ class EdgeIngestPropertiesIT {
 		Lease staleLease = a.leaseFor(LANE).orElseThrow();
 
 		// Instance A stalls. Its lease expires by the DATABASE's clock — never by
-		// anybody's local one (§B8) — so this is expressed as the database sees it.
+		// anybody's local one, so this is expressed as the database sees it.
 		expireLease(LANE);
 
 		inScope(b::reconcile);
@@ -280,7 +280,7 @@ class EdgeIngestPropertiesIT {
 
 	// ------------------------------------------------------------------------
 	// Property 3 — the listener stores before it acknowledges, and speaks the
-	// framing the fielded estate speaks (DERIVED-FROM-1X).
+	// framing translated from the fielded 1.x listener.
 	// ------------------------------------------------------------------------
 
 	@Test
@@ -310,7 +310,7 @@ class EdgeIngestPropertiesIT {
 							+ "the whole guarantee")
 					.isEqualTo(1);
 
-			// Edge is the hardware boundary (§C3): the vendor's dialect is decoded
+			// Edge is the hardware boundary: the vendor's dialect is decoded
 			// once, here, and what crosses to runtime carries no ZapPacket in it.
 			assertThat(attributesOf(uuid))
 					.as("the winning plate, by highest Confidence, 1-based index — §4 of the "
@@ -418,7 +418,7 @@ class EdgeIngestPropertiesIT {
 				out.write(framed("<ZapPacket Type=\"MSG\" Id=\"pkt-broken\"><Event><EventGuid>"));
 				out.flush();
 
-				// §5 defect 2: 1.x `return`s out of its read loop here, so a per-packet
+				// Legacy defect: 1.x `return`s out of its read loop here, so a per-packet
 				// fault becomes a connection fault and every LATER capture on that
 				// connection is lost with it.
 				assertThat(readFrame(in))
@@ -456,7 +456,7 @@ class EdgeIngestPropertiesIT {
 			List<String> answers = exchange(listener.boundPort(),
 					framed(zapPacket(LANE, "evt-" + UUID.randomUUID(), "T-0000", "0.9")));
 
-			// §5 defect 1: 1.x writes its ACK after the publish ATTEMPT, so a failed
+			// Legacy defect: 1.x writes its ACK after the publish ATTEMPT, so a failed
 			// publish and a successful one are indistinguishable to the camera — and
 			// the camera never sends that capture again.
 			assertThat(answers).singleElement().asString()
@@ -515,8 +515,8 @@ class EdgeIngestPropertiesIT {
 	}
 
 	// ------------------------------------------------------------------------
-	// The camera's side of the wire, DERIVED-FROM-1X.
-	// docs/lpr-wire-format-from-1x.md §1-§3.
+	// The camera's side of the wire, translated from the legacy 1.x listener.
+	// See docs/lpr-wire-format-from-1x.md.
 	// ------------------------------------------------------------------------
 
 	private static final byte STX = 0x02;
@@ -536,7 +536,7 @@ class EdgeIngestPropertiesIT {
 				+ "<LaneId>" + lane + "</LaneId><LaneName>" + lane + "</LaneName>"
 				+ "<LP><AutoLPR>" + plate + "</AutoLPR><Confidence>" + confidence + "</Confidence>"
 				+ "<CharConfidence>0.88</CharConfidence>"
-				// Images travel as PATHS, never as bytes (§D2, and §2 of the document).
+				// Images travel as PATHS, never as bytes.
 				+ "<LPRImage TIN=\"1\" CameraId=\"CAM-1\"><Path>/var/lpr/1.jpg</Path></LPRImage>"
 				+ "</LP>"
 				+ "</Event></ZapPacket>";

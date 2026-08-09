@@ -72,7 +72,7 @@ class DeviceHostWireIT {
 	}
 
 	// ------------------------------------------------------------------------
-	// §1 of the source document — the three calls and the asymmetry.
+	// The three legacy 1.x calls and their routing asymmetry.
 	// ------------------------------------------------------------------------
 
 	@Test
@@ -157,7 +157,7 @@ class DeviceHostWireIT {
 	}
 
 	// ------------------------------------------------------------------------
-	// §2 — success is 200 AND a body that decodes.
+	// Success is HTTP 200 AND a body that decodes.
 	// ------------------------------------------------------------------------
 
 	@Test
