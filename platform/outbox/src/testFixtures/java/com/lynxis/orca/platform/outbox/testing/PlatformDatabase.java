@@ -70,8 +70,8 @@ public final class PlatformDatabase {
 	 * Creates a login and database user with <em>exactly</em> the given name, owning
 	 * no schema and granted nothing.
 	 *
-	 * <p>For the other side of ADR-009. A published view is only published if some
-	 * <em>other</em> service's login can select it, and that cannot be tested
+	 * <p>A published cross-schema view is only truly published if the consuming
+	 * service's login can select it, and that cannot be tested
 	 * unless a principal by that name exists — {@code GRANT SELECT ON
 	 * core.topology_lane TO [orca_runtime]} fails outright otherwise.
 	 * {@code deploy/bootstrap} creates these in a real database; this is the
@@ -128,8 +128,8 @@ public final class PlatformDatabase {
 	private static void dropAllTables(String schema) {
 		// Views first — they depend on the tables, and a view left behind makes
 		// Flyway refuse the NEXT clean migration of this schema with "found
-		// non-empty schema but no schema history table". Found by Phase 2's core
-		// suites, which are the first to migrate a schema with published views
+		// non-empty schema but no schema history table". Found when the core
+		// integration suites first migrated a schema with published views
 		// (V102) twice in one build. Then foreign keys, then tables: dropping in
 		// an arbitrary order fails and leaves the schema half-cleaned.
 		execute(administrative(), """

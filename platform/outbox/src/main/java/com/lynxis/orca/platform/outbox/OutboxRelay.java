@@ -31,8 +31,8 @@ import lombok.extern.slf4j.Slf4j;
  *       fact <em>blocks its own key</em> and no other, which is what "ordered per
  *       key, never globally" means in practice.</li>
  *   <li><strong>The relay runs under an explicit identity.</strong> No user invoked
- *       it (§B6, §D3), so it enters a {@link SystemContext} rather than running
- *       anonymously.</li>
+ *       it, so it enters a {@link SystemContext} rather than running anonymously;
+ *       its reads and writes remain authorisable and attributable.</li>
  * </ul>
  *
  * <p>This class does not schedule itself. Polling interval, batch size and lease
@@ -145,10 +145,10 @@ public class OutboxRelay {
 	 *
 	 * <p>The guard is not weakened and the nesting rule is not relaxed. The identity
 	 * is <em>asserted</em> here instead of established: a caller with none is refused
-	 * by {@link SystemContext#require()}, so the relay still cannot run anonymously —
-	 * which is the guarantee §B6 and §D3 actually ask for. What changes is who names
-	 * the identity, and the scheduling service naming its own is the better answer:
-	 * an operator reading the audit trail sees {@code orca-runtime}, not a primitive.
+	 * by {@link SystemContext#require()}, so the relay still cannot run anonymously.
+	 * What changes is who names the identity, and the scheduling service naming its
+	 * own is the better answer: an operator reading the audit trail sees
+	 * {@code orca-runtime}, not a primitive.
 	 */
 	public int deliverPendingUnderCurrentIdentity(int batchSize) {
 		SystemContext.require();

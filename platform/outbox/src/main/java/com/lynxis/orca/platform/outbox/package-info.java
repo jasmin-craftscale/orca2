@@ -1,6 +1,6 @@
 /**
- * P1 · Transactional outbox and relay — the mechanism that replaces a message
- * broker (ADR-007).
+ * Transactional outbox and relay — the mechanism that replaces the message broker
+ * deliberately absent from an on-site installation.
  *
  * <p>The business fact and its outbox row are written in one transaction, so a fact
  * cannot be published without being recorded nor recorded without being published.

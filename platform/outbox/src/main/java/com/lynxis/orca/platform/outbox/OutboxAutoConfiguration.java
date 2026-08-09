@@ -66,8 +66,8 @@ public class OutboxAutoConfiguration {
 	 * The instance identity a claim is recorded under.
 	 *
 	 * <p>Per process, not per host: two instances on one machine are two holders,
-	 * and a host name would make them indistinguishable in exactly the arrangement
-	 * §A5 supports.
+	 * and a host name would make them indistinguishable when several service
+	 * instances share one machine, which is a supported deployment arrangement.
 	 */
 	private static String holderId(Environment environment) {
 		return serviceName(environment) + ":" + UUID.randomUUID();

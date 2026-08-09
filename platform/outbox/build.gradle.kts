@@ -1,6 +1,6 @@
-// P1 · Transactional outbox and relay.
+// Transactional outbox and relay.
 //
-// Replaces a message broker. There is no broker inside a site (ADR-007).
+// Replaces a message broker: an on-site installation deliberately has no broker.
 //
 // This module knows about transactions, sequences, ordering keys and consumers.
 // It does not know what a visit, a lane, a ticket, a driver or a truck is — and

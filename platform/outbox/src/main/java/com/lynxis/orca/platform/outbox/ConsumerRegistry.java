@@ -9,10 +9,10 @@ import java.util.Set;
  *
  * <p><strong>Registration is configuration, not presence.</strong> A consumer that
  * is currently down is still registered, and its unacknowledged rows still hold
- * retention off. That is the point: §B10 requires that "retention cannot destroy
- * unreplicated data", and a registry built from whatever happens to be running
- * would let an outage quietly become data loss — the one failure mode this
- * mechanism exists to make impossible.
+ * retention off. That is the point: retention must not destroy data that has not
+ * reached every intended consumer. A registry built from whatever happens to be
+ * running would let an outage quietly become data loss — the one failure mode
+ * this mechanism exists to make impossible.
  *
  * <p><strong>A consequence worth stating.</strong> Delivery rows are written when
  * the fact is written, so a consumer registered <em>after</em> a fact was recorded

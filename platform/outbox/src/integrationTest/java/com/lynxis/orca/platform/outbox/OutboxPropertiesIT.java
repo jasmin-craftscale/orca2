@@ -31,7 +31,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.lynxis.orca.platform.outbox.testing.PlatformDatabase;
 
 /**
- * The four properties P1 claims, each proven by making the failure happen.
+ * Proves the transactional outbox's four guarantees by making each failure happen.
  *
  * <p>None of these is "the outbox writes a row". Every one of them is a way the
  * naive implementation breaks in production and passes in development.

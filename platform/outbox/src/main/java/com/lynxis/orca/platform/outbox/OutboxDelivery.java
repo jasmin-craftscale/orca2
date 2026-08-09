@@ -10,8 +10,8 @@ import com.lynxis.orca.platform.scope.table.RetentionClass;
  * One fact's state for one registered consumer.
  *
  * <p>This is what makes "a row is deletable only when every registered consumer has
- * acknowledged it" a query rather than a hope — and it is why retention cannot
- * destroy data a peer never received (§B10, §C5).
+ * acknowledged it" a query rather than a hope. Retention joins these rows and
+ * therefore cannot destroy a fact that a registered peer never received.
  *
  * @param acknowledged whether this consumer has taken it. An unacknowledged row
  *                     holds retention off, whether or not its consumer is running
