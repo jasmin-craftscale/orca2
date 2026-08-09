@@ -38,7 +38,7 @@ import com.lynxis.orca.platform.web.ApiStatus;
 import com.lynxis.orca.platform.web.PlatformErrorCode;
 import com.lynxis.orca.platform.web.RequestId;
 
-/** §C1's device registry surface. No credential crosses this boundary. */
+/** The device-registry HTTP surface. No device credential crosses this boundary. */
 @RestController
 public class DeviceAdminController implements DevicesApi {
 

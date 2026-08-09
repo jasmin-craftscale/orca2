@@ -87,7 +87,10 @@ public final class DeviceTables {
 			Instant createdAt) {
 	}
 
-	/** A named PTZ preset — numeric at last; execution is edge's (register NEW-5). */
+	/**
+	 * A named PTZ preset with numeric coordinates. Executing a preset is not yet
+	 * designed; that future hardware action belongs at the edge boundary.
+	 */
 	@PersistentTable(name = "ptz_preset", growth = Growth.BOUNDED)
 	public record PtzPreset(
 			long ptzPresetId,
@@ -140,7 +143,7 @@ public final class DeviceTables {
 			Instant createdAt) {
 	}
 
-	/** §C1's custom variables: typed scope, per-scope unique, sized value. */
+	/** Custom selector variables with typed scope, per-scope uniqueness and a sized value. */
 	@PersistentTable(name = "resource_configuration", growth = Growth.BOUNDED)
 	public record ResourceConfiguration(
 			long resourceConfigurationId,

@@ -36,7 +36,7 @@ import com.lynxis.orca.platform.web.ApiStatus;
 import com.lynxis.orca.platform.web.PlatformErrorCode;
 import com.lynxis.orca.platform.web.RequestId;
 
-/** §C1's `/me/workspace/*` — the calling user's grids and filters. */
+/** Serves the calling user's grid preferences and filters under {@code /me/workspace/*}. */
 @RestController
 public class WorkspaceController implements WorkspaceApi {
 

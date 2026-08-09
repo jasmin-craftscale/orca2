@@ -22,7 +22,7 @@ import com.lynxis.orca.platform.web.ApiStatus;
 import com.lynxis.orca.platform.web.PlatformErrorCode;
 import com.lynxis.orca.platform.web.RequestId;
 
-/** The screen identity's admin surface — hand-written against the generated interface (ADR-014). */
+/** The screen-identity admin surface, hand-written against its generated contract interface. */
 @RestController
 public class ScreenAdminController implements ScreensApi {
 

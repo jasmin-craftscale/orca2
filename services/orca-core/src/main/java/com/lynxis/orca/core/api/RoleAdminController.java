@@ -29,7 +29,7 @@ import com.lynxis.orca.platform.web.ApiStatus;
 import com.lynxis.orca.platform.web.PlatformErrorCode;
 import com.lynxis.orca.platform.web.RequestId;
 
-/** §C1's role surface: roles, entitlement grants and site scoping. */
+/** The role HTTP surface: roles, entitlement grants and site scope. */
 @RestController
 public class RoleAdminController implements RolesApi {
 

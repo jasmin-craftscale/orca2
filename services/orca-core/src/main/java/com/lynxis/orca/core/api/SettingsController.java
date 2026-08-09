@@ -26,7 +26,7 @@ import com.lynxis.orca.platform.web.ApiStatus;
 import com.lynxis.orca.platform.web.PlatformErrorCode;
 import com.lynxis.orca.platform.web.RequestId;
 
-/** §C1's settings surface. */
+/** The known-settings registry and value-history HTTP surface. */
 @RestController
 public class SettingsController implements SettingsApi {
 

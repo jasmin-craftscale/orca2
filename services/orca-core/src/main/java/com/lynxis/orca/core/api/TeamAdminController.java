@@ -32,7 +32,7 @@ import com.lynxis.orca.platform.web.ApiStatus;
 import com.lynxis.orca.platform.web.PlatformErrorCode;
 import com.lynxis.orca.platform.web.RequestId;
 
-/** §C1's team surface: members, handling method, shift & break templates. */
+/** The team HTTP surface: members, handling method, and shift/break templates. */
 @RestController
 public class TeamAdminController implements TeamsApi {
 

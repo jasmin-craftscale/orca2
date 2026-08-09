@@ -25,7 +25,7 @@ import com.lynxis.orca.platform.web.ApiStatus;
 import com.lynxis.orca.platform.web.PlatformErrorCode;
 import com.lynxis.orca.platform.web.RequestId;
 
-/** §C1's `/resource-configurations/{scope}/{id}` — custom variables, read by selectors. */
+/** Serves custom selector variables at {@code /resource-configurations/{scope}/{id}}. */
 @RestController
 public class ResourceConfigurationController implements ResourceConfigurationsApi {
 

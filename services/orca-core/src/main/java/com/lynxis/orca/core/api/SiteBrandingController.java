@@ -29,7 +29,7 @@ import com.lynxis.orca.platform.web.ApiStatus;
 import com.lynxis.orca.platform.web.PlatformErrorCode;
 import com.lynxis.orca.platform.web.RequestId;
 
-/** The branding-and-localization slice of §C1's site update. */
+/** The branding-and-localization slice of the site-update HTTP surface. */
 @RestController
 public class SiteBrandingController implements SiteBrandingApi {
 

@@ -31,7 +31,7 @@ import com.lynxis.orca.platform.web.ApiStatus;
 import com.lynxis.orca.platform.web.PlatformErrorCode;
 import com.lynxis.orca.platform.web.RequestId;
 
-/** §C1's break template catalog. */
+/** The break-template catalog's HTTP surface. */
 @RestController
 public class BreakTemplateController implements BreakTemplatesApi {
 
