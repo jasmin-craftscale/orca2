@@ -11,35 +11,35 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 
 /**
- * <strong>Check 9 · Contract-first, enforced.</strong> A controller that implements
- * no generated interface, and the build stops.
+ * Enforces contract-first controllers: if a controller implements no generated
+ * interface, the build stops.
  *
  * <h2>Why this exists — a rule that was believed to be enforced and was not</h2>
  *
- * <p>{@code docs/ai-context-report.md} §7.1 reports it in full. The brief attributed
- * to {@code ErrorEnvelopeRule} the rule that <em>"controllers implement generated
- * interfaces and return the shared envelope"</em>. That check has exactly one test
- * and it inspects <strong>return types</strong>. Nothing in it — or in any other
- * check — asserted that a controller implements anything at all.
+ * <p>A repository audit found that {@code ErrorEnvelopeRule} was credited with
+ * enforcing two things: generated interfaces and the shared response envelope.
+ * It actually has one test and inspects <strong>return types</strong>; nothing in it
+ * asserted that a controller implemented anything at all.
  *
  * <p>The practice held anyway, by convention plus the compiler: once a controller
  * declares {@code implements HealthApi}, a contract change breaks compilation until
- * the implementation matches, which is the whole point of ADR-014. But that
+ * the implementation matches, which is the point of making the authored OpenAPI
+ * document the source of truth. But that
  * consequence is only bought by the {@code implements}, and <strong>nothing stopped a
  * new controller from implementing nothing and still passing every check</strong>,
  * provided it returned the envelope. A hand-written route beside a generated one is
  * invisible in the served document and invisible to every reviewer who trusts the
  * document.
  *
- * <p>So: contract-first was a discipline with a compile-time consequence. It is now
- * a build check, and the gap §7.1 named is closed.
+ * <p>So contract-first was a discipline with a compile-time consequence but no
+ * enforcement. This class closes that gap by making it a build check.
  *
  * <h2>What counts as generated</h2>
  *
  * <p>An interface in a package ending {@code .api.generated} — where the OpenAPI
  * generator puts them, per every service's {@code build.gradle.kts}. Generated code
- * is never committed (ADR-014), so nothing can be hand-written into that package and
- * survive a clean build: the directory is recreated from the contract every time.
+ * is never committed, so nothing can be hand-written into that package and survive
+ * a clean build: the directory is recreated from the contract every time.
  */
 class ContractInterfaceRule {
 

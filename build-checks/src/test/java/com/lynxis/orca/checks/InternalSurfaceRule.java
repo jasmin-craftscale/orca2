@@ -15,17 +15,15 @@ import org.yaml.snakeyaml.Yaml;
 import com.lynxis.orca.platform.web.internal.InternalCallProperties;
 
 /**
- * <strong>Check 10 · The internal surface and the filter that guards it.</strong> An
- * internal operation that does not map under the filter's pattern, and the build
- * stops.
+ * Keeps every internal operation under the path pattern guarded by the
+ * service-to-service authentication filter; a mismatch stops the build.
  *
  * <h2>What can go wrong, and why nothing else would catch it</h2>
  *
- * <p>ADR-011: service-to-service calls carry the per-installation shared credential
- * and no token is minted, because token <em>issuing</em> would put the identity
- * provider on the gate path. The mechanism is one filter matching one path pattern —
- * {@code /internal/**} — and everything about that arrangement is correct except
- * that the pattern is the <strong>only</strong> thing binding an endpoint to it.
+ * <p>Service-to-service calls carry a per-installation shared credential and mint
+ * no token, because token <em>issuing</em> would put the identity provider on the
+ * gate path. One filter matches one path pattern — {@code /internal/**} — and the
+ * pattern is the <strong>only</strong> thing binding an endpoint to that filter.
  *
  * <p>An operation authored one level up, at {@code /commands/v1} rather than
  * {@code /internal/commands/v1}, is not caught by anything. The document generates
@@ -52,8 +50,8 @@ import com.lynxis.orca.platform.web.internal.InternalCallProperties;
  * pattern the filter no longer matches — which is exactly the silent-miss this rule
  * is named for.
  *
- * <p>It reads the <strong>authored</strong> documents (contract-first, ADR-014), not
- * the compiled controllers. A route that exists only in Java is
+ * <p>It reads the <strong>authored</strong> OpenAPI documents, which are the source of
+ * truth, not the compiled controllers. A route that exists only in Java is
  * {@link ContractInterfaceRule}'s business, and the two together are what make the
  * served document a complete description of the surface.
  */

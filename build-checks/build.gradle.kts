@@ -2,10 +2,10 @@
 //
 // TESTS ONLY. No production code. Its entire output is build failures.
 //
-// These rules have to see every module at once, which is the reason the
-// repository is a monorepo (ADR-014). In seven repositories they would degrade
-// into a code-review convention — and a convention is what the current system
-// enforced tenancy with, across roughly 816 hand-written scope conditions.
+// These rules have to see every module at once, which is why they live in the
+// monorepo. Split across seven repositories, they would degrade into a code-review
+// convention — the same weak protection used by the current production system's
+// roughly 816 hand-written scope conditions.
 
 plugins {
 	java

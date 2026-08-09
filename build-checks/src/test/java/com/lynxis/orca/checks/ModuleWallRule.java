@@ -9,8 +9,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * <strong>Check 2 · Module walls.</strong> A service may not import another
- * service's internals, and a module may not read another module's tables.
+ * Enforces module walls: a service may not import another service's internals,
+ * and an orca-runtime module may not read another runtime module's tables.
  *
  * <p>The second half is what the {@code api} / {@code domain} / {@code persistence}
  * split is <em>for</em>. It makes the wall expressible as one statement — "no
@@ -18,9 +18,9 @@ import org.junit.jupiter.api.Test;
  * as a paragraph in a document nobody reads at three in the afternoon.
  *
  * <p>This is the check orca-runtime's size rests on. It is the largest service by
- * a distance, and §C2 says outright that the risk is managed structurally rather
- * than by intention: module walls enforced at build time. Without this rule that
- * sentence is aspirational.
+ * a distance, so its coupling risk is managed structurally through build-enforced
+ * module walls rather than developer intention. Without this rule the package
+ * split is merely aspirational.
  */
 class ModuleWallRule {
 
@@ -38,13 +38,12 @@ class ModuleWallRule {
 					.that().resideInAPackage(OrcaClasses.ROOT + ".runtime." + owner + "..")
 					.should().dependOnClassesThat()
 					.resideInAnyPackage(othersPersistence.toArray(String[]::new))
-					// Phase 0 puts no code inside runtime's five modules — there is no
-					// business logic to put there — so this currently governs an empty set.
-					// ArchUnit would otherwise fail the rule for having checked nothing, which
-					// is the right default and the wrong answer here: the wall must land WITH
-					// the module structure it governs, not after the first class arrives.
-					// ImportedSetGuard records that the set is empty, so it is visible rather
-					// than assumed, and §7 item 8 proves the rule fires by breaking it.
+					// This rule was introduced before the runtime modules held business logic.
+					// ArchUnit normally fails a rule that checks nothing, but the wall had to
+					// land WITH the module structure rather than after the first class arrived.
+					// notify and readmodel are still empty, so the exemption remains;
+					// ImportedSetGuard records the exact empty set and deliberate violations
+					// during verification proved that the rule fires.
 					.allowEmptyShould(true)
 					.because("a module reaching into another module's repositories is a module reading "
 							+ "another module's tables. The lane monitor legitimately needs running visits "
@@ -57,7 +56,7 @@ class ModuleWallRule {
 	@Test
 	@DisplayName("no module reaches into another module's domain package either")
 	void modulesDoNotReachIntoEachOthersDomain() {
-		// The brief names persistence. Domain is included because the same defect
+		// Persistence is the obvious wall. Domain is included because the same defect
 		// arrives one layer up: a module that constructs another module's entities is
 		// coupled to its schema just as tightly, and it is the shape a developer
 		// reaches for when persistence is closed to them.

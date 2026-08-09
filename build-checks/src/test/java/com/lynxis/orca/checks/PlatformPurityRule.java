@@ -15,8 +15,8 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 
 /**
- * <strong>Check 1 · Platform purity.</strong> A class in {@code platform/} may not
- * reference a domain type.
+ * Enforces platform purity: a class in {@code platform/} may not reference a
+ * domain concept or depend on a service.
  *
  * <p>The rule stated as a test you can apply to any class: if it names a
  * <em>visit</em>, a <em>lane</em>, a <em>ticket</em>, a <em>driver</em> or a
@@ -32,7 +32,7 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 class PlatformPurityRule {
 
 	/**
-	 * The five words from §5 of the brief and §5 of PLATFORM_PRIMITIVES, verbatim.
+	 * The five domain words that the platform is forbidden to name, verbatim.
 	 *
 	 * <p>Deliberately a word list rather than a package rule. A package rule only
 	 * catches a dependency that already exists; this catches the moment somebody
@@ -77,7 +77,7 @@ class PlatformPurityRule {
 	@Test
 	@DisplayName("the matcher itself is right — it catches camelCase and plurals, and does not cry wolf")
 	void theMatcherIsCorrect() {
-		// The first run of §7 item 8 found this check SILENTLY NOT FIRING: the
+		// The first deliberate violation found this check SILENTLY NOT FIRING: the
 		// matcher required a non-letter after the word, so `VisitResponse` — the
 		// most likely violation there is — did not match. A rule is only as good as
 		// its predicate, so the predicate is tested directly rather than trusted.

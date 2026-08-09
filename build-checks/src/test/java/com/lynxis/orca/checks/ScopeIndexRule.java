@@ -15,8 +15,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * <strong>Check 8 · The scope-predicate lock trap.</strong> A scoped table with no
- * index leading with the scope column, and the build stops.
+ * Stops the build when a scoped table has no index leading with its scope column,
+ * preventing a scope-predicate lock trap.
  *
  * <h2>The failure this exists to prevent, which already happened once</h2>
  *
@@ -26,7 +26,8 @@ import org.junit.jupiter.api.Test;
  * column of every query shape in the product, whether or not the author of a
  * migration was thinking about it.
  *
- * <p>WP6 found what follows from that. {@code runtime.lane_session} was keyed on
+ * <p>The first multi-lane admission run exposed what follows from that.
+ * {@code runtime.lane_session} was keyed on
  * {@code lane_id} alone, which does not match the leading column of the predicate,
  * so on a table with a handful of rows SQL Server answered with a <strong>clustered
  * index scan</strong> — and under the {@code UPDLOCK} the lane lock exists to
@@ -34,11 +35,10 @@ import org.junit.jupiter.api.Test;
  * The eight-lane run deadlocked repeatedly and exhausted its retries. It was fixed
  * by widening the key to {@code (site_external_id, lane_id)}, in that order.
  *
- * <p>{@code phase-1-report.md} §5.13 records it and says the important part out
- * loud: <em>this is a general trap the seam creates, not a one-off — any table whose
- * hot access path does not lead with the scope column will silently do this, and
- * nothing in Java can see it.</em> Nothing in Java, but something in the migrations,
- * which is what this reads.
+ * <p><strong>This is a general trap the seam creates, not a one-off.</strong> Any
+ * table whose hot access path does not lead with the scope column can silently do
+ * this, and nothing in Java can see it. The necessary evidence is in the authored
+ * migrations, which is why this rule reads them directly.
  *
  * <h2>What it enforces</h2>
  *
@@ -54,9 +54,9 @@ import org.junit.jupiter.api.Test;
  *
  * <h2>⚠️ The scope dimension is named here, and there is exactly one today</h2>
  *
- * <p>{@code site_external_id} is the dimension every service scopes on (the phase-1
- * report §5.7 records why edge uses the <em>external</em> id). If a second dimension
- * is ever introduced, <strong>it must be added to {@link #SCOPE_COLUMNS}</strong> —
+ * <p>{@code site_external_id}, configured for the installation, is the dimension
+ * every service currently scopes on. If a second dimension is ever introduced,
+ * <strong>it must be added to {@link #SCOPE_COLUMNS}</strong> —
  * and nothing automated will tell you, because a dimension that exists only inside a
  * {@code Scope.of(…)} call is not something this file can discover. That is the
  * known limit of this rule, recorded rather than hidden.

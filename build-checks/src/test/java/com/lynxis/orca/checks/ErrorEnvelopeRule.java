@@ -14,13 +14,13 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 
 /**
- * <strong>Check 4 · Error envelope.</strong> A controller returns a shape other
- * than the envelope, and the build stops.
+ * Enforces the error envelope: a controller returns any other shape, and the build
+ * stops.
  *
- * <p>§B8: "One response shape everywhere, with a machine-readable code a caller
- * can branch on." One controller returning a bare DTO is all it takes for that to
- * become "one response shape almost everywhere", which is a different and much
- * less useful promise.
+ * <p>Every response must have one shape and a machine-readable code a caller can
+ * branch on. One controller returning a bare DTO is all it takes for that to
+ * become "one response shape almost everywhere", a different and much less useful
+ * promise.
  *
  * <p><strong>How "the envelope" is recognised.</strong> Either the returned type
  * is {@code platform/web}'s own {@code ApiResponse}, or it is a generated model

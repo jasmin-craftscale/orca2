@@ -11,25 +11,22 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 
 /**
- * A sixth check, beyond the five §5 of the brief tabulates.
+ * Fails the build when a scheduled entry point does not establish an explicit
+ * system identity.
  *
- * <p>It is here because P5's second property is stated as a test —
- * <em>"assert every scheduled entry point sets the system context"</em> — and
- * §B10 says the same thing under "Nothing leaks": <em>"assert every scheduled
- * job, relay and reconciler enters it"</em>. That cannot be a unit test. A unit
- * test proves the mechanism works; only a rule over every class proves that
- * nobody skipped it, which is the actual claim.
+ * <p>The requirement is that every scheduled job, relay and reconciler enters a
+ * system context. That cannot be proved by a unit test: a unit test proves the
+ * mechanism works, while only a rule over every class proves that nobody skipped
+ * it, which is the actual claim.
  *
- * <p>§B6 and §D3: "Every entry point that runs without a user — a relay, a
- * scheduled job, a reconciler — enters an explicit system context. There is no
- * path that runs with no identity at all." Work that runs anonymously cannot be
- * authorised and cannot be attributed, and the first time anybody notices is when
+ * <p>Every entry point that runs without a user — a relay, a scheduled job, a
+ * reconciler — must enter an explicit system context. Work that runs anonymously
+ * cannot be authorised or attributed, and the first time anybody notices is when
  * they are trying to explain a write nobody can account for.
  *
- * <p>Phase 0 has no {@code @Scheduled} methods, so this rule currently governs an
- * empty set — and it is written now rather than later precisely because a check
- * added after the scheduled jobs exist certifies whatever was written instead of
- * constraining it.
+ * <p>This rule was written before the repository had any {@code @Scheduled}
+ * methods, rather than added after jobs existed and merely certifying whatever had
+ * already been written. It now governs the edge ingest tasks and runtime relay.
  */
 class SystemContextRule {
 

@@ -6,14 +6,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * <strong>Check 3 · Scope seam.</strong> A query constructed outside the seam
- * fails the build.
+ * Fails the build when a service constructs a query outside the scope seam.
  *
- * <p>§B6 and ADR-005: <em>"Scope is enforced in one place, applied by
- * construction, with a build-time check that fails when a query bypasses it. No
- * query carries its own scoping condition."</em> The seam is
- * {@code platform/scope}; <strong>this rule is the second half of that sentence,
- * and without it the seam is a suggestion.</strong>
+ * <p>Scope is enforced in one place and applied by construction; no query carries
+ * its own scoping condition. The seam is {@code platform/scope}, and this class is
+ * the build-time enforcement that fails whenever a service bypasses it.
+ * <strong>Without this rule the seam is a suggestion.</strong>
  *
  * <p>The failure it prevents does not look like a failure. A {@code WHERE site_id
  * = ?} written correctly three hundred times and omitted once, in a query added
@@ -22,10 +20,10 @@ import org.junit.jupiter.api.Test;
  * 816 hand-written conditions and no single place to fix them.
  *
  * <p><strong>platform/ is exempt, deliberately.</strong> The primitives operate on
- * process-coordination state that has no tenant dimension at all — §C2 says the
- * lease has no {@code site_id} and no row-level-security policy, because every
- * holder runs under the system context. Platform purity is what keeps that
- * exemption honest: a primitive cannot hold tenant data, so it cannot leak it.
+ * process-coordination state that has no tenant dimension at all. For example,
+ * the lease has no {@code site_id} and no row-level-security policy because every
+ * holder runs under the system context. {@link PlatformPurityRule} keeps that
+ * exemption honest: a primitive cannot hold domain data, so it cannot leak it.
  */
 class ScopeSeamRule {
 

@@ -66,8 +66,8 @@ class ImportedSetGuard {
 				.as("six services, six hand-written controllers implementing six generated interfaces")
 				.isEqualTo(6);
 
-		// H1 added ContractInterfaceRule, which governs EVERY @RestController rather
-		// than the six by name. Counting them here is what says the rule is looking at
+		// ContractInterfaceRule governs EVERY @RestController rather than six classes
+		// by name. Counting them here is what says the rule is looking at
 		// a populated set: six health controllers plus edge's commands and buffer
 		// stats and runtime's events.
 		assertThat(annotatedRestControllers())
@@ -104,9 +104,9 @@ class ImportedSetGuard {
 	@Test
 	@DisplayName("records exactly which rule sets are still empty, so nothing passes vacuously unnoticed")
 	void whatIsStillEmptyIsStated() {
-		// WP4 put the first classes into `execution` and WP7 into `integration`, so
-		// the module wall is no longer governing nothing — for those two. The other
-		// three are still empty and still carry allowEmptyShould(true), so the
+		// execution and integration now contain classes, so the module wall no longer
+		// governs an empty set for those two. Some other modules still carry
+		// allowEmptyShould(true), so the
 		// statement has to be kept exact rather than deleted wholesale.
 		//
 		// orca-runtime/AGENTS.md said to delete this test outright when the first
@@ -116,10 +116,10 @@ class ImportedSetGuard {
 		// it is narrowed instead, and made to assert BOTH halves: what is populated,
 		// and what is not.
 		//
-		// ⚠️ THIS TEST HAS NOW FIRED FOR REAL, TWICE OVER. WP7 added the connector to
-		// `integration` and this failed the build naming the module — which is what a
-		// guard is for, and is the difference between a recorded exemption and a
-		// forgotten one.
+		// ⚠️ THIS TEST HAS NOW FIRED FOR REAL, TWICE OVER. Adding the first
+		// connector to `integration` made it fail the build and name the newly populated
+		// module — which is what a guard is for, and is the difference between a
+		// recorded exemption and a forgotten one.
 		assertThat(classesIn("execution"))
 				.as("execution holds the delegates, the engine gateway and admission. If this is "
 						+ "ever zero again, ModuleWallRule and EngineConfinementRule are both passing "

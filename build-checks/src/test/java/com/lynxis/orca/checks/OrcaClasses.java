@@ -9,17 +9,16 @@ import com.tngtech.archunit.core.importer.ImportOption;
  *
  * <p>These rules have to see all twelve modules at the same time — a service
  * reaching into another service's internals is invisible from inside either one.
- * That is the reason this is a monorepo (ADR-014): in seven repositories these
- * checks degrade into a code-review convention, and a convention is what the
- * current system enforced tenancy with across roughly 816 hand-written scope
- * conditions.
+ * That need is why the checks run from the monorepo: in seven repositories they
+ * would degrade into a code-review convention, the same weak protection used by
+ * the current production system's roughly 816 hand-written scope conditions.
  */
 final class OrcaClasses {
 
 	static final String ROOT = "com.lynxis.orca";
 	static final String PLATFORM = ROOT + ".platform";
 
-	/** The five modules §C2 names inside orca-runtime. The module wall depends on these names. */
+	/** The five internal modules of orca-runtime. {@link ModuleWallRule} depends on these names. */
 	static final String[] RUNTIME_MODULES = { "execution", "workitem", "integration", "notify", "readmodel" };
 
 	/** The six built services. orca-media is not a module and has no classes here. */

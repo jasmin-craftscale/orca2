@@ -7,15 +7,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * <strong>Check 7 · Engine confinement.</strong> Flowable appears in
- * {@code runtime.execution} and nowhere else.
+ * Confines Flowable to {@code runtime.execution} and nowhere else.
  *
- * <p>§C2: the engine <em>"is reached behind an interface so the platform is not
- * written against a specific engine's API throughout"</em>, and ADR-006 records
- * that the engine is the half of that decision which can still be unwound — the
- * compiler is the harder half. That reversibility is worth exactly as much as the
- * number of places {@code org.flowable} appears, and nothing in a document keeps
- * that number down.
+ * <p>The engine is reached behind an interface so the platform is not written
+ * against one engine's API throughout. Replacing Flowable is the reversible half
+ * of the workflow design; replacing the process compiler would be harder. That
+ * reversibility is worth exactly as much as the number of places
+ * {@code org.flowable} appears, and only this build rule keeps that number down.
  *
  * <p>The failure this prevents is ordinary and cumulative. A {@code readmodel}
  * projection that reaches for {@code HistoryService} because the query is easier
