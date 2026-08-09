@@ -53,9 +53,9 @@ public class WorkItemController implements WorkItemsApi {
 
 	@Override
 	public ResponseEntity<WorkItemListEnvelope> listWorkItems(String status, String laneExternalId,
-			String assignee, Integer limit) {
+			String assignee, String teamExternalId, Integer limit) {
 		List<WorkItemTables.WorkItem> items = inScope(() -> workItems.list(status, laneExternalId,
-				assignee, limit == null ? 100 : Math.min(limit, 500)));
+				assignee, teamExternalId, limit == null ? 100 : Math.min(limit, 500)));
 		return ResponseEntity.ok(new WorkItemListEnvelope()
 				.status(ApiStatus.SUCCESS)
 				.code(ApiResponse.OK)
@@ -137,6 +137,9 @@ public class WorkItemController implements WorkItemsApi {
 		}
 		catch (WorkItemService.WorkItemConflictException conflict) {
 			throw new ApiException(WorkItemErrorCode.WORK_ITEM_CONFLICT, conflict.getMessage());
+		}
+		catch (WorkItemService.WorkItemIneligibleException ineligible) {
+			throw new ApiException(WorkItemErrorCode.WORK_ITEM_NOT_ELIGIBLE, ineligible.getMessage());
 		}
 		catch (ManualStepPort.ProcessNotWaitingException outOfOrder) {
 			throw new ApiException(WorkItemErrorCode.WORK_ITEM_OUT_OF_ORDER, outOfOrder.getMessage());

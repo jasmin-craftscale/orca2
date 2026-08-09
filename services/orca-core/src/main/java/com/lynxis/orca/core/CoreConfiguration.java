@@ -187,6 +187,38 @@ public class CoreConfiguration {
 		return new TeamAdminController(service, installation.siteExternalId());
 	}
 
+	// --- Phase 3 WP2 · screens & routing -------------------------------------
+
+	@Bean
+	public com.lynxis.orca.core.persistence.ScreenRepository screenRepository(ScopeSeam seam) {
+		return new com.lynxis.orca.core.persistence.ScreenRepository(seam);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.persistence.TeamRoutingRepository teamRoutingRepository(ScopeSeam seam) {
+		return new com.lynxis.orca.core.persistence.TeamRoutingRepository(seam);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.domain.RoutingAdminService routingAdminService(
+			com.lynxis.orca.core.persistence.ScreenRepository screens,
+			com.lynxis.orca.core.persistence.TeamRoutingRepository routing,
+			TeamRepository teams, DeviceRepository devices, AuditTrail audit) {
+		return new com.lynxis.orca.core.domain.RoutingAdminService(screens, routing, teams, devices, audit);
+	}
+
+	@Bean
+	public com.lynxis.orca.core.api.ScreenAdminController screenAdminController(
+			com.lynxis.orca.core.domain.RoutingAdminService service, InstallationProperties installation) {
+		return new com.lynxis.orca.core.api.ScreenAdminController(service, installation.siteExternalId());
+	}
+
+	@Bean
+	public com.lynxis.orca.core.api.TeamRoutingController teamRoutingController(
+			com.lynxis.orca.core.domain.RoutingAdminService service, InstallationProperties installation) {
+		return new com.lynxis.orca.core.api.TeamRoutingController(service, installation.siteExternalId());
+	}
+
 	// --- WP3 · device registry ----------------------------------------------
 
 	@Bean

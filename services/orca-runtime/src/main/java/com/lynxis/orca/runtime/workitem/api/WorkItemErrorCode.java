@@ -29,6 +29,12 @@ public enum WorkItemErrorCode implements ErrorCode {
 	WORK_ITEM_OUT_OF_ORDER("WORK_ITEM_OUT_OF_ORDER", 409),
 
 	/**
+	 * The operator is outside the item's eligible teams (WP2 — the claim respects
+	 * the routing rules). 403, not 409: nothing raced, the claim was never theirs.
+	 */
+	WORK_ITEM_NOT_ELIGIBLE("WORK_ITEM_NOT_ELIGIBLE", 403),
+
+	/**
 	 * The request is authenticated but carries no resolvable operator identity.
 	 * Every work-item action needs an actor — an audit trail with a hole in it is
 	 * the 1.x shape this module refuses.

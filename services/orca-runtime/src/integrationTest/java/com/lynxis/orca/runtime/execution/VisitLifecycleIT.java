@@ -127,6 +127,7 @@ class VisitLifecycleIT {
 
 		publishTopologyLane();
 		grantTopologyLaneTo("it_" + SCHEMA);
+		publishRoutingTopology();
 
 		tos = start("/tos/v1/visits", exchange -> {
 			sleep(tosDelayMillis.get());
@@ -445,6 +446,11 @@ class VisitLifecycleIT {
 		catch (InterruptedException interrupted) {
 			Thread.currentThread().interrupt();
 		}
+	}
+
+	private static void publishRoutingTopology() {
+		com.lynxis.orca.runtime.workitem.RoutingTopologyFixture.publish(
+				VisitLifecycleIT::admin, "it_" + SCHEMA);
 	}
 
 	private static void publishTopologyLane() {

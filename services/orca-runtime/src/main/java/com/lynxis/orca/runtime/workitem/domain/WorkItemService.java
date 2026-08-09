@@ -11,6 +11,7 @@ import com.lynxis.orca.runtime.execution.api.ManualStepPort;
 import com.lynxis.orca.runtime.workitem.api.WorkItemIntake;
 import com.lynxis.orca.runtime.workitem.domain.WorkItemTables.WorkItem;
 import com.lynxis.orca.runtime.workitem.domain.WorkItemTables.WorkItemAudit;
+import com.lynxis.orca.runtime.workitem.persistence.RoutingReadRepository;
 import com.lynxis.orca.runtime.workitem.persistence.WorkItemRepository;
 
 import lombok.extern.slf4j.Slf4j;
@@ -43,13 +44,15 @@ import lombok.extern.slf4j.Slf4j;
 public class WorkItemService implements WorkItemIntake {
 
 	private final WorkItemRepository repository;
+	private final RoutingReadRepository routing;
 	private final ManualStepPort manualSteps;
 	private final TransactionTemplate transactions;
 	private final String siteExternalId;
 
-	public WorkItemService(WorkItemRepository repository, ManualStepPort manualSteps,
-			TransactionTemplate transactions, String siteExternalId) {
+	public WorkItemService(WorkItemRepository repository, RoutingReadRepository routing,
+			ManualStepPort manualSteps, TransactionTemplate transactions, String siteExternalId) {
 		this.repository = repository;
+		this.routing = routing;
 		this.manualSteps = manualSteps;
 		this.transactions = transactions;
 		this.siteExternalId = siteExternalId;
@@ -67,12 +70,20 @@ public class WorkItemService implements WorkItemIntake {
 	@Override
 	public void manualStepReached(ManualStep step) {
 		transactions.executeWithoutResult(status -> {
+			// The screen identity this node fronts, resolved at creation (WP2). An
+			// unconfigured node still creates an item — a screen-less item is
+			// visible and claimable by anyone, which beats invisible human work.
+			String screenExternalId = routing
+					.screenFor(step.processDefinitionKey(), step.nodeReference())
+					.map(RoutingReadRepository.ScreenIdentity::screenExternalId)
+					.orElse(null);
+
 			String externalId = "wi-" + UUID.randomUUID();
 			repository.insert(externalId, siteExternalId, step.executionId(), step.laneId(),
 					step.visitExternalId(), step.laneExternalId(), step.processInstanceId(), step.taskId(),
-					step.processDefinitionKey(), step.nodeReference(), null, step.eventData());
-			log.info("work item {} queued for visit {} at node '{}' (task {})", externalId,
-					step.visitExternalId(), step.nodeReference(), step.taskId());
+					step.processDefinitionKey(), step.nodeReference(), screenExternalId, step.eventData());
+			log.info("work item {} queued for visit {} at node '{}' (task {}, screen {})", externalId,
+					step.visitExternalId(), step.nodeReference(), step.taskId(), screenExternalId);
 		});
 	}
 
@@ -94,10 +105,17 @@ public class WorkItemService implements WorkItemIntake {
 
 	// --- the operator actions ----------------------------------------------
 
-	/** The guarded claim. The loser is told what the item is now, never silently no-op'd. */
+	/**
+	 * The guarded claim. The loser is told what the item is now, never silently
+	 * no-op'd — and an operator outside the eligible teams is refused <em>before</em>
+	 * the guard (WP2: the claim respects eligibility). The eligibility check is
+	 * authorization, not the race guard: only the conditional UPDATE prevents a
+	 * double claim.
+	 */
 	public WorkItem take(String externalId, String actor) {
 		return transactions.execute(status -> {
 			WorkItem before = require(externalId);
+			requireEligible(before, actor);
 			if (!repository.take(externalId, actor, Instant.now())) {
 				throw conflict(externalId, "take");
 			}
@@ -215,14 +233,104 @@ public class WorkItemService implements WorkItemIntake {
 		});
 	}
 
+	// --- eligibility (WP2) ---------------------------------------------------
+
+	/**
+	 * Who may claim: the pre-assigned operator; anyone, when the item has no
+	 * screen or no routing rules (unrouted work claimable by all beats work
+	 * nobody may touch); otherwise a member of an eligible team.
+	 */
+	private void requireEligible(WorkItem item, String actor) {
+		if (actor.equals(item.assignee())) {
+			return;
+		}
+		if (item.screenExternalId() == null) {
+			return;
+		}
+		List<RoutingReadRepository.RouteRule> rules =
+				routing.rulesFor(item.screenExternalId(), item.laneExternalId());
+		if (rules.isEmpty()) {
+			return;
+		}
+		List<String> eligibleTeams = rules.stream()
+				.map(RoutingReadRepository.RouteRule::teamExternalId)
+				.distinct().toList();
+		if (!routing.isMemberOfAny(actor, eligibleTeams)) {
+			throw new WorkItemIneligibleException(item.externalId(), actor, eligibleTeams);
+		}
+	}
+
 	// --- reads --------------------------------------------------------------
 
 	public WorkItem get(String externalId) {
 		return require(externalId);
 	}
 
-	public List<WorkItem> list(String status, String laneExternalId, String assignee, int limit) {
-		return repository.list(status, laneExternalId, assignee, limit);
+	/**
+	 * The grid read, with the sheet's ordering (§5): rules with a set priority
+	 * before unset, lower number more urgent, oldest-queued as the tiebreak —
+	 * and, deliberately, ONE ordering for every consumer: the Push selection in
+	 * the presence work package reads the same sorted queue, closing 1.x's
+	 * split-brain between the grid's SQL and the push path's map iteration.
+	 *
+	 * <p>Sorted here rather than in SQL: the priority lives on the routing rules
+	 * (core's world), the item is runtime's, and the seam deliberately has no
+	 * cross-schema join. The open queue is operationally bounded — trucks
+	 * standing at a site's gates — so the fetch is capped, sorted, and trimmed.
+	 */
+	public List<WorkItem> list(String status, String laneExternalId, String assignee,
+			String teamExternalId, int limit) {
+		boolean openQueue = status == null || WorkItem.QUEUED.equals(status)
+				|| WorkItem.IN_PROGRESS.equals(status);
+		if (!openQueue) {
+			return repository.list(status, laneExternalId, assignee, limit);
+		}
+
+		List<WorkItem> items = repository.list(status, laneExternalId, assignee,
+				Math.max(limit, 2_000));
+
+		List<RoutingReadRepository.TeamRule> rules = teamExternalId == null
+				? routing.allRules()
+				: routing.rulesOfTeam(teamExternalId);
+		java.util.Map<String, Integer> priorityByScreenLane = new java.util.HashMap<>();
+		java.util.Set<String> routedScreenLanes = new java.util.HashSet<>();
+		for (RoutingReadRepository.TeamRule rule : rules) {
+			String key = rule.screenExternalId() + "|" + rule.laneExternalId();
+			routedScreenLanes.add(key);
+			if (rule.priority() != null) {
+				priorityByScreenLane.merge(key, rule.priority(), Math::min);
+			}
+		}
+		// A team filter narrows to that team's work — plus the unrouted items,
+		// which every grid shows because anyone may claim them.
+		java.util.Set<String> anyRuleAtAll = teamExternalId == null ? routedScreenLanes
+				: routing.allRules().stream()
+						.map(rule -> rule.screenExternalId() + "|" + rule.laneExternalId())
+						.collect(java.util.stream.Collectors.toSet());
+
+		return items.stream()
+				.filter(item -> {
+					if (teamExternalId == null) {
+						return true;
+					}
+					String key = item.screenExternalId() + "|" + item.laneExternalId();
+					boolean unrouted = item.screenExternalId() == null || !anyRuleAtAll.contains(key);
+					return unrouted || routedScreenLanes.contains(key);
+				})
+				.sorted(java.util.Comparator
+						.comparing((WorkItem item) -> {
+							Integer priority = priorityByScreenLane
+									.get(item.screenExternalId() + "|" + item.laneExternalId());
+							return priority == null ? 1 : 0;
+						})
+						.thenComparing(item -> {
+							Integer priority = priorityByScreenLane
+									.get(item.screenExternalId() + "|" + item.laneExternalId());
+							return priority == null ? Integer.MAX_VALUE : priority;
+						})
+						.thenComparing(WorkItem::queuedAt))
+				.limit(limit)
+				.toList();
 	}
 
 	public List<WorkItemAudit> auditTrail(String externalId) {
@@ -259,6 +367,19 @@ public class WorkItemService implements WorkItemIntake {
 
 		public WorkItemNotFoundException(String externalId) {
 			super("No work item '" + externalId + "' exists under this installation's scope.");
+		}
+	}
+
+	/**
+	 * The operator is outside the item's eligible teams (WP2). Distinguished from
+	 * a conflict: nothing raced — this claim was never theirs to make.
+	 */
+	public static class WorkItemIneligibleException extends RuntimeException {
+
+		public WorkItemIneligibleException(String externalId, String actor, List<String> eligibleTeams) {
+			super("Operator '" + actor + "' is not a member of any team routed to work item '"
+					+ externalId + "' (eligible teams: " + String.join(", ", eligibleTeams)
+					+ "). The claim respects the routing rules.");
 		}
 	}
 

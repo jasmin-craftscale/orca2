@@ -54,7 +54,17 @@ public enum CoreErrorCode implements ErrorCode {
 	GRID_UNKNOWN("GRID_UNKNOWN", 422),
 
 	/** The authenticated token maps to no active platform user. */
-	USER_NOT_LINKED("USER_NOT_LINKED", 403);
+	USER_NOT_LINKED("USER_NOT_LINKED", 403),
+
+	SCREEN_UNKNOWN("SCREEN_UNKNOWN", 422),
+
+	/** An active screen already fronts that node at this site — routing must resolve to ONE screen. */
+	SCREEN_NODE_TAKEN("SCREEN_NODE_TAKEN", 409),
+
+	LANE_UNKNOWN("LANE_UNKNOWN", 422),
+
+	/** The submitted rule set names the same (screen, lane) pair twice. */
+	ROUTING_RULE_DUPLICATE("ROUTING_RULE_DUPLICATE", 422);
 
 	private final String code;
 	private final int httpStatus;

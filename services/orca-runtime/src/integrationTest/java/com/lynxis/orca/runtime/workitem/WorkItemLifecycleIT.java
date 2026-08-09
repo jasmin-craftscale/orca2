@@ -143,6 +143,10 @@ class WorkItemLifecycleIT {
 				"execution_event", "execution", "lane_session", "idempotency_record")) {
 			jdbc.execute("DELETE FROM " + table);
 		}
+		for (String table : List.of("topology_screen", "topology_team_routing",
+				"topology_team_member", "topology_operator")) {
+			admin("DELETE FROM core." + table);
+		}
 	}
 
 	// ------------------------------------------------------------------------
@@ -153,6 +157,12 @@ class WorkItemLifecycleIT {
 	@Timeout(value = 10, unit = TimeUnit.MINUTES)
 	@DisplayName("a process reaching the manual step queues the item and parks the engine — one transaction, both visible together")
 	void theItemAndTheWaitStateAppearTogether() {
+		// A screen identity fronts the node — creation resolves it (WP2).
+		admin("INSERT INTO core.topology_screen (screen_external_id, screen_name, "
+				+ "process_definition_key, node_reference, max_sec, site_external_id) "
+				+ "VALUES ('scr-manual', N'Manual handling', 'gate-visit', 'manualInput', 300, '"
+				+ SITE + "')");
+
 		String visit = admitAndPark();
 		WorkItemRow item = queuedItemOf(visit);
 
@@ -161,6 +171,10 @@ class WorkItemLifecycleIT {
 		assertThat(item.laneExternalId()).isEqualTo(LANE);
 		assertThat(item.processDefinitionKey()).isEqualTo("gate-visit");
 		assertThat(item.nodeReference()).isEqualTo("manualInput");
+		assertThat(jdbc.queryForObject("SELECT screen_external_id FROM work_item WHERE external_id = ?",
+				String.class, item.externalId()))
+				.as("the screen identity resolved at creation, in the creating transaction")
+				.isEqualTo("scr-manual");
 
 		// The engine task the item parks on genuinely exists and is the wait state.
 		assertThat(taskService.createTaskQuery().taskId(item.taskId()).count())
@@ -539,6 +553,7 @@ class WorkItemLifecycleIT {
 		admin("IF OBJECT_ID(N'core.topology_lane', 'V') IS NOT NULL DROP VIEW core.topology_lane");
 		admin("EXEC('CREATE VIEW core.topology_lane AS SELECT CAST(1 AS BIGINT) AS lane_id, "
 				+ "''" + LANE + "'' AS lane_external_id, ''" + SITE + "'' AS site_external_id')");
+		RoutingTopologyFixture.publish(WorkItemLifecycleIT::admin, "it_" + SCHEMA);
 	}
 
 	private static void admin(String sql) {

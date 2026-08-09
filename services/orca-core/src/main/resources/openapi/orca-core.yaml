@@ -38,6 +38,15 @@ tags:
     description: The four-level entitlement catalog (application → module → sub-module → action item).
   - name: teams
     description: Clerk teams — members, handling method (PUSH/PROMPT), shift & break templates (§C1).
+  - name: screens
+    description: |
+      Screen IDENTITIES (Phase 3 WP2) — a name, the process node the screen
+      fronts, and its three SLA thresholds. Identity only: the renderer and the
+      component tree are the builder's, deferred.
+  - name: teamRouting
+    description: |
+      Team routing rules (team × screen × lane × priority) — which teams handle
+      which manual work where. Published to runtime as `topology_team_routing`.
   - name: shiftTemplates
     description: The shift template catalog. One validated IANA timezone per template.
   - name: breakTemplates
@@ -384,6 +393,158 @@ paths:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "422":
           description: A template or a member user is unknown
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/screens:
+    get:
+      tags: [screens]
+      operationId: listScreens
+      summary: List the screen identities
+      responses:
+        "200":
+          description: The screens, retired included and flagged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScreensEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    post:
+      tags: [screens]
+      operationId: createScreen
+      summary: Create a screen identity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScreenRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScreenEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: An active screen already fronts that node at this site
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/screens/{screenExternalId}:
+    patch:
+      tags: [screens]
+      operationId: updateScreen
+      summary: Update a screen identity — name, thresholds, node binding, retirement
+      description: |
+        Absent fields are unchanged. A threshold of 0 clears that threshold
+        back to the global-setting fallback.
+      parameters:
+        - name: screenExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateScreenRequest"
+      responses:
+        "200":
+          description: The screen after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScreenEnvelope"
+        "404":
+          description: No such screen
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: An active screen already fronts that node at this site
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/teams/{teamExternalId}/routing-rules:
+    get:
+      tags: [teamRouting]
+      operationId: listTeamRoutingRules
+      summary: The team's routing rules
+      parameters:
+        - name: teamExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The rules
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutingRulesEnvelope"
+        "404":
+          description: No such team
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    put:
+      tags: [teamRouting]
+      operationId: replaceTeamRoutingRules
+      summary: Replace the team's routing rules — a declarative set
+      description: |
+        The submitted set becomes the team's rules; rules absent from it are
+        removed. The (screen × lane) pair is unique per team — 1.x allowed
+        duplicates, this refuses them.
+      parameters:
+        - name: teamExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplaceRoutingRulesRequest"
+      responses:
+        "200":
+          description: The rules after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutingRulesEnvelope"
+        "404":
+          description: No such team
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: A screen or lane is unknown, or the set repeats a (screen, lane) pair
           content:
             application/json:
               schema:
@@ -1861,6 +2022,142 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/TeamSummary"
+
+    # --- Phase 3 WP2 · screens & routing -------------------------------------
+
+    ScreenSummary:
+      type: object
+      properties:
+        externalId:
+          type: string
+        name:
+          type: string
+        processDefinitionKey:
+          type: string
+        nodeReference:
+          type: string
+          description: The wait-state node this screen fronts, in the engine's vocabulary.
+        belowExpectedSec:
+          type: integer
+          format: int32
+          description: Per-screen threshold; absent = no below-expected threshold (there is no global fallback for this one).
+        expectedSec:
+          type: integer
+          format: int32
+          description: Per-screen threshold; absent = the EXPECTED_PROCESSING_TIME_SEC setting decides.
+        maxSec:
+          type: integer
+          format: int32
+          description: Per-screen threshold; absent = the MAX_PROCESSING_TIME_SEC setting decides. This is the one the SLA timer arms from.
+        retired:
+          type: boolean
+
+    CreateScreenRequest:
+      type: object
+      required: [name, processDefinitionKey, nodeReference]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        processDefinitionKey:
+          type: string
+          maxLength: 255
+        nodeReference:
+          type: string
+          maxLength: 255
+        belowExpectedSec:
+          type: integer
+          format: int32
+          minimum: 1
+        expectedSec:
+          type: integer
+          format: int32
+          minimum: 1
+        maxSec:
+          type: integer
+          format: int32
+          minimum: 1
+
+    UpdateScreenRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        processDefinitionKey:
+          type: string
+          maxLength: 255
+        nodeReference:
+          type: string
+          maxLength: 255
+        belowExpectedSec:
+          type: integer
+          format: int32
+          minimum: 0
+          description: 0 clears the threshold back to the fallback.
+        expectedSec:
+          type: integer
+          format: int32
+          minimum: 0
+          description: 0 clears the threshold back to the fallback.
+        maxSec:
+          type: integer
+          format: int32
+          minimum: 0
+          description: 0 clears the threshold back to the fallback.
+        retired:
+          type: boolean
+
+    RoutingRule:
+      type: object
+      required: [screenExternalId, laneExternalId]
+      properties:
+        screenExternalId:
+          type: string
+        laneExternalId:
+          type: string
+        priority:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Lower = more urgent. Absent = unprioritised, ordered after the prioritised.
+
+    ReplaceRoutingRulesRequest:
+      type: object
+      required: [rules]
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutingRule"
+
+    ScreenEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/ScreenSummary"
+
+    ScreensEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/ScreenSummary"
+
+    RoutingRulesEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/RoutingRule"
 
     # --- WP3 · device registry ----------------------------------------------
 

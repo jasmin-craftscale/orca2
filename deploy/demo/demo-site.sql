@@ -102,10 +102,69 @@ IF NOT EXISTS (SELECT 1 FROM core.device WHERE external_id = N'DEV-DEMO-BARRIER'
 	FROM core.lane l WHERE l.external_id = N'LANE-DEMO-01';
 GO
 
+-- --------------------------------------------------------------------------
+-- Phase 3: the clerk world — one operator, one team, the screen identity for
+-- gate-visit's manual-input wait state, and the routing rule that sends that
+-- work to the team. This is what makes the exception→work-item→resolution loop
+-- demonstrable live (phase-3 plan §4 item 4).
+--
+-- The clerk's keycloak_subject starts NULL: the local realm has no human user,
+-- only the dev convenience clients. The demo links the subject of whatever
+-- token it obtains with ONE visible UPDATE — which also demonstrates the
+-- operator directory doing its job (docs/phase-3-report.md shows the step).
+-- --------------------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM core.role WHERE external_id = N'rol-demo-clerk')
+	INSERT INTO core.role (external_id, name, description)
+	VALUES (N'rol-demo-clerk', N'Demo Clerk', N'Demo-only role for the clerk workflow walkthrough');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM core.user_account WHERE external_id = N'usr-demo-clerk')
+	INSERT INTO core.user_account (external_id, display_name, email, role_id)
+	SELECT N'usr-demo-clerk', N'Demo Clerk', N'demo-clerk@example.invalid', r.role_id
+	FROM core.role r WHERE r.external_id = N'rol-demo-clerk';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM core.team WHERE external_id = N'team-demo-clerks')
+	INSERT INTO core.team (external_id, site_external_id, name, handling_method)
+	VALUES (N'team-demo-clerks', N'SITE-DEMO', N'Demo Clerks', N'PROMPT');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM core.team_member tm
+		JOIN core.team t ON t.team_id = tm.team_id
+		WHERE t.external_id = N'team-demo-clerks' AND tm.retired_at IS NULL)
+	INSERT INTO core.team_member (team_id, user_id, site_external_id)
+	SELECT t.team_id, u.user_id, N'SITE-DEMO'
+	FROM core.team t, core.user_account u
+	WHERE t.external_id = N'team-demo-clerks' AND u.external_id = N'usr-demo-clerk';
+GO
+
+-- The screen identity fronting gate-visit's wait state. max_sec 60 arms the SLA
+-- boundary timer at one minute — short enough to watch breach live, long enough
+-- to complete the loop first when that is what is being demonstrated.
+IF NOT EXISTS (SELECT 1 FROM core.screen WHERE external_id = N'scr-demo-manual')
+	INSERT INTO core.screen (external_id, site_external_id, name,
+		process_definition_key, node_reference, expected_sec, max_sec)
+	VALUES (N'scr-demo-manual', N'SITE-DEMO', N'Manual handling',
+		N'gate-visit', N'manualInput', 30, 60);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM core.team_routing tr
+		JOIN core.team t ON t.team_id = tr.team_id
+		WHERE t.external_id = N'team-demo-clerks' AND tr.retired_at IS NULL)
+	INSERT INTO core.team_routing (external_id, site_external_id, team_id, screen_id, lane_id, priority)
+	SELECT N'rt-demo-clerks-manual', N'SITE-DEMO', t.team_id, sc.screen_id, l.lane_id, 1
+	FROM core.team t, core.screen sc, core.lane l
+	WHERE t.external_id = N'team-demo-clerks'
+	  AND sc.external_id = N'scr-demo-manual'
+	  AND l.external_id = N'LANE-DEMO-01';
+GO
+
 PRINT 'Demo data present:';
 GO
 SELECT s.external_id AS site, a.external_id AS area, l.external_id AS lane,
-       (SELECT COUNT(*) FROM core.device d WHERE d.lane_id = l.lane_id) AS devices
+       (SELECT COUNT(*) FROM core.device d WHERE d.lane_id = l.lane_id) AS devices,
+       (SELECT COUNT(*) FROM core.screen) AS screens,
+       (SELECT COUNT(*) FROM core.team_routing tr WHERE tr.retired_at IS NULL) AS routing_rules
 FROM core.lane l
 	JOIN core.area a ON a.area_id = l.area_id
 	JOIN core.site s ON s.site_id = a.site_id

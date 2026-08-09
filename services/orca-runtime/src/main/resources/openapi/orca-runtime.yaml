@@ -134,8 +134,9 @@ paths:
       summary: The queue, filtered
       description: |
         Queue membership is `status` + `queuedAt` + assignee — there is no queue
-        table. Oldest first; the priority ordering from the routing rules joins
-        at this read in the routing work package.
+        table. Open-queue reads (QUEUED/IN_PROGRESS) are ordered by the routing
+        rules' priority — set before unset, lower more urgent, oldest-queued as
+        the tiebreak; terminal-status reads are oldest first.
       parameters:
         - name: status
           in: query
@@ -148,6 +149,14 @@ paths:
             type: string
         - name: assignee
           in: query
+          schema:
+            type: string
+        - name: teamExternalId
+          in: query
+          description: |
+            Narrow to a team's routed work — plus the unrouted items, which
+            every grid shows because anyone may claim them. Ordering uses this
+            team's rule priorities.
           schema:
             type: string
         - name: limit
