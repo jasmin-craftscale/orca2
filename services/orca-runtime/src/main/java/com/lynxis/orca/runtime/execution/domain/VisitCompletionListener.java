@@ -24,10 +24,10 @@ import lombok.RequiredArgsConstructor;
  * plus {@code flowable:executionListener} is a proprietary extension and the
  * profile admits exactly one ({@code delegateExpression}).
  *
- * <p><strong>Why two event types since Phase 3, where Phase 1 used one.</strong>
- * Phase 1 closed the visit on {@code ACTIVITY_COMPLETED} of any {@code endEvent} —
- * which was correct while every end event ended the process, and became wrong the
- * moment gate-visit gained a NON-INTERRUPTING branch: the SLA breach path
+ * <p><strong>Why two engine event types are required.</strong> The first version
+ * closed the visit on {@code ACTIVITY_COMPLETED} of any {@code endEvent}. That was
+ * correct while every end event ended the process, and became wrong when
+ * gate-visit gained a NON-INTERRUPTING SLA branch: its breach path
  * concludes at its own end event <em>while the manual-input task still waits</em>,
  * and closing the visit there would mark a truck resolved that is still standing
  * at the gate. So the end event's id is <em>stashed</em> per instance on
@@ -52,9 +52,9 @@ import lombok.RequiredArgsConstructor;
  * (non-released → {@code MANUAL}), and a rolled-back <em>final</em> end event is
  * retried by the executor, re-stamping the stash. It becomes real only if a
  * compiler emits a process where a <em>differently-classified</em> end
- * ({@code visitReleased}) races a non-interrupting branch's end — a shape the
- * profile (§8b) now names as unsupported until the platform bridges through the
- * database instead of memory. Recorded in {@code phase-3-report.md} §10.
+ * ({@code visitReleased}) races a non-interrupting branch's end. The
+ * {@code docs/BPMN_EXECUTION_PROFILE.md} dialect forbids that shape until the
+ * platform persists this bridge in the database instead of JVM memory.
  */
 @RequiredArgsConstructor
 public class VisitCompletionListener implements FlowableEventListener {
@@ -98,8 +98,8 @@ public class VisitCompletionListener implements FlowableEventListener {
 	/**
 	 * All the ways Flowable says "this instance is over". The engine fires a
 	 * VARIANT instead of plain {@code PROCESS_COMPLETED} when the final end event
-	 * is a terminate, error or escalation end event — none exist in the current
-	 * dialect (profile §2), but this listener is platform behaviour for every
+	 * is a terminate, error or escalation end event. None exists in the current
+	 * {@code docs/BPMN_EXECUTION_PROFILE.md} dialect, but this listener is platform behavior for every
 	 * process a compiler will ever emit, and a variant it ignored would end an
 	 * instance whose visit never closes, silently. Found by the pre-handover
 	 * review; verified against the Flowable 8 event-type enum.

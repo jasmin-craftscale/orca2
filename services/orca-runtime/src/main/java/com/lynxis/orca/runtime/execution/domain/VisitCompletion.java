@@ -15,7 +15,7 @@ import lombok.extern.slf4j.Slf4j;
  * same transaction.
  *
  * <p><strong>The two writes are one commit, and that is the whole point.</strong>
- * §D3 and the outbox primitive: <em>save the thing, then tell somebody</em> fails
+ * The outbox exists because <em>save the thing, then tell somebody</em> fails
  * in two directions and neither is detectable — the save commits and the
  * notification fails, so it happened and nobody was told; or the notification
  * succeeds and the transaction rolls back, so everybody was told about something
@@ -24,8 +24,8 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <p>This runs inside the engine's own command context — the same transaction that
  * is ending the process instance — so the visit row, the outbox row and the
- * engine's own state commit together or not at all. That is only possible because
- * the engine is on this database and this transaction manager (§C2, ADR-006).
+ * engine's own state commit together or not at all. That is possible because the
+ * engine shares this database and Spring transaction manager.
  *
  * <h2>Which end state was reached</h2>
  *
@@ -35,11 +35,11 @@ import lombok.extern.slf4j.Slf4j;
  * <em>named</em> outcome rather than a failure: a visit that needed a human is
  * distinguishable from one that crashed.
  *
- * <p><strong>Only the released path writes a fact.</strong> The plan asks for
- * {@code visit.completed} on the happy path and names no other event, and inventing
- * {@code visit.manual_handling_required} would publish a contract nobody has agreed
- * and no consumer wants. A visit awaiting a human is visible as a row with status
- * {@code MANUAL}; the clerk workflow that reads it is Phase 2. Reported.
+ * <p><strong>Only the released path writes a fact.</strong>
+ * {@code visit.completed} is the only agreed external event. Inventing
+ * {@code visit.manual_handling_required} here would publish a contract with no
+ * agreed consumer; manual work is already visible through the visit row and the
+ * work-item queue.
  */
 @Slf4j
 public class VisitCompletion {
@@ -47,7 +47,7 @@ public class VisitCompletion {
 	/** The end event that means the truck may go. Part of the BPMN execution profile. */
 	public static final String RELEASED_END_EVENT = "visitReleased";
 
-	/** §D3's ordering key shape: facts about one lane are delivered in sequence. */
+	/** Facts use the lane as ordering key, so events for one lane are delivered in sequence. */
 	public static final String ORDERING_KEY_PREFIX = "lane:";
 
 	public static final String VISIT_COMPLETED = "visit.completed";
@@ -66,8 +66,8 @@ public class VisitCompletion {
 	 * @param endEventId the BPMN id of the end event the instance reached
 	 */
 	public void reachedEndState(String processInstanceId, String endEventId) {
-		// The engine's worker has an identity but no scope — §B6 grants none
-		// implicitly, and this is the deliberate act that gives it one.
+		// The engine worker has an identity but no implicit entitlement. This is the
+		// deliberate act that gives it installation scope.
 		ScopeContext.runIn(Scope.of("site_external_id", Set.of(siteExternalId)),
 				() -> close(processInstanceId, endEventId));
 	}

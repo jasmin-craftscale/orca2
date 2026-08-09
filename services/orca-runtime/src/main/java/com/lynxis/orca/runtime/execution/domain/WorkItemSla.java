@@ -31,8 +31,8 @@ import lombok.extern.slf4j.Slf4j;
  * manual step exactly when a screen is not yet configured. The ten-year job costs
  * one row in the engine's timer table and is deleted with the task; the honest
  * alternative (compile the timer only when a threshold exists) would freeze
- * threshold configuration into the published process. Recorded in the profile
- * (§8b) and the phase report.
+ * threshold configuration into the published process. The sentinel and its cost
+ * are part of {@code docs/BPMN_EXECUTION_PROFILE.md}.
  */
 @Slf4j
 public class WorkItemSla {

@@ -15,14 +15,13 @@ import lombok.RequiredArgsConstructor;
 /**
  * Everything admission touches, through the scope seam and nothing else.
  *
- * <p>WP0 proved the property with a {@code JdbcTemplate} inside
- * {@code src/integrationTest}, which {@code src/main} cannot have:
- * {@code ScopeSeamRule} forbids it, and until WP2 the seam could not write at all.
- * This is the same three mechanisms — the lane lock, the filtered unique index and
- * one transaction — expressed through the seam.
+ * <p>The first property proof used a {@code JdbcTemplate} inside
+ * {@code src/integrationTest}; production cannot do that because
+ * {@code ScopeSeamRule} fails such a dependency at build time. This repository is
+ * the same three mechanisms — lane lock, filtered unique index and one transaction
+ * — expressed through the seam.
  *
- * <p><strong>Two things the seam had to learn for this</strong>, both recorded in
- * the phase report as platform changes WP6 made:
+ * <p><strong>Admission required two additions to the seam:</strong>
  *
  * <ul>
  *   <li>{@link ScopedSelect#lockMatchedRows()} — the read half of a read-decide-write
@@ -44,8 +43,9 @@ public class AdmissionRepository {
 	 * Resolves a lane external id to core's surrogate key, through core's published
 	 * view.
 	 *
-	 * <p>Mechanism 2 of §B4: in runtime's own transaction, no network hop on the
-	 * gate path, and nothing core has not deliberately published (ADR-009). An
+	 * <p>This is a read through core's published view in runtime's own transaction:
+	 * no network hop on the gate path and no access to anything core has not
+	 * deliberately published. An
 	 * external id this installation's site does not have resolves to empty — the
 	 * scope predicate does that, not a check written here.
 	 */
@@ -58,7 +58,7 @@ public class AdmissionRepository {
 				.stream().findFirst();
 	}
 
-	/** The reverse of {@link #laneIdOf}, for anything leaving this service (§B8). */
+	/** The reverse of {@link #laneIdOf}, returning the stable identifier used outside this service. */
 	public Optional<String> laneExternalIdOf(long laneId) {
 		return seam.select(ScopedSelect.from("core.topology_lane")
 								.columns("lane_external_id")

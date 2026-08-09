@@ -13,14 +13,14 @@ import com.lynxis.orca.runtime.execution.domain.DeviceCommandPort;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Issues a device command to the site's edge instance, over §C3's
+ * Issues a device command to the site's edge instance over
  * {@code /internal/commands/v1}.
  *
- * <p>ADR-011: no token is minted. The per-installation shared credential goes on
+ * <p>No token is minted. The per-installation shared credential goes on
  * the request, and {@code X-Orca-Service} is attribution only — a shared credential
  * cannot prove which peer is calling. Token <em>issuing</em> would put the identity
- * provider on the gate path, and §A1 says the gate must keep working when other
- * things do not.
+ * provider on the gate path; the gate must keep working when that dependency does
+ * not.
  *
  * <h2>The mapping that matters</h2>
  *
@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
  * That is the single most important line in this class. If the request timed out,
  * or the connection dropped after it was sent, edge may already have raised the
  * barrier — and telling the process the command failed would state, as fact, that a
- * physical thing did not happen when it may well have. §B10 resolves an unknown
+ * physical thing did not happen when it may well have. An unknown
  * outcome by verifying the device, never by retrying and never by assuming.
  *
  * <p>{@code IN_PROGRESS} maps to {@code UNKNOWN} for the same reason and not

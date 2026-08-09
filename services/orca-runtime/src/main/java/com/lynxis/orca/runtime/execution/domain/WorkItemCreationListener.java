@@ -18,10 +18,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Notices that the engine is parking at a manual-input wait state, and creates the
- * work item <strong>in the same transaction</strong> — inversion 1 of the sheet's
- * §0, and the sequence §B9 draws: <em>"manual-input step reached — create the item
- * in the SAME transaction"</em>.
+ * Notices that the engine is parking at a manual-input wait state and creates the
+ * work item <strong>in the same transaction</strong>. This reverses the legacy 1.x
+ * ownership: the process reaches a wait state first, then runtime creates the
+ * clerk's item atomically with that wait.
  *
  * <p><strong>Why an engine listener and not a task listener on the BPMN.</strong>
  * The same argument as {@link VisitCompletionListener}: the compiled process is the
@@ -30,7 +30,8 @@ import lombok.extern.slf4j.Slf4j;
  * work, the worst failure this module can have. Work-item creation is platform
  * behaviour, not process design, so it is attached to the engine once, at startup,
  * for every {@code userTask} in every process any administrator ever designs. The
- * BPMN needs nothing but the plain wait state (profile §2's {@code userTask} row).
+ * BPMN needs nothing but the plain {@code userTask} wait state defined by
+ * {@code docs/BPMN_EXECUTION_PROFILE.md}.
  *
  * <p><strong>{@code isFailOnException() == true} is the atomicity property.</strong>
  * If the item cannot be written, the engine does not park: the whole job rolls
@@ -89,8 +90,8 @@ public class WorkItemCreationListener implements FlowableEventListener {
 
 	/**
 	 * The step's captured context: the branch discriminators the process was
-	 * carrying when it parked. Discriminators only — a response body is not a
-	 * process variable (profile §6), so this can never leak one.
+	 * carrying when it parked. Discriminators only: process variables may not carry
+	 * response bodies, so this context cannot leak one.
 	 */
 	private static String capturedContext(Task task) {
 		if (!(task instanceof VariableScope variables)) {
@@ -111,8 +112,8 @@ public class WorkItemCreationListener implements FlowableEventListener {
 			json.append(',');
 		}
 		// Backslash BEFORE quote, or escaping the quote mints new backslashes.
-		// Discriminators are short routing tokens today, but WP7's status routing
-		// derives them from connector answers — this must stay valid JSON then too.
+		// Discriminators are short routing tokens derived from connector answers, so
+		// this escaping must keep the captured context valid JSON.
 		json.append('"').append(name).append("\":\"")
 				.append(value.toString().replace("\\", "\\\\").replace("\"", "\\\"")).append('"');
 	}

@@ -18,8 +18,8 @@ import lombok.extern.slf4j.Slf4j;
  * the other two delegates.
  *
  * <p>It records and nothing else: no requeue, no reassignment, no notification.
- * The narrow version of escalation (register #5) is <em>detection + recording +
- * visibility</em>; a configurable escalation policy is a separate feature, not
+ * Escalation is deliberately limited to <em>detection + recording + visibility</em>;
+ * a configurable escalation policy remains a separate product decision, not
  * implied here. The item stays exactly where it was — the timer is
  * non-interrupting, so the operator's claim and completion are untouched.
  *
