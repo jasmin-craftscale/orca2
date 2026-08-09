@@ -5,7 +5,7 @@ import com.lynxis.orca.platform.web.ErrorCode;
 /**
  * orca-core's own error codes, alongside the platform set.
  *
- * <p>Each is a branch point a console can act on without reading prose (§B8):
+ * <p>Each is a machine-readable branch point a console can act on without prose:
  * "that role does not exist" and "that entitlement code does not exist" lead an
  * administrator to two different screens.
  */

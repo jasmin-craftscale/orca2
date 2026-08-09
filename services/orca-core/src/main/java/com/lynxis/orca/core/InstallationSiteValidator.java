@@ -9,7 +9,7 @@ import org.springframework.core.env.Profiles;
  * development machine.
  *
  * <p>The same mechanism, for the same reason, as
- * {@code InternalCredentialValidator} (ADR-011): a deployment that forgot
+ * {@code InternalCredentialValidator}: a deployment that forgot
  * {@code ORCA_SITE_EXTERNAL_ID} would otherwise boot green and run silently
  * scoped to a site that does not exist — every read empty, every write
  * refused, and nothing to say why. Refusing at startup is the honest failure.

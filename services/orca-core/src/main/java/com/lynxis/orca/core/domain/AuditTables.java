@@ -11,8 +11,9 @@ import com.lynxis.orca.platform.scope.table.RetentionClass;
  * the moment {@link WorldModelTables}'s Javadoc said the growth question would
  * have to be answered differently: one row per admin mutation, unbounded in
  * 1.x ({@code audit_history}), bounded here by the {@code audit} retention
- * class (PROVISIONAL until the class list is reconciled — the check enforces
- * that a class is <em>named</em>, which is what §B10 specifies).
+ * class. That name is PROVISIONAL until the closed retention catalog is
+ * reconciled; {@code RetentionClassRule} currently enforces at build time only
+ * that every traffic-growing table <em>names</em> a class.
  */
 public final class AuditTables {
 

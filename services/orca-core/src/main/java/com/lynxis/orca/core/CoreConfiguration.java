@@ -88,7 +88,7 @@ public class CoreConfiguration {
 		};
 	}
 
-	// --- WP1 · identity ------------------------------------------------------
+	// --- identity ------------------------------------------------------------
 
 	@Bean
 	public UserAccountRepository userAccountRepository(ScopeSeam seam) {
@@ -139,7 +139,7 @@ public class CoreConfiguration {
 		return new EntitlementCatalogController(catalog, installation.siteExternalId());
 	}
 
-	// --- WP2 · teams & templates --------------------------------------------
+	// --- teams & templates --------------------------------------------------
 
 	@Bean
 	public ShiftTemplateRepository shiftTemplateRepository(ScopeSeam seam) {
@@ -187,7 +187,7 @@ public class CoreConfiguration {
 		return new TeamAdminController(service, installation.siteExternalId());
 	}
 
-	// --- Phase 3 WP2 · screens & routing -------------------------------------
+	// --- screens & routing --------------------------------------------------
 
 	@Bean
 	public com.lynxis.orca.core.persistence.ScreenRepository screenRepository(ScopeSeam seam) {
@@ -219,7 +219,7 @@ public class CoreConfiguration {
 		return new com.lynxis.orca.core.api.TeamRoutingController(service, installation.siteExternalId());
 	}
 
-	// --- WP3 · device registry ----------------------------------------------
+	// --- device registry ----------------------------------------------------
 
 	@Bean
 	public DeviceCatalogRepository deviceCatalogRepository(ScopeSeam seam) {
@@ -267,7 +267,7 @@ public class CoreConfiguration {
 		return new ResourceConfigurationController(service, installation.siteExternalId());
 	}
 
-	// --- WP4 · settings · workspace · audit ---------------------------------
+	// --- settings · workspace · audit ---------------------------------------
 
 	@Bean
 	public SettingRepository settingRepository(ScopeSeam seam) {

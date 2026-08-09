@@ -23,12 +23,11 @@ import com.lynxis.orca.platform.web.ApiStatus;
 import com.lynxis.orca.platform.web.RequestId;
 
 /**
- * §C1's catalog route: the four-level tree, assembled from the seeded tables.
+ * Serves the four-level entitlement catalog assembled from the seeded tables.
  *
- * <p>Unfiltered by licence — deliberately: licence verification is a later
- * phase's feature (register U4/fleet), and filtering by a licence that cannot
- * yet be read would be inventing the licence model here. Recorded in the
- * phase report.
+ * <p>Unfiltered by licence, deliberately. Licence verification belongs to the
+ * future fleet/cloud scope and no licence source exists yet; filtering by a value
+ * that cannot be read would invent the licence model inside this controller.
  */
 @RestController
 public class EntitlementCatalogController implements EntitlementsApi {

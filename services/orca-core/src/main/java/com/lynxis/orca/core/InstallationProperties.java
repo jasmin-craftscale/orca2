@@ -8,15 +8,17 @@ import jakarta.validation.constraints.NotBlank;
 /**
  * The installation's identity in the scope mechanism — one property, bound
  * once, injected as a type rather than thirteen copies of a {@code @Value}
- * expression (review finding, Phase 2 addendum).
+ * expression. A review found those copies drifting, which is why this type owns
+ * the binding.
  *
  * @param siteExternalId the installation's own site, from configuration and
- *                       never from a request (phase-1 decision 7). The
- *                       committed default is the demo fixture;
+ *                       never from a request, because a caller must not choose
+ *                       the scope it is allowed to see. The committed default is
+ *                       the demo fixture;
  *                       {@link InstallationSiteValidator} refuses to start a
  *                       non-{@code local} service with it, the same way the
- *                       internal credential's fixture is refused (ADR-011's
- *                       pattern) — a production install that forgot
+ *                       internal credential's local fixture is refused — a
+ *                       production install that forgot
  *                       {@code ORCA_SITE_EXTERNAL_ID} must fail loudly, not
  *                       boot silently scoped to a site that does not exist
  */

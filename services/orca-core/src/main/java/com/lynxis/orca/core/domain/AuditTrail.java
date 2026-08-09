@@ -16,12 +16,12 @@ import lombok.RequiredArgsConstructor;
  *
  * <p>The actor is resolved once, here: the calling user's external id when the
  * token maps to one, the raw subject when it does not (a fact worth auditing
- * verbatim), or the system identity for §B6's user-less paths. There is no
- * anonymous branch to reach — no path runs with no identity.
+ * verbatim), or the explicit system identity for work no user invoked. There is
+ * no anonymous production branch to reach: every entry point has an identity.
  *
- * <p>This phase wires it into the settings and branding mutations it lands
- * with; instrumenting the WP1–WP3 mutation paths is recorded in the report as
- * deliberate follow-up, not assumed done.
+ * <p>Settings and branding mutations call this writer. Identity, team/template
+ * and device-registry mutations do not yet do so; that instrumentation remains
+ * explicit follow-up and must not be assumed complete.
  */
 @RequiredArgsConstructor
 public class AuditTrail {
@@ -52,7 +52,7 @@ public class AuditTrail {
 			return SystemContext.require().toString();
 		}
 		// Reachable only from a test harness that established neither; a real
-		// request is authenticated before any controller runs (§B6).
+		// request is authenticated before any controller runs.
 		return "unattributed";
 	}
 }

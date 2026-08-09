@@ -18,9 +18,9 @@ import com.lynxis.orca.platform.web.RequestId;
 
 /**
  * The audit trail's read surface — newest first, always bounded. A route this
- * phase adds beyond §C1's interface table (recorded in the report): a
- * write-only audit table would be readable only with a database login, which
- * is the operator blindness H3 removed elsewhere.
+ * implementation adds beyond the original service interface table: a write-only
+ * audit table would be readable only with a database login, leaving operators
+ * unable to inspect the history the application records for them.
  */
 @RestController
 public class AuditEventController implements AuditApi {

@@ -30,11 +30,11 @@ import com.lynxis.orca.platform.web.PlatformErrorCode;
 import com.lynxis.orca.platform.web.RequestId;
 
 /**
- * §C1's user-management surface, implementing the generated contract.
+ * The user-management HTTP surface, implementing the generated contract.
  *
- * <p>Scope is established here, at the request boundary, from configuration —
- * never from the request (phase-1 decision 15's reasoning, applied to the
- * public surface: the caller does not choose what it may see).
+ * <p>Scope is established here, at the request boundary, from installation
+ * configuration and never from the request: the caller does not choose what it
+ * may see.
  */
 @RestController
 public class UserAdminController implements UsersApi {

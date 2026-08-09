@@ -8,8 +8,8 @@ import java.time.ZoneOffset;
 /**
  * The API boundary's time conversions, once — this package's counterpart to
  * {@code persistence.Utc}, and consolidated for the same reason: the identical
- * two-line helper had been copied into nine controllers (review finding,
- * Phase 2 addendum).
+ * two-line helper had been copied into nine controllers before a review exposed
+ * the duplication.
  */
 final class ApiTime {
 
