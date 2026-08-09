@@ -13,7 +13,7 @@ import com.lynxis.orca.core.persistence.SiteDirectoryRepository;
 import lombok.RequiredArgsConstructor;
 
 /**
- * §C1's custom variables at site/area/lane/device scope.
+ * Manages custom variables at site, area, lane and device scope.
  *
  * <p>The resource must exist before it can carry variables — resolved per
  * scope: sites from core's own table, lanes and areas through the published

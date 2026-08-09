@@ -6,9 +6,9 @@ import com.lynxis.orca.platform.scope.table.Growth;
 import com.lynxis.orca.platform.scope.table.PersistentTable;
 
 /**
- * The tables {@code V109__routing_screens.sql} creates — Phase 3 WP2's screen
- * identity and team routing rules. Both {@link Growth#BOUNDED}: rows appear when
- * an administrator configures, not when trucks move.
+ * The screen-identity and team-routing tables created by
+ * {@code V109__routing_screens.sql}. Both are {@link Growth#BOUNDED}: rows appear
+ * when an administrator configures them, not when trucks move.
  */
 public final class RoutingTables {
 
@@ -16,8 +16,8 @@ public final class RoutingTables {
 	}
 
 	/**
-	 * The screen <em>identity</em> — deliberately not the renderer (work-items
-	 * sheet §5): a name, the node it fronts, and the three SLA thresholds.
+	 * The screen <em>identity</em>, deliberately not the renderer: a name, the
+	 * process node it fronts, and the three SLA thresholds.
 	 * What the operator sees on it is the builder-developer's, deferred.
 	 *
 	 * @param belowExpectedSec ·

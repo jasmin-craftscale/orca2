@@ -8,15 +8,14 @@ import com.lynxis.orca.platform.scope.Scope;
  * How core's request boundary builds its scope — in one place, so the two
  * dimensions cannot drift apart between controllers.
  *
- * <p>Core follows the fielded pattern (phase-1 decision 7): the installation's
- * site comes from configuration ({@code orca.installation.site-external-id}),
- * never from the request. To that this phase adds the second dimension,
- * {@code config_realm} — the declared way to read installation-wide
- * configuration, since the seam deliberately has no unscoped read.
+ * <p>The installation's site comes from configuration
+ * ({@code orca.installation.site-external-id}), never from the request, because a
+ * caller cannot choose its own scope. {@code config_realm} is the second
+ * dimension: the explicit way to read installation-wide configuration when the
+ * seam deliberately offers no unscoped read.
  *
- * <p>An installation with more than one site is the hosted tier's shape and is
- * deferred with cloud scope (register NEW-1b); when it arrives, this is the one
- * method that widens.
+ * <p>An installation with more than one site belongs to the deferred hosted/cloud
+ * design. If that scope opens, this is the one method that must widen.
  */
 public final class CoreScopes {
 

@@ -20,8 +20,8 @@ import com.lynxis.orca.core.persistence.DeviceRepository.LaneRef;
 import lombok.RequiredArgsConstructor;
 
 /**
- * The device registry's admin operations (§C1): inventory per lane,
- * registration, update, retirement, the IO port layout and PTZ presets.
+ * The device registry's administration service: inventory per lane,
+ * registration, update, retirement, I/O port layout and PTZ presets.
  *
  * <p>The type vocabulary is the seeded catalog — a device cannot claim a type
  * the catalog does not carry, which is what makes the catalog a contract

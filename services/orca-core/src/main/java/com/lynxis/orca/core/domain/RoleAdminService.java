@@ -21,8 +21,7 @@ import com.lynxis.orca.core.persistence.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Role management (§C1): customer-defined roles, their entitlement grants and
- * their site scoping.
+ * Manages customer-defined roles, their entitlement grants and their site scope.
  *
  * <p>Grants and site scope are declarative — the request's set replaces the
  * stored set. Codes are validated against the seeded catalog and sites against

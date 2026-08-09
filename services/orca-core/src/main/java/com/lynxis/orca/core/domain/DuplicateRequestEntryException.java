@@ -13,7 +13,7 @@ import lombok.Getter;
  * <p>This is a request-shaped fault, and before this exception existed it was
  * answered by the filtered unique indexes — correctly refused, but as an
  * uncaught {@code DuplicateKeyException} falling through to a 500 on six
- * contracted routes (review finding, Phase 2 addendum). The services now
+ * contracted routes. A review found that incorrect response shape. The services now
  * refuse it here, before any row is touched, and the controllers translate it
  * to {@code VALIDATION_FAILED} with the offending field named. The indexes
  * stay what they were: the backstop, not the answer.

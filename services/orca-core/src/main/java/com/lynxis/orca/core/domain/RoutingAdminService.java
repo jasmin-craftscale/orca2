@@ -16,8 +16,9 @@ import com.lynxis.orca.core.persistence.TeamRepository;
 import com.lynxis.orca.core.persistence.TeamRoutingRepository;
 
 /**
- * Screens (the identity, not the renderer) and the team routing rules — Phase 3
- * WP2, the piece Phase 2's WP2 deferred because it references a screen.
+ * Manages screen identities (not their renderer) and team routing rules. Routing
+ * was implemented with screens because a rule cannot name a screen before screen
+ * identity exists.
  *
  * <p>Rule sets are declarative, like a role's grants and a team's members: the
  * submitted set becomes the team's rules. The unique tuple is the database's —

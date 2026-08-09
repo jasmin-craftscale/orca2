@@ -8,8 +8,9 @@ import java.util.Optional;
  *
  * <p>An interface rather than a static read of the security context, so the
  * property suites (which run without a Spring context) can hand a controller a
- * caller the same way production's filter chain does. The production bean
- * reads the JWT; §B6's system paths have no subject and answer empty.
+ * caller the same way production's filter chain does. The production bean reads
+ * the JWT; work running under a system identity has no user subject and answers
+ * empty.
  */
 public interface CallerIdentity {
 

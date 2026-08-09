@@ -48,10 +48,9 @@ public final class IdentityTables {
 	}
 
 	/**
-	 * A platform user: profile and claim mapping only. Credentials are Keycloak's
-	 * (§B6, sheet rule 9); {@code keycloakSubject} is how a token resolves to this
-	 * row. Exactly one role per user, held structurally by the single NOT NULL
-	 * {@code roleId}.
+	 * A platform user: profile and claim mapping only. Keycloak owns credentials;
+	 * {@code keycloakSubject} is how a verified token resolves to this row. Exactly
+	 * one role per user is held structurally by the single NOT NULL {@code roleId}.
 	 */
 	@PersistentTable(name = "user_account", growth = Growth.BOUNDED)
 	public record UserAccount(

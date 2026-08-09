@@ -23,15 +23,15 @@ public final class DeviceTables {
 	}
 
 	/**
-	 * A piece of equipment at a lane — identity, addressing, and the parameters
-	 * a device host needs to load its plugins (§C1). Deliberately WITHOUT
-	 * credential columns: device-credential storage is security-shaped and
-	 * PROPOSED in the WP3 report, not implemented.
+	 * A piece of equipment at a lane — identity, addressing, and the parameters a
+	 * device host needs to load its plugins. Deliberately WITHOUT credential
+	 * columns: secure device-credential storage remains a proposed security design,
+	 * not an implemented feature.
 	 *
 	 * @param deviceTypeId one FK to the catalog — 1.x kept three denormalized
 	 *                     copies of the type and all three died in V106
-	 * @param assemblyName .NET plugin-load parameter, load-bearing for the
-	 *                     frozen config poll (§D2)
+	 * @param assemblyName .NET plugin-load parameter required by the frozen device
+	 *                     configuration-poll contract
 	 */
 	@PersistentTable(name = "device", growth = Growth.BOUNDED)
 	public record Device(
