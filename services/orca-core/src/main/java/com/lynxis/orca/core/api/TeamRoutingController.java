@@ -62,6 +62,10 @@ public class TeamRoutingController implements TeamRoutingApi {
 		catch (RoutingAdminService.RoutingRuleDuplicateException duplicate) {
 			throw new ApiException(CoreErrorCode.ROUTING_RULE_DUPLICATE, duplicate.getMessage());
 		}
+		catch (RoutingAdminService.ConcurrentRuleChangeException raced) {
+			throw new ApiException(com.lynxis.orca.platform.web.PlatformErrorCode.CONFLICT,
+					raced.getMessage());
+		}
 	}
 
 	private static RoutingRulesEnvelope envelope(List<RoutingAdminService.Rule> rules) {

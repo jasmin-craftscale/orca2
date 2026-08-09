@@ -28,9 +28,9 @@ The numbers: two new runtime tables (`work_item`, `work_item_audit`) plus
 published views, one BPMN wait state with a non-interrupting SLA boundary timer,
 three new compiler link targets (`workItemSla`, `workItemSlaBreachDelegate`, and
 the bare `userTask` convention), 16 new contract operations across the two
-services, and **five new integration suites (24 tests) on top of the updated
-Phase 1 suites — 220 integration tests in 30 suites, all green under
-`check integrationTest --rerun-tasks`**. The catalog debt Phase 2 recorded is
+services, and **five new integration suites (26 tests, two added by the §10 review) on top
+of the updated Phase 1 suites — 222 integration tests in 30 suites, all green
+under `check integrationTest --rerun-tasks`**. The catalog debt Phase 2 recorded is
 paid: 19 / 40 / 16, byte-stable.
 
 ## 2 · What was built, package by package
@@ -436,3 +436,84 @@ a configurable escalation *policy* (register #5's second half — nothing here
 implies it); `/screens/submit`, take-by-lane, the operator grids and exports
 (console scope); portal/sync/fleet (cloud scope, register NEW-1b). Escalation's
 dead 1.x statuses were not inherited anywhere.
+
+## 10 · Review addendum — the independent pass before handover (9 Aug 2026)
+
+An adversarial review of the whole phase diff, run before handover — the same
+ritual as Phase 2's §9. Nine findings; seven fixed, two accepted and documented.
+Every fix landed with the full suite forced green again
+(`check integrationTest --rerun-tasks`, `BUILD SUCCESSFUL in 5m 46s`, all 68
+tasks executed — 222 integration tests in 30 suites after the two tests the
+review added).
+
+### Fixed
+
+1. **(HIGH) The unfiltered work-item listing would have lost the open queue on
+   any mature site.** `GET /work-items` with no `status` fetched oldest-first
+   with *no status predicate* — on a traffic-growing table the capped fetch
+   eventually returns nothing but ancient terminal rows, and every open item
+   (necessarily newer) falls outside it. The open-queue predicate
+   (`status IN ('QUEUED','IN_PROGRESS')`) now lives in the SQL itself; the
+   contract states that no `status` means the open queue; pinned by
+   `WorkItemRoutingIT.aNoStatusListingServesOnlyOpenWork` (terminal rows queued
+   *earlier* than the open ones, exactly the starving arrangement).
+2. **(HIGH) `replaceRules` was not transactional.** A failure between the
+   retire and the inserts would leave a team with no routing at all — its work
+   silently unrouted — and two concurrent replaces could commit an interleaved
+   partial set. Now `@Transactional` (the sibling replace-set idiom
+   `TeamAdminService`/`RoleAdminService` already used), with a tuple collision
+   from a concurrent replace rolled back whole and surfaced as a retryable 409
+   (`ConcurrentRuleChangeException`), not a 500.
+3. **(MEDIUM) A breach that fired could go unrecorded if the operator completed
+   first.** The recording job runs seconds after the timer (executor acquire
+   interval); an open-status filter in its read dropped exactly the borderline
+   breaches. The read now covers terminal items, judged against **their own
+   completion instant** — an operator who finished after the threshold
+   breached; one who finished inside it (whose timer died with the task) never
+   reaches the recorder at all. Pinned by
+   `WorkItemRoutingIT.aBreachIsRecordedEvenAfterCompletion`, both directions.
+4. **(MEDIUM, from the maintainer's own pass) Flowable ends an instance through
+   *four* event types.** `PROCESS_COMPLETED_WITH_TERMINATE/ERROR/ESCALATION_END_EVENT`
+   fire *instead of* plain `PROCESS_COMPLETED` for those end-event kinds —
+   verified against the Flowable 8 enum. None exist in the dialect, but the
+   listener is platform behaviour for every future process; all four now close
+   the visit.
+5. **(MEDIUM) Contract/implementation mismatches**: `take`'s 403
+   (`WORK_ITEM_NOT_ELIGIBLE`) and reset's 401 were undeclared; `limit` had no
+   `minimum` and a contract-legal `limit=0` produced a 500 (now `minimum: 1` +
+   clamped); `teamExternalId` on a terminal-status read was silently ignored —
+   now **refused, typed** (`TEAM_FILTER_IS_OPEN_QUEUE_ONLY`, 422), because a
+   team-filtered history that ignores the filter shows every team's history as
+   one team's.
+6. **(LOW) V115 re-created `ck_execution_status` without the binary collation**
+   — the one enum CHECK in the phase diverging from the Phase 2 §7.1
+   convention. Aligned by **V117** (a new migration, not an edit: V115 has been
+   applied to development databases and checksums do not drift).
+7. **(LOW) A malformed `MAX_PROCESSING_TIME_SEC` would have failed the timer's
+   arming expression** — at activity entry, where the one-transaction design
+   means one bad admin value stops every manual step at the site. The parse is
+   now length-bounded and degrades to "no SLA", which is the sentinel's stated
+   intent. Also: the stale `OperatorIdentity` javadoc (still describing the
+   retired subject-as-actor slice shape) deleted, and both hand-rolled JSON
+   writers now escape backslashes before quotes.
+
+### Accepted, documented, deliberately not fixed now
+
+8. **The completion listener's stash race** (review finding 4): JVM state
+   bridging two engine events can be poisoned by a concurrently rolled-back
+   command — *when* a differently-classified end event races a non-interrupting
+   branch's end. No process the dialect can express has that shape (every
+   concurrently-reachable end classifies identically, and a rolled-back final
+   end is retried by the executor). Stated in full in
+   `VisitCompletionListener`'s javadoc, and the profile (§8b) now names the
+   conflicting shape as one the compiler must not emit until the platform
+   bridges through the database. A gap reported over a mechanism invented under
+   review pressure.
+9. **The team-filtered grid re-reads the rule set twice per call** — two reads
+   of a bounded config view; noted, not worth the restructuring.
+
+What the review confirmed clean: every guarded conditional UPDATE (predicates
+carry status + holder; rows-affected the only guard; complete's engine call
+genuinely inside the same transaction), lane reset's lock ordering, the
+presence open-row invariant and retry, the scope-leading indexes, and no dead
+code or unused imports beyond the stale javadoc above.

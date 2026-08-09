@@ -96,7 +96,19 @@ public class RoutingAdminService {
 		return resolved(routing.activeOfTeam(team.teamId()));
 	}
 
-	/** The submitted set becomes the team's rules — retire the old, insert the new, one transaction expected of the caller's boundary (each write is scoped and small; the controller runs this per request). */
+	/**
+	 * The submitted set becomes the team's rules — retire the old, insert the new,
+	 * <strong>one transaction</strong> (the sibling replace-set idiom:
+	 * {@code TeamAdminService}, {@code RoleAdminService}). Without it, a failure
+	 * between the retire and the inserts leaves the team with NO rules — its work
+	 * silently unrouted — and two concurrent replaces could commit an interleaved
+	 * partial set. Found by the pre-handover review.
+	 *
+	 * <p>A tuple collision inside the transaction (two concurrent replaces racing
+	 * past each other's uncommitted retires) rolls the whole set back and surfaces
+	 * as {@link ConcurrentRuleChangeException} — a retryable conflict, not a 500.
+	 */
+	@org.springframework.transaction.annotation.Transactional
 	public List<Rule> replaceRules(String teamExternalId, List<Rule> rules) {
 		Team team = teams.byExternalId(teamExternalId)
 				.orElseThrow(() -> new TeamUnknownException(teamExternalId));
@@ -117,9 +129,17 @@ public class RoutingAdminService {
 		}).toList();
 
 		routing.retireOfTeam(team.teamId());
-		for (Resolved rule : resolved) {
-			routing.insert("rt-" + UUID.randomUUID(), team.siteExternalId(), team.teamId(),
-					rule.screenId(), rule.laneId(), rule.priority());
+		try {
+			for (Resolved rule : resolved) {
+				routing.insert("rt-" + UUID.randomUUID(), team.siteExternalId(), team.teamId(),
+						rule.screenId(), rule.laneId(), rule.priority());
+			}
+		}
+		catch (DuplicateKeyException racedAnotherReplace) {
+			// The filtered unique tuple caught a concurrent replace for the same
+			// team. This transaction rolls back whole; the caller retries on top of
+			// whichever set won.
+			throw new ConcurrentRuleChangeException(teamExternalId, racedAnotherReplace);
 		}
 		audit.record("team_routing", teamExternalId, "REPLACED", rules.size() + " rule(s)");
 		return resolved(routing.activeOfTeam(team.teamId()));
@@ -167,6 +187,15 @@ public class RoutingAdminService {
 		public RoutingRuleDuplicateException(String screenExternalId, String laneExternalId) {
 			super("The submitted set names (screen '" + screenExternalId + "', lane '"
 					+ laneExternalId + "') more than once.");
+		}
+	}
+
+	/** Two replaces raced; this one lost and rolled back whole. Retryable, not a defect. */
+	public static class ConcurrentRuleChangeException extends RuntimeException {
+		public ConcurrentRuleChangeException(String teamExternalId, Throwable cause) {
+			super("Another replace of team '" + teamExternalId + "'s routing rules committed "
+					+ "concurrently. Nothing from this request was applied; retry on top of the "
+					+ "current set.", cause);
 		}
 	}
 }

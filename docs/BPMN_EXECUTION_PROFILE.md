@@ -304,6 +304,16 @@ Rules the compiler must keep, and why:
   in the same command) rather than on any end event — Phase 1's
   any-end-event-closes rule broke the day the process gained a non-interrupting
   branch, and `VisitCompletionListener` records the measurement.
+- ⚠️ **One shape the compiler must not emit yet**: a process where a
+  *differently-classified* end event (`visitReleased`) is reachable
+  **concurrently** with a non-interrupting branch's own end. The platform's
+  end-event classification bridges two engine events through memory, and a
+  concurrently rolled-back command can leave a phantom id — harmless while every
+  concurrently-reachable end classifies identically (true of everything this
+  profile can express today, including the SLA construct above), wrong the day
+  that stops holding. `VisitCompletionListener` states the race in full; lifting
+  this restriction means bridging through the database instead, and is the
+  platform's work, not the compiler's.
 
 **For the builder developer's open §8 question:** this settles the wait-state
 half from the running side — timers on wait states are real, restart-safe

@@ -110,8 +110,11 @@ public class WorkItemCreationListener implements FlowableEventListener {
 		if (json.length() > 1) {
 			json.append(',');
 		}
+		// Backslash BEFORE quote, or escaping the quote mints new backslashes.
+		// Discriminators are short routing tokens today, but WP7's status routing
+		// derives them from connector answers — this must stay valid JSON then too.
 		json.append('"').append(name).append("\":\"")
-				.append(value.toString().replace("\"", "\\\"")).append('"');
+				.append(value.toString().replace("\\", "\\\\").replace("\"", "\\\"")).append('"');
 	}
 
 	/** {@code gate-visit:3:12034} → {@code gate-visit}. The id format is the engine's own contract. */

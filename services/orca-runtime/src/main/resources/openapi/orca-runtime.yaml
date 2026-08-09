@@ -139,9 +139,11 @@ paths:
       summary: The queue, filtered
       description: |
         Queue membership is `status` + `queuedAt` + assignee — there is no queue
-        table. Open-queue reads (QUEUED/IN_PROGRESS) are ordered by the routing
-        rules' priority — set before unset, lower more urgent, oldest-queued as
-        the tiebreak; terminal-status reads are oldest first.
+        table. **No `status` means the open queue** (QUEUED and IN_PROGRESS) —
+        the table grows with traffic, and an unpredicated read would serve
+        history, not work. Open-queue reads are ordered by the routing rules'
+        priority — set before unset, lower more urgent, oldest-queued as the
+        tiebreak; terminal-status reads are oldest first.
       parameters:
         - name: status
           in: query
@@ -161,7 +163,10 @@ paths:
           description: |
             Narrow to a team's routed work — plus the unrouted items, which
             every grid shows because anyone may claim them. Ordering uses this
-            team's rule priorities.
+            team's rule priorities. **Open-queue reads only**: on a
+            terminal-status read the parameter is refused (422), because
+            silently ignoring it would present every team's history as one
+            team's.
           schema:
             type: string
         - name: limit
@@ -170,6 +175,7 @@ paths:
             type: integer
             format: int32
             default: 100
+            minimum: 1
             maximum: 500
       responses:
         "200":
@@ -180,6 +186,12 @@ paths:
                 $ref: "#/components/schemas/WorkItemListEnvelope"
         "401":
           description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: teamExternalId was combined with a terminal status
           content:
             application/json:
               schema:
@@ -225,6 +237,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkItemEnvelope"
+        "403":
+          description: The operator is outside the item's eligible teams (WORK_ITEM_NOT_ELIGIBLE)
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "404":
           description: No such item under this installation's scope
           content:
@@ -475,6 +493,7 @@ paths:
             type: integer
             format: int32
             default: 50
+            minimum: 1
             maximum: 500
       responses:
         "200":
@@ -508,6 +527,12 @@ paths:
             type: string
             maxLength: 64
       responses:
+        "401":
+          description: No credential, or no resolvable operator behind it
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "200":
           description: What was reset — nothing, when the lane was already clear
           content:

@@ -67,7 +67,7 @@ public class PresenceController implements PresenceApi {
 	public ResponseEntity<PresenceListEnvelope> listOperatorActivity(String userExternalId,
 			Integer limit) {
 		List<UserActivity> history = inScope(() ->
-				presence.historyOf(userExternalId, limit == null ? 50 : Math.min(limit, 500)));
+				presence.historyOf(userExternalId, limit == null ? 50 : Math.max(1, Math.min(limit, 500))));
 		return ResponseEntity.ok(listEnvelope(history));
 	}
 

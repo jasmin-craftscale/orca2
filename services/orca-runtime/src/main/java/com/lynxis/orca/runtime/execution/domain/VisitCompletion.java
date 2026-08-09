@@ -118,6 +118,9 @@ public class VisitCompletion {
 	}
 
 	private static String quoted(String value) {
-		return value == null ? "null" : "\"" + value.replace("\"", "\\\"") + "\"";
+		// Backslash before quote — the same fix as the work-item creation
+		// listener's context writer, found by the same review pass.
+		return value == null ? "null"
+				: "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
 	}
 }

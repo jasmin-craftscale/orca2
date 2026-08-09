@@ -274,9 +274,15 @@ public class WorkItemService implements WorkItemIntake {
 		if (screenMax.isPresent()) {
 			return screenMax.map(Duration::ofSeconds);
 		}
+		// A malformed setting degrades to "no SLA" — it must never throw, because
+		// this runs inside the timer's ARMING expression at activity entry, and an
+		// exception there would fail the park itself (one bad admin value stopping
+		// every manual step at the site). Digits-only AND length-bounded: nine
+		// digits keeps parseLong safe and still allows a 31-year threshold.
 		return routing.settingValue("MAX_PROCESSING_TIME_SEC")
 				.map(String::trim)
-				.filter(value -> value.chars().allMatch(Character::isDigit) && !value.isEmpty())
+				.filter(value -> !value.isEmpty() && value.length() <= 9
+						&& value.chars().allMatch(Character::isDigit))
 				.map(Long::parseLong)
 				.filter(seconds -> seconds > 0)
 				.map(Duration::ofSeconds);
@@ -293,7 +299,7 @@ public class WorkItemService implements WorkItemIntake {
 	public void recordDueSlaBreaches(String processInstanceId) {
 		transactions.executeWithoutResult(status -> {
 			Instant now = Instant.now();
-			for (WorkItem item : repository.openItemsOfProcessInstance(processInstanceId)) {
+			for (WorkItem item : repository.itemsOfProcessInstance(processInstanceId)) {
 				if (item.slaBreachedAt() != null) {
 					continue;
 				}
@@ -301,10 +307,17 @@ public class WorkItemService implements WorkItemIntake {
 				// only the instance, and a sibling manual step not yet overdue must
 				// not be marked. A small tolerance absorbs the skew between the
 				// engine's clock arming the timer and the database's queued_at.
+				//
+				// A TERMINAL item is judged against its own completion instant, not
+				// against now: the timer fired while the task lived, but this
+				// recording job may run seconds later — an operator who completed
+				// AFTER the threshold still breached, and one who completed inside
+				// it (whose timer job died with the task) never reaches here at all.
+				Instant reference = item.completedAt() != null ? item.completedAt() : now;
 				java.util.Optional<Duration> threshold =
 						slaBreachAfter(item.processDefinitionKey(), item.nodeReference());
 				if (threshold.isEmpty()
-						|| item.queuedAt().plus(threshold.get()).minusSeconds(5).isAfter(now)) {
+						|| item.queuedAt().plus(threshold.get()).minusSeconds(5).isAfter(reference)) {
 					continue;
 				}
 				if (!repository.recordBreach(item.taskId(), now)) {

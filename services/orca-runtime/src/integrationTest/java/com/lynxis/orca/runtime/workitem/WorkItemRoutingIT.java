@@ -189,6 +189,79 @@ class WorkItemRoutingIT {
 				.containsExactly("wi-a", "wi-unrouted");
 	}
 
+	@Test
+	@DisplayName("a no-status listing is the OPEN QUEUE — terminal history cannot crowd live work out of the fetch")
+	void aNoStatusListingServesOnlyOpenWork() {
+		// Terminal rows queued EARLIER than the open ones: with no status
+		// predicate in the SQL, an oldest-first capped fetch would return exactly
+		// these and starve the queue — the pre-handover review's finding 1.
+		insertItem("wi-done-1", null, "LANE-1");
+		insertItem("wi-done-2", null, "LANE-1");
+		jdbc.update("UPDATE work_item SET status = 'COMPLETED' WHERE external_id IN ('wi-done-1', 'wi-done-2')");
+		insertItem("wi-open-q", null, "LANE-1");
+		insertItem("wi-open-p", null, "LANE-1");
+		inScope(() -> workItems.take("wi-open-p", "op-a"));
+
+		assertThat(inScope(() -> workItems.list(null, null, null, null, 100))
+				.stream().map(WorkItem::externalId).toList())
+				.as("no status = QUEUED and IN_PROGRESS, nothing terminal")
+				.containsExactly("wi-open-q", "wi-open-p");
+
+		assertThat(inScope(() -> workItems.list("COMPLETED", null, null, null, 100)))
+				.as("terminal reads still work when asked for by name")
+				.hasSize(2);
+	}
+
+	@Test
+	@DisplayName("a breach that fired is recorded even when the operator completed before the recording job ran")
+	void aBreachIsRecordedEvenAfterCompletion() {
+		// The timer fired while the task lived; the async recording job runs a few
+		// seconds later, after the operator completed. The breach is a fact —
+		// judged against the item's OWN completion instant, not against now.
+		admin("INSERT INTO core.topology_screen (screen_external_id, screen_name, "
+				+ "process_definition_key, node_reference, max_sec, site_external_id) "
+				+ "VALUES ('scr-sla', N'S', 'gate-visit', 'manualInput', 10, '" + SITE + "')");
+		insertItem("wi-late", "scr-sla", "LANE-1");
+		// Queued 100 s ago, completed 40 s ago — 60 s of handling against a 10 s
+		// threshold. (insertItem's synthetic queued_at is in the past already;
+		// make both instants explicit.)
+		jdbc.update("UPDATE work_item SET status = 'COMPLETED', "
+				+ "queued_at = DATEADD(SECOND, -100, SYSUTCDATETIME()), "
+				+ "started_at = DATEADD(SECOND, -90, SYSUTCDATETIME()), "
+				+ "completed_at = DATEADD(SECOND, -40, SYSUTCDATETIME()) "
+				+ "WHERE external_id = 'wi-late'");
+
+		inScope(() -> {
+			workItems.recordDueSlaBreaches("pi-fake");
+			return null;
+		});
+
+		assertThat(jdbc.queryForObject("SELECT sla_breached_at FROM work_item WHERE external_id = 'wi-late'",
+				Object.class))
+				.as("the fired timer's record survives the item completing first")
+				.isNotNull();
+
+		// And the counter-case: completed INSIDE the threshold, judged by its own
+		// completion instant — never marked, even though 'now' is far past it.
+		// Two seconds of handling, clearly inside the threshold-minus-tolerance
+		// window (the recorder allows 5 s of clock skew, so a case ON that
+		// boundary legitimately records).
+		insertItem("wi-prompt", "scr-sla", "LANE-1");
+		jdbc.update("UPDATE work_item SET status = 'COMPLETED', "
+				+ "queued_at = DATEADD(SECOND, -100, SYSUTCDATETIME()), "
+				+ "completed_at = DATEADD(SECOND, -98, SYSUTCDATETIME()) "
+				+ "WHERE external_id = 'wi-prompt'");
+		inScope(() -> {
+			workItems.recordDueSlaBreaches("pi-fake");
+			return null;
+		});
+		assertThat(jdbc.queryForObject("SELECT sla_breached_at FROM work_item WHERE external_id = 'wi-prompt'",
+				Object.class))
+				.as("two seconds of handling against a ten-second threshold is not a breach, "
+						+ "however late the recording job runs")
+				.isNull();
+	}
+
 	// ------------------------------------------------------------------------
 
 	private void screen(String externalId) {

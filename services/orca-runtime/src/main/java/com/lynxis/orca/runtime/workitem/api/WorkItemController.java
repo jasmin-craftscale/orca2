@@ -54,8 +54,15 @@ public class WorkItemController implements WorkItemsApi {
 	@Override
 	public ResponseEntity<WorkItemListEnvelope> listWorkItems(String status, String laneExternalId,
 			String assignee, String teamExternalId, Integer limit) {
+		boolean terminal = "COMPLETED".equals(status) || "FAILED".equals(status);
+		if (terminal && teamExternalId != null) {
+			throw new ApiException(WorkItemErrorCode.TEAM_FILTER_IS_OPEN_QUEUE_ONLY,
+					"The team filter applies to the open queue; a terminal-status read filtered "
+							+ "by team would silently show every team's history as one team's.");
+		}
+		int boundedLimit = limit == null ? 100 : Math.max(1, Math.min(limit, 500));
 		List<WorkItemTables.WorkItem> items = inScope(() -> workItems.list(status, laneExternalId,
-				assignee, teamExternalId, limit == null ? 100 : Math.min(limit, 500)));
+				assignee, teamExternalId, boundedLimit));
 		return ResponseEntity.ok(new WorkItemListEnvelope()
 				.status(ApiStatus.SUCCESS)
 				.code(ApiResponse.OK)

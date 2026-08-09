@@ -39,7 +39,14 @@ public enum WorkItemErrorCode implements ErrorCode {
 	 * Every work-item action needs an actor — an audit trail with a hole in it is
 	 * the 1.x shape this module refuses.
 	 */
-	OPERATOR_UNRESOLVED("OPERATOR_UNRESOLVED", 401);
+	OPERATOR_UNRESOLVED("OPERATOR_UNRESOLVED", 401),
+
+	/**
+	 * {@code teamExternalId} was combined with a terminal status. The team filter
+	 * is an open-queue concept (routing rules govern live work); silently ignoring
+	 * it would present every team's history as one team's. Refused, stated.
+	 */
+	TEAM_FILTER_IS_OPEN_QUEUE_ONLY("TEAM_FILTER_IS_OPEN_QUEUE_ONLY", 422);
 
 	private final String code;
 	private final int httpStatus;

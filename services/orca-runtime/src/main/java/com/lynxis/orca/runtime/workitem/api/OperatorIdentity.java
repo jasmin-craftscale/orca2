@@ -10,11 +10,11 @@ import java.util.Optional;
  * controllers directly, with no Spring context, and hand them a caller the same
  * way production's filter chain does.
  *
- * <p>⚠️ <strong>Slice shape, stated openly:</strong> until the routing work
- * package publishes core's operator directory, the production bean answers the
- * identity-provider <em>subject</em>, not core's user external id. The two become
- * the same value the moment the directory view exists and the bean resolves
- * through it — one bean changes, no caller does. Recorded in the phase report.
+ * <p>The production bean resolves the identity-provider subject to the platform
+ * user's external id through core's published {@code topology_operator} view —
+ * so the value here, and everywhere it lands (assignees, the audit trail's actor
+ * column), is core's user vocabulary. A subject with no linked user answers
+ * empty and the surface refuses with {@code OPERATOR_UNRESOLVED}.
  */
 public interface OperatorIdentity {
 

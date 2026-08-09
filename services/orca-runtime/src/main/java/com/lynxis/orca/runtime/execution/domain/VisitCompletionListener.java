@@ -41,6 +41,20 @@ import lombok.RequiredArgsConstructor;
  * <p>The stash is bounded: an entry is written per end event and removed when the
  * instance completes or is cancelled (lane reset). An instance that ends neither
  * way does not exist.
+ *
+ * <p>⚠️ <strong>A residual race, stated rather than hidden</strong> (pre-handover
+ * review, finding 4): the stash is JVM state written inside engine commands but
+ * not rolled back with them. Two commands on one instance can run concurrently —
+ * the async SLA-breach branch beside an HTTP complete — and a command that stashes
+ * its end-event id and then rolls back (optimistic lock) can leave a phantom id
+ * for the committing command to consume. In every process the current dialect can
+ * express this is harmless: the racing pair's end events all classify identically
+ * (non-released → {@code MANUAL}), and a rolled-back <em>final</em> end event is
+ * retried by the executor, re-stamping the stash. It becomes real only if a
+ * compiler emits a process where a <em>differently-classified</em> end
+ * ({@code visitReleased}) races a non-interrupting branch's end — a shape the
+ * profile (§8b) now names as unsupported until the platform bridges through the
+ * database instead of memory. Recorded in {@code phase-3-report.md} §10.
  */
 @RequiredArgsConstructor
 public class VisitCompletionListener implements FlowableEventListener {
@@ -60,7 +74,7 @@ public class VisitCompletionListener implements FlowableEventListener {
 			lastEndEventByInstance.put(activity.getProcessInstanceId(), activity.getActivityId());
 			return;
 		}
-		if (event.getType() == FlowableEngineEventType.PROCESS_COMPLETED
+		if (isProcessCompletion(event.getType())
 				&& event instanceof org.flowable.common.engine.api.delegate.event.FlowableEngineEvent engineEvent) {
 			String processInstanceId = engineEvent.getProcessInstanceId();
 			String endEventId = lastEndEventByInstance.remove(processInstanceId);
@@ -79,6 +93,23 @@ public class VisitCompletionListener implements FlowableEventListener {
 			// write; this only keeps the stash bounded.
 			lastEndEventByInstance.remove(engineEvent.getProcessInstanceId());
 		}
+	}
+
+	/**
+	 * All the ways Flowable says "this instance is over". The engine fires a
+	 * VARIANT instead of plain {@code PROCESS_COMPLETED} when the final end event
+	 * is a terminate, error or escalation end event — none exist in the current
+	 * dialect (profile §2), but this listener is platform behaviour for every
+	 * process a compiler will ever emit, and a variant it ignored would end an
+	 * instance whose visit never closes, silently. Found by the pre-handover
+	 * review; verified against the Flowable 8 event-type enum.
+	 */
+	private static boolean isProcessCompletion(
+			org.flowable.common.engine.api.delegate.event.FlowableEventType type) {
+		return type == FlowableEngineEventType.PROCESS_COMPLETED
+				|| type == FlowableEngineEventType.PROCESS_COMPLETED_WITH_TERMINATE_END_EVENT
+				|| type == FlowableEngineEventType.PROCESS_COMPLETED_WITH_ERROR_END_EVENT
+				|| type == FlowableEngineEventType.PROCESS_COMPLETED_WITH_ESCALATION_END_EVENT;
 	}
 
 	/**

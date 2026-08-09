@@ -77,6 +77,14 @@ public class WorkItemRepository {
 	/**
 	 * The queue, oldest first. Priority ordering joins in WP2 at the grid read;
 	 * FIFO by {@code queued_at} is the tiebreak it will keep.
+	 *
+	 * <p><strong>{@code status == null} means the OPEN QUEUE, in the SQL itself.</strong>
+	 * The predicate has to live here rather than in the caller's post-filter: this
+	 * table is traffic-growing and the read is ordered oldest-first, so on any
+	 * mature site an unpredicated fetch returns nothing but ancient terminal rows
+	 * and the open items — necessarily newer — fall outside every cap. Found by
+	 * the pre-handover review; the grid semantics did not change, the query now
+	 * actually implements them.
 	 */
 	public List<WorkItem> list(String status, String laneExternalId, String assignee, int limit) {
 		StringBuilder where = new StringBuilder("1 = 1");
@@ -84,6 +92,9 @@ public class WorkItemRepository {
 		if (status != null) {
 			where.append(" AND status = ?");
 			parameters.add(status);
+		}
+		else {
+			where.append(" AND status IN ('QUEUED', 'IN_PROGRESS')");
 		}
 		if (laneExternalId != null) {
 			where.append(" AND lane_external_id = ?");
@@ -102,12 +113,18 @@ public class WorkItemRepository {
 				(rs, row) -> map(rs));
 	}
 
-	public List<WorkItem> openItemsOfProcessInstance(String processInstanceId) {
+	/**
+	 * Every item of the instance, terminal ones included — the SLA recording read.
+	 * Deliberately NOT filtered to open statuses: a timer that fired is a fact,
+	 * and the recording job may run after the operator completed the item (the
+	 * executor's acquire interval is seconds); an open-only read would silently
+	 * drop exactly the borderline breaches the statistics exist to count.
+	 */
+	public List<WorkItem> itemsOfProcessInstance(String processInstanceId) {
 		return seam.select(ScopedSelect.from("work_item")
 						.columns(COLUMNS)
 						.scopedBy(SCOPE_COLUMN)
-						.where("process_instance_id = ? AND status IN ('QUEUED', 'IN_PROGRESS')",
-								processInstanceId),
+						.where("process_instance_id = ?", processInstanceId),
 				(rs, row) -> map(rs));
 	}
 
