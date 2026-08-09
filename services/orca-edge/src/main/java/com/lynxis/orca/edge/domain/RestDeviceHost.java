@@ -20,15 +20,14 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * The outbound half of the device-host contract, as the fielded estate speaks it.
  *
- * <p><strong>DERIVED-FROM-1X.</strong> Every route, every body and the whole
+ * <p><strong>Translated from the legacy 1.x caller.</strong> Every route, every body and the whole
  * success rule below comes from {@code docs/device-host-outbound-from-1x.md}, which
  * was extracted from the ORCA 1.x production caller — the Go service that commands
  * real barriers today. It is <em>not</em> the vendor's specification, which nobody
  * in this repository has and which remains worth obtaining.
  *
- * <p>It supersedes the invented dialect this class shipped with in WP7 — one
- * {@code POST /api/v1/commands} with a JSON envelope — which
- * {@code phase-1-report.md} §3 recorded as a guess. <strong>That guess was wrong in
+ * <p>It supersedes the earlier invented dialect: one
+ * {@code POST /api/v1/commands} with a JSON envelope. <strong>That guess was wrong in
  * every particular: the route, the body, the method of addressing the device and the
  * success rule.</strong>
  *
@@ -51,7 +50,7 @@ import lombok.extern.slf4j.Slf4j;
  * <p>1.x treats a command as performed on <strong>HTTP 200 and a body that
  * decodes</strong> as its answer document —
  * {@code {status, code, message, request_id, timestamp}}. Anything else is a
- * failure. That is §C3's rule — <em>an acknowledgement <strong>and</strong> a body
+ * failure. A command requires <em>an acknowledgement <strong>and</strong> a body
  * that decodes</em> — already fielded, so the 2.0 outcome vocabulary maps onto it
  * without interpretation:
  *
@@ -63,7 +62,7 @@ import lombok.extern.slf4j.Slf4j;
  *       2xx: 1.x compares against 200 and collapses everything else into one
  *       failure, so a 204 is a failure here too.</li>
  *   <li>No answer inside the deadline → {@code UNKNOWN}. Nobody knows whether the
- *       barrier moved, and the only correct next step is to look (§B10). Coercing
+ *       barrier moved, and the only correct next step is to look. Coercing
  *       this to {@code FAILED} would tell the gate a barrier did not rise when it
  *       did.</li>
  *   <li>A connection that was never established → {@code FAILED}. The request never
@@ -73,14 +72,14 @@ import lombok.extern.slf4j.Slf4j;
  *       {@link HttpTimeoutException} and the two mean opposite things here.</li>
  * </ul>
  *
- * <h2>⚠️ The Authorization header is deliberately absent — OPEN QUESTION, register NEW-4</h2>
+ * <h2>⚠️ The Authorization header is deliberately absent: an open product-owner question</h2>
  *
  * <p>1.x mints a Keycloak token for every device-host command and presents it as
- * {@code Bearer} (§3 of the source document). <strong>Whether the .NET host
+ * {@code Bearer}. <strong>Whether the .NET host
  * validates that token cannot be determined from this repository</strong>, and the
  * two answers have opposite consequences: if it is ignored, the header is cargo; if
- * it is enforced, the barrier path acquires an identity-provider dependency that §A1
- * forbids and ADR-011 rules out, and 1.x cannot open a gate today while Keycloak is
+ * it is enforced, the barrier path acquires an identity-provider dependency, and
+ * 1.x cannot open a gate today while Keycloak is
  * unreachable. Only the vendor, the host's configuration, or a test against a real
  * host can answer it, and the choice between the remedies is the product owner's.
  *
@@ -99,7 +98,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class RestDeviceHost implements DeviceHostPort {
 
-	/** §C3's action vocabulary. Four of the five have a route in the 1.x extraction. */
+	/** The device-action vocabulary; four of its five actions have a route in the 1.x extraction. */
 	static final String RAISE_GATE = "RAISE_GATE";
 	static final String LOWER_GATE = "LOWER_GATE";
 	static final String PRINT = "PRINT";
@@ -175,7 +174,7 @@ public class RestDeviceHost implements DeviceHostPort {
 	}
 
 	// ------------------------------------------------------------------------
-	// The routes. DERIVED-FROM-1X · §1 of the source document.
+	// Routes translated from the legacy 1.x caller.
 	// ------------------------------------------------------------------------
 
 	/**
@@ -296,13 +295,13 @@ public class RestDeviceHost implements DeviceHostPort {
 
 	/**
 	 * ⚠️ <strong>The Authorization header's slot. Deliberately empty — OPEN QUESTION,
-	 * register NEW-4.</strong>
+	 * an open product-owner question.</strong>
 	 *
 	 * <p>This method exists so the question has an address in the code rather than
 	 * only in a document. 1.x sends {@code Authorization: Bearer <keycloak token>} on
 	 * all three calls; whether the host validates it is unknown, and filling this in
 	 * either way settles a question that belongs to the product owner and the vendor.
-	 * See the class Javadoc and §3 of {@code docs/device-host-outbound-from-1x.md}.
+	 * See the class Javadoc and {@code docs/device-host-outbound-from-1x.md}.
 	 */
 	@SuppressWarnings("unused")
 	private static void openQuestionAuthorization(HttpRequest.Builder request) {
@@ -310,7 +309,7 @@ public class RestDeviceHost implements DeviceHostPort {
 	}
 
 	// ------------------------------------------------------------------------
-	// The answer. DERIVED-FROM-1X · §2 of the source document.
+	// Response handling translated from the legacy 1.x caller.
 	// ------------------------------------------------------------------------
 
 	/**
@@ -324,7 +323,7 @@ public class RestDeviceHost implements DeviceHostPort {
 	 *
 	 * <p>Requiring the five fields would be stricter than the fielded caller and
 	 * would risk reporting {@code FAILED} for a barrier that rose, which is the exact
-	 * hazard §B10 exists to prevent. The cost of the looseness is stated rather than
+	 * hazard the unknown-outcome rule exists to prevent. The cost of the looseness is stated rather than
 	 * fixed: a proxy that answers {@code 200 {"error":"..."}} would read as an
 	 * execution here, as it does in 1.x today.
 	 */
@@ -386,14 +385,14 @@ public class RestDeviceHost implements DeviceHostPort {
 	/**
 	 * A client per call, because the deadline is per command.
 	 *
-	 * <p>Not cached: §C3's actions carry their own deadlines and two commands to one
+	 * <p>Not cached: actions carry their own deadlines and two commands to one
 	 * host can legitimately want different ones. A barrier is a handful of calls a
 	 * minute, so the cost of a fresh client is not the thing to optimise.
 	 *
 	 * <p>⚠️ <strong>HTTP/1.1, pinned.</strong> The JDK's client attempts an HTTP/2
 	 * upgrade by default, and a server that does not speak it can answer by closing
 	 * the connection — which would arrive here as an unreachable device host. A .NET
-	 * device host is a field-proven component of unknown vintage (§D2); negotiating a
+	 * device host is a field-proven component of unknown vintage; negotiating a
 	 * protocol it may not speak is not a default worth having on a barrier.
 	 */
 	private static HttpClient client(long deadlineMillis) {

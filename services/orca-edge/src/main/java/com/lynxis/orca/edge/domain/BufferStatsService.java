@@ -12,10 +12,10 @@ import com.lynxis.orca.edge.persistence.EventBufferRepository;
 /**
  * What an operator asks when a truck went through and nothing happened.
  *
- * <p>§C3 names {@code /internal/buffer/stats} and Phase 1 did not build it, so a
+ * <p>{@code /internal/buffer/stats} exists because a
  * {@code DEAD} event — one nobody could deliver, and the single event a site
  * operator most needs to see — was visible only to somebody with a database login.
- * {@code phase-1-report.md} §3 records that as operator blindness. This closes it.
+ * These counters close that operator blind spot.
  *
  * <h2>Why the age is here and not a later refinement</h2>
  *
@@ -27,7 +27,7 @@ import com.lynxis.orca.edge.persistence.EventBufferRepository;
  *
  * <h2>Why ownership is on the answer</h2>
  *
- * <p>§C3 gives one instance ownership of a lane at a time. An operator reading these
+ * <p>One edge instance owns a lane at a time. An operator reading these
  * numbers from an instance that does <em>not</em> own a lane is reading a backlog
  * nothing at that address is draining — the same figures meaning two different
  * things depending on which host was called, with nothing on the response saying

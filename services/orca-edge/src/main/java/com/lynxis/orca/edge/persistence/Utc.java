@@ -37,7 +37,7 @@ import java.time.ZoneOffset;
  * relay do every time <em>comparison</em> inside SQL against {@code SYSUTCDATETIME()}
  * and never against a JVM clock, which {@code JdbcLeaseManager}'s Javadoc calls out
  * deliberately — so the skew is confined to values they merely report. It is still
- * the same trap, one primitive away. See {@code phase-1-hardening-report.md} §H3.
+ * the same trap, one primitive away.
  */
 final class Utc {
 

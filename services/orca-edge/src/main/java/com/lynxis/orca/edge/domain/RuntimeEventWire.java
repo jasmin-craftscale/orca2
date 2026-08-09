@@ -11,7 +11,7 @@ import com.lynxis.orca.edge.domain.EdgeTables.BufferedEvent;
  * <p><strong>Hand-written on purpose, and it is a duplication.</strong> The
  * contract is authored in {@code orca-runtime.yaml} and orca-runtime generates its
  * server interface from it; edge cannot generate a client from that file without
- * importing another service's module, and §B4 permits five mechanisms between
+ * importing another service's module. Services communicate only through the five
  * services of which a Java import is not one. So the caller's side of the contract
  * is written out here, where a reviewer can see it is a copy, rather than smuggled
  * in as a compile-time dependency that would make the two services one deployable.
@@ -39,7 +39,7 @@ public final class RuntimeEventWire {
 	 *                   a link outage those differ by the length of the outage, and
 	 *                   the first is the one that says when the truck was at the gate
 	 * @param attributes the normalised half, as a JSON object. Edge is the hardware
-	 *                   boundary (§C3): the vendor's dialect is decoded here and
+	 *                   boundary: the vendor's dialect is decoded here and
 	 *                   never crosses this link
 	 */
 	public record Event(

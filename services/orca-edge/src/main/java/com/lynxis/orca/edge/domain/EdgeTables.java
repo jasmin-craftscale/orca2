@@ -12,7 +12,7 @@ import com.lynxis.orca.platform.scope.table.RetentionClass;
  *
  * <p>{@link BufferedEvent} is the first {@link Growth#TRAFFIC_GROWING} table this
  * phase adds, and it is the reason {@code RetentionClassRule} exists: one row per
- * capture, forever, at every lane. §C3 sizes the buffer at ≥72 h of peak traffic —
+ * capture, forever, at every lane. The buffer must hold at least 72 h of peak traffic;
  * which is a statement about how much has to fit, not about what removes it.
  */
 public final class EdgeTables {
@@ -24,14 +24,14 @@ public final class EdgeTables {
 	 * One undelivered inbound event.
 	 *
 	 * <p>⚠️ The retention class name is <strong>PROVISIONAL</strong>, exactly as
-	 * Phase 0's three are. §C2 invariant 4 closes the list with a database
+	 * The earlier three retention classes are also provisional. A database
 	 * {@code CHECK} over 18 values, that list lives in the Data Dictionary which is
 	 * not in this repository, and the register records that its two published
 	 * copies disagree. The build check enforces that a class is <em>named</em> —
-	 * which is what §B10 specifies — and naming one here is not the same as
+	 * which preserves FIFO order across a link outage; naming one here is not the same as
 	 * choosing the list.
 	 *
-	 * @param sequenceNo the per-lane FIFO position. Order is the guarantee: §B10
+	 * @param sequenceNo the per-lane FIFO position. Order is the guarantee: the buffer
 	 *                   asks for zero loss <em>and preserved order</em> on drain
 	 * @param eventUuid  the producer's dedup key. A camera retrying after a lost
 	 *                   acknowledgement sends the same one, and it must not become
@@ -40,7 +40,7 @@ public final class EdgeTables {
 	 *                   the vendor's {@code ZapPacket} XML — see
 	 *                   {@code docs/lpr-wire-format-from-1x.md}
 	 * @param attributes the normalised half, as JSON, decoded once at ingest.
-	 *                   §C3 makes edge the hardware boundary, so the vendor's dialect
+	 *                   edge is the hardware boundary, so the vendor's dialect
 	 *                   stops here and this is what crosses to runtime. Null for a
 	 *                   row buffered before {@code V102}
 	 * @param status     {@code PENDING · DISPATCHED · ACKED · DEAD}
@@ -90,7 +90,7 @@ public final class EdgeTables {
 	}
 
 	/**
-	 * One command this site was asked to perform, and its outcome (§C3).
+	 * One command this site was asked to perform, and its outcome.
 	 *
 	 * <p>{@link Growth#TRAFFIC_GROWING}: a barrier command per truck, forever, at
 	 * every lane. ⚠️ Retention class PROVISIONAL, as every other one in this phase

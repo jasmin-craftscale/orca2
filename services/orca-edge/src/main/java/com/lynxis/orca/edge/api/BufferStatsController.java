@@ -19,12 +19,11 @@ import com.lynxis.orca.platform.web.ApiStatus;
 import com.lynxis.orca.platform.web.RequestId;
 
 /**
- * §C3's capture-buffer diagnostics, hand-written over a generated interface
- * (ADR-014).
+ * Capture-buffer diagnostics, hand-written over a generated contract interface.
  *
  * <p><strong>Scope comes from configuration, never from the request</strong>, for
  * the same reason it does on {@code /internal/commands/v1}: the credential on
- * {@code /internal/**} is a per-installation shared secret (ADR-011) and cannot
+ * {@code /internal/**} is a per-installation shared secret and cannot
  * prove which peer is calling, so a site identifier on the wire would be a value the
  * caller chose.
  */

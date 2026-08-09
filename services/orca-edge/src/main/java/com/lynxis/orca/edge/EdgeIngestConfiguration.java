@@ -63,7 +63,7 @@ public class EdgeIngestConfiguration {
 	/**
 	 * The delivery port: a batched POST to runtime's {@code /internal/events/v1}.
 	 *
-	 * <p>ADR-011: no token is minted. The per-installation shared credential goes on
+	 * <p>No token is minted. The per-installation shared credential goes on
 	 * the request, and {@code X-Orca-Service} is attribution only — a shared
 	 * credential cannot prove which peer is calling, and treating it as authority
 	 * would be reading more into it than it can carry.
@@ -77,7 +77,7 @@ public class EdgeIngestConfiguration {
 	 * constructs these beans directly rather than refreshing the context. Found by
 	 * running the demo; recorded in the phase report.
 	 *
-	 * <p>The deadline is new with it. §B8 requires every external call to have one,
+	 * <p>The deadline is new with it. Every external call must have one,
 	 * and the pump's POST had none: a runtime that accepted the connection and then
 	 * went quiet would have held the pump's only thread indefinitely, which is a
 	 * lane that stops draining rather than one that retries.
@@ -126,7 +126,7 @@ public class EdgeIngestConfiguration {
 	}
 
 	/**
-	 * The camera's framing — DERIVED-FROM-1X, see {@link LprFraming}.
+	 * The camera framing translated from the legacy 1.x reader; see {@link LprFraming}.
 	 *
 	 * <p>A bean rather than a constant because it is the one thing here that a
 	 * vendor specification or a capture from a fielded unit could still correct, and
@@ -146,14 +146,14 @@ public class EdgeIngestConfiguration {
 		return new LprListener(port, siteExternalId, framing, buffer, ownership, fencedWrite, json);
 	}
 
-	// --- WP7 · commands in (§C3) ----------------------------------------------
+	// --- commands entering the hardware boundary ------------------------------
 
 	@Bean
 	public CommandLogRepository commandLogRepository(ScopeSeam seam) {
 		return new CommandLogRepository(seam);
 	}
 
-	/** The outbound device-host shape is DERIVED-FROM-1X — see {@link RestDeviceHost}. */
+	/** The outbound device-host shape is translated from the legacy 1.x caller; see {@link RestDeviceHost}. */
 	@Bean
 	public DeviceHostPort deviceHostPort() {
 		return new RestDeviceHost();
@@ -173,7 +173,7 @@ public class EdgeIngestConfiguration {
 		return new DeviceCommandController(commands, siteExternalId);
 	}
 
-	// --- H3 · §C3's buffer diagnostics ----------------------------------------
+	// --- capture-buffer diagnostics --------------------------------------------
 
 	@Bean
 	public BufferStatsService bufferStatsService(EventBufferRepository buffer, LaneOwnership ownership,
@@ -197,7 +197,7 @@ public class EdgeIngestConfiguration {
 	 * <p>A failure to bind is deliberately fatal. An edge instance that came up
 	 * healthy with no listener would answer {@code /actuator/health} 200 while every
 	 * camera at the site silently failed to connect, which is the worst version of
-	 * this failure: §C3 says edge is the service whose availability the lane
+	 * this failure: edge is the service whose availability the lane
 	 * depends on.
 	 */
 	@EventListener(ApplicationReadyEvent.class)

@@ -24,13 +24,13 @@ import com.lynxis.orca.platform.web.RequestId;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Where a command to move a barrier enters the site (§B9 step 6).
+ * Where a command to move a barrier enters the site.
  *
- * <p>Hand-written, implementing a generated interface — ADR-014.
+ * <p>Hand-written, implementing the generated contract interface.
  *
  * <p><strong>Scope comes from configuration, not from the request</strong>, for the
  * same reason it does on runtime's events endpoint: the credential on
- * {@code /internal/**} is a per-installation shared secret (ADR-011) and cannot
+ * {@code /internal/**} is a per-installation shared secret and cannot
  * prove which peer is calling, so a site identifier on the wire would be a value
  * the caller chose.
  *

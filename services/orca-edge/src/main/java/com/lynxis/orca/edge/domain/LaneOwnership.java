@@ -16,16 +16,16 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Which lanes this instance owns right now.
  *
- * <p>§C3: <em>"Cameras and device hosts each address a single endpoint. So while
+ * <p>Cameras and device hosts each address a single endpoint. So while
  * everything else runs on every instance, device ingestion for a given lane is
  * owned by one instance at a time."</em> This is the one place the platform is not
  * symmetric, and the reason is the hardware contract rather than the design.
  *
- * <p><strong>Per lane, not per site</strong>, and §C3 says why: the frozen
+ * <p><strong>Per lane, not per site</strong>: the frozen
  * contracts are per lane, and one stuck owner must not idle a whole site. The
  * lease name is {@code edge.ingest:lane:<lane>} — per-lane scope rides in the
  * lease name, which is how one mechanism covers a retention job, a feed reader and
- * this alike (§C2).
+ * this alike.
  *
  * <p><strong>Holding a lease is not permission to write.</strong> Ownership says
  * which lane's traffic this instance handles; the fence token is what makes a
@@ -36,7 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class LaneOwnership {
 
-	/** §C3 names this exact shape. It is read by operators in the lease table. */
+	/** The holder identity read by operators in the lease table. */
 	public static final String LEASE_PREFIX = "edge.ingest:lane:";
 
 	private final LeaseManager leaseManager;
@@ -117,7 +117,7 @@ public class LaneOwnership {
 	/**
 	 * The site's lanes, read from core's published view through the seam.
 	 *
-	 * <p>Mechanism 2 of §B4: in edge's own transaction, no network hop, and nothing
+	 * <p>Reads core's published view in edge's own transaction, with no network hop; nothing
 	 * core has not published. Out-of-service lanes are still owned — a lane an
 	 * operator has taken out of service still has a camera that may connect, and
 	 * refusing to own it would leave that camera talking to nobody.

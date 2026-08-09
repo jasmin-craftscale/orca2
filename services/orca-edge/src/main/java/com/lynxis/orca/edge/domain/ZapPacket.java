@@ -15,8 +15,8 @@ import org.w3c.dom.NodeList;
 /**
  * One inbound camera packet, decoded.
  *
- * <p><strong>DERIVED-FROM-1X.</strong> The element tree, the attribute names and the
- * plate-selection rule below are §2 and §4 of
+ * <p><strong>Translated from the legacy 1.x reader.</strong> The element tree,
+ * attribute names and plate-selection rule below come from
  * {@code docs/lpr-wire-format-from-1x.md}, extracted from the 1.x DTOs
  * ({@code internal/dtos/xml_request.go}) and the 1.x plate selector
  * ({@code internal/utils/utils.go:227-278}). They are what the code that talks to
@@ -113,7 +113,7 @@ public record ZapPacket(
 	// ------------------------------------------------------------------------
 
 	/**
-	 * DERIVED-FROM-1X · §4 of the source document.
+	 * Plate selection translated from the legacy 1.x reader.
 	 *
 	 * <p>Among {@code Event/LP[]}, the entry with the <strong>highest numeric
 	 * {@code Confidence}</strong> wins; a value that does not parse is skipped, not
@@ -123,7 +123,7 @@ public record ZapPacket(
 	 *
 	 * <p>A packet with no {@code LP} at all yields a blank plate. That is
 	 * <strong>not</strong> a reason to drop it here: 1.x skips a plateless event and
-	 * acknowledges it anyway, which is defect 1 of §5 — an event the camera believes
+	 * acknowledges it anyway: an event the camera believes
 	 * was delivered and that exists nowhere. The buffer records what arrived and
 	 * runtime decides what it means.
 	 */

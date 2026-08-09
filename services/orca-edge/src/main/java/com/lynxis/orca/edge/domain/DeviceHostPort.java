@@ -4,10 +4,11 @@ package com.lynxis.orca.edge.domain;
  * The way out to a lane's device host — the .NET component that actually moves the
  * barrier.
  *
- * <p><strong>The outbound shape is now DERIVED-FROM-1X, not invented.</strong> §D2
- * freezes the device-host REST contract and says why — <em>"a field-proven vendor
+ * <p><strong>The outbound shape is translated from the legacy 1.x caller, not invented.</strong>
+ * The device-host REST contract is frozen because it belongs to a field-proven vendor
  * component that loads a driver plugin per device; changing this contract would mean
- * re-certifying every device vendor"</em> — and §C3 names what travels in each
+ * component that loads a driver plugin per device; changing it would mean
+ * re-certifying every device vendor. The architecture names what travels in each
  * direction, but neither states the route, the body or the response document for an
  * outbound command. {@code docs/device-host-outbound-from-1x.md} does: it was
  * extracted from the ORCA 1.x production caller, the way
@@ -20,8 +21,9 @@ package com.lynxis.orca.edge.domain;
  * <ol>
  *   <li><strong>The Authorization header</strong> — 1.x mints a Keycloak token per
  *       command; whether the host validates it is unknown and the answer collides
- *       with ADR-011 on the barrier path. OPEN QUESTION, register NEW-4.</li>
- *   <li><strong>{@code PTZ_PRESET} has no route in the extraction.</strong> §C3's
+ *       with the rule that the identity provider stays off the barrier path. This
+ *       remains an open product-owner question.</li>
+ *   <li><strong>{@code PTZ_PRESET} has no route in the extraction.</strong> The action
  *       vocabulary has five actions and the 1.x caller has three calls.
  *       {@link RestDeviceHost} refuses the command rather than inventing a URL for
  *       it.</li>
@@ -37,7 +39,7 @@ public interface DeviceHostPort {
 	/**
 	 * Issues one command and waits for the host's answer, bounded by the deadline.
 	 *
-	 * <p>§C3: <em>"a command completes when the device host confirms it acted — an
+	 * <p>A command completes when the device host confirms it acted: an
 	 * acknowledgement <strong>and</strong> a body that decodes. Anything else is an
 	 * unknown outcome."</em> Both halves are the implementation's job, and the
 	 * distinction between {@link Outcome#FAILED} and {@link Outcome#UNKNOWN} is the
@@ -73,7 +75,7 @@ public interface DeviceHostPort {
 		/**
 		 * The deadline passed with no answer.
 		 *
-		 * <p><strong>Not a failure, and not a success.</strong> §B10 resolves an
+		 * <p><strong>Not a failure, and not a success.</strong> Resolve an
 		 * unknown outcome by <em>looking</em> — verifying the device's actual state —
 		 * never by retrying blindly. A caller that coerces this to {@link #FAILED}
 		 * produces exactly the hazard the value exists to prevent.

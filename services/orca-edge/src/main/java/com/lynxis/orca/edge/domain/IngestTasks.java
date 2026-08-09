@@ -19,7 +19,7 @@ import lombok.extern.slf4j.Slf4j;
  * <p><strong>Both are deliberate acts, and neither is implied by the other.</strong>
  *
  * <ul>
- *   <li>{@link SystemContext} gives the work an <em>identity</em> — §B6 and §D3:
+ *   <li>{@link SystemContext} gives the work an <em>identity</em>: background work
  *       no path runs with no identity, and {@code SystemContextRule} fails the
  *       build on any {@code @Scheduled} method that does not enter one.</li>
  *   <li>{@link ScopeContext} gives it an <em>entitlement</em> — the installation's
@@ -74,7 +74,7 @@ public class IngestTasks {
 	 * The installation's own site.
 	 *
 	 * <p>Configuration, not derivation. This is an appliance: which site it is
-	 * belongs to the installation (§C1 — exactly one site is primary, and it is the
+	 * belongs to the installation. Exactly one site is primary, and it is the
 	 * one the licence binds to), and deriving it per cycle from whatever happens to
 	 * be in the database would make a mis-seeded world model silently redirect a
 	 * gate's traffic.

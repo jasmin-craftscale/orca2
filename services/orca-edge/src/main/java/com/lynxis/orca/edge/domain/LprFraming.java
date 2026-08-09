@@ -8,17 +8,16 @@ import java.nio.charset.StandardCharsets;
 /**
  * How a plate camera's messages are framed on the wire.
  *
- * <p><strong>DERIVED-FROM-1X.</strong> Every byte in this file comes from
+ * <p><strong>Translated from the legacy 1.x listener.</strong> Every byte in this file comes from
  * {@code docs/lpr-wire-format-from-1x.md}, which was extracted from the ORCA 1.x
  * production listener — the Go service that talks to real cameras today. It is
  * <em>not</em> a vendor specification and it is not a capture from a fielded unit;
- * both remain worth obtaining, and §6 of that document lists what neither the 1.x
+ * both remain worth obtaining. That document lists what neither the 1.x
  * code nor this file can answer (retry-on-NAK behaviour, fields beyond the 1.x
  * DTOs, charset corner cases).
  *
- * <p>It supersedes the length-prefixed guess this class shipped with in WP5, which
- * {@code phase-1-report.md} §5.6 recorded as a provisional reading of §D2's one
- * sentence. <strong>That reading was wrong against the fielded estate.</strong> The
+ * <p>It supersedes the earlier length-prefixed guess.
+ * <strong>That reading was wrong against the fielded estate.</strong> The
  * framing is delimiter-based:
  *
  * <pre>
@@ -34,7 +33,7 @@ import java.nio.charset.StandardCharsets;
  *
  * <h2>Three things 1.x does that this deliberately does not</h2>
  *
- * <p>Listed in §5 of the source document as behaviours observed in the fielded
+ * <p>These are behaviours observed in the fielded 1.x
  * handler, so that nobody mistakes them for contract:
  *
  * <ol>
@@ -107,7 +106,7 @@ public interface LprFraming {
 	}
 
 	/**
-	 * DERIVED-FROM-1X · the STX/ETX-delimited framing the fielded estate speaks.
+	 * The STX/ETX-delimited framing translated from the fielded 1.x listener.
 	 *
 	 * <p>Sources, for whoever checks this against the Go: the framing bytes are
 	 * {@code internal/utils/constants.go:76-77}; the accumulate-and-scan reader is
@@ -144,8 +143,8 @@ public interface LprFraming {
 		 * A run of bytes longer than this with no {@code ETX} is a lost stream, not
 		 * a large packet.
 		 *
-		 * <p>Images travel as filesystem paths and never as bytes (§D2, and §2 of the
-		 * source document), so a real packet is a few kilobytes of XML.
+		 * <p>Images travel as filesystem paths and never as bytes, so a real packet is
+		 * a few kilobytes of XML.
 		 */
 		private static final int MAX_PACKET_BYTES = 1 << 20;
 

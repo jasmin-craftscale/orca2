@@ -31,19 +31,19 @@ import lombok.extern.slf4j.Slf4j;
  * The TCP server a plate camera connects to.
  *
  * <p><strong>The one rule that matters here:</strong> the capture is persisted
- * <em>before</em> the acknowledgement is sent. §C3 calls the buffer durable and
- * §B10 says a device event survives a link outage — both are false if the camera
+ * <em>before</em> the acknowledgement is sent. The buffer is durable and a device
+ * event must survive a link outage; both are false if the camera
  * is told "received" first, because a camera that has been acknowledged does not
  * send that capture again, and a restart in the gap is then permanent data loss
  * with nothing to show for it.
  *
  * <p>That is also the first of the three 1.x behaviours this deliberately does not
- * copy (§5 of {@code docs/lpr-wire-format-from-1x.md}): 1.x writes its ACK after
+ * copy (see {@code docs/lpr-wire-format-from-1x.md}): 1.x writes its ACK after
  * the publish <em>attempt</em>, so a failed publish and a successful one look
  * identical to the camera.
  *
- * <p><strong>Transport: the JDK, on virtual threads.</strong> The plan named Netty
- * or Spring Integration. Neither is here, and the reason is the plan's own rule
+ * <p><strong>Transport: the JDK, on virtual threads.</strong> Netty and Spring
+ * Integration were considered but add no value here: the governing rule is
  * that every dependency addition is recorded with a why — there is no why. A site
  * has a handful of cameras; the framing is a delimiter scan; and Java 25's virtual
  * threads make thread-per-connection the simple shape again rather than the
@@ -65,7 +65,7 @@ import lombok.extern.slf4j.Slf4j;
  * <p>The last two rows are the ones worth arguing with, so both are written out.
  *
  * <p><strong>Why a refusal is a {@code NAK} and not silence.</strong> 1.x sends
- * {@code NAK} on a parse failure alone, and §6 of the source document records that
+ * {@code NAK} on a parse failure alone. The source document records that
  * nobody here knows how a camera reacts to one. Given that, the choice is between
  * telling the camera something true — <em>this was not taken</em> — and telling it
  * nothing and letting it wait out a timeout. A packet with no {@code EventGuid}
@@ -236,7 +236,7 @@ public class LprListener implements AutoCloseable {
 	/**
 	 * The normalised half of a capture, as JSON.
 	 *
-	 * <p><strong>Edge is the hardware boundary (§C3), so the vendor's dialect stops
+	 * <p><strong>Edge is the hardware boundary, so the vendor's dialect stops
 	 * here.</strong> The raw packet stays in {@code payload} because that is what
 	 * arrived and a durable buffer that paraphrased its input would be worth less
 	 * than one that did not; but what crosses to runtime is this — a small, stable

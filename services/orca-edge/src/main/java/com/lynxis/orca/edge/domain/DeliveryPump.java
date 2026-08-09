@@ -14,12 +14,12 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <ul>
  *   <li><strong>Per lane, in order.</strong> One batch per lane, oldest first, and
- *       a lane that fails does not hold up any other. §D3: facts are ordered per
+ *       a lane that fails does not hold up any other. Facts are ordered per
  *       key, never globally.</li>
  *   <li><strong>At least once, never at most once.</strong> A batch that was sent
  *       and not acknowledged is sent again. Runtime deduplicates on
  *       {@code event_uuid}, so a duplicate delivery has one effect — and that is
- *       the trade §B4 mechanism 4 makes deliberately: a lost event is
+ *       the deliberate at-least-once trade: a lost event is
  *       unrecoverable, a repeated one is not.</li>
  *   <li><strong>The batch is not advanced past a failure.</strong> If a lane's
  *       oldest batch cannot be delivered, its newer events wait. Skipping ahead
@@ -88,7 +88,7 @@ public class DeliveryPump {
 	 * The way out to runtime.
 	 *
 	 * <p>An interface so the pump's ordering and retry behaviour can be proven
-	 * against a link that is severed on demand — which is the property §B10 states
+	 * against a link that is severed on demand, proving the required outage behaviour
 	 * and the one a real HTTP client makes hardest to test.
 	 */
 	@FunctionalInterface

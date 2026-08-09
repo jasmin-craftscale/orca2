@@ -16,7 +16,7 @@ import lombok.extern.slf4j.Slf4j;
  * <h2>The two rules, and the order they run in</h2>
  *
  * <ol>
- *   <li><strong>Claim first.</strong> {@code commandId} — §C3's node-execution id —
+ *   <li><strong>Claim first.</strong> {@code commandId}, the node-execution id,
  *       is the idempotency key. A replay returns the recorded outcome rather than
  *       acting again, because a caller that retried did so <em>because it never saw
  *       the first answer</em>, and "duplicate" is the one response it cannot use. A
@@ -37,7 +37,7 @@ import lombok.extern.slf4j.Slf4j;
  * <h2>Why a discarded command is FAILED and not UNKNOWN</h2>
  *
  * <p>{@code UNKNOWN} means nobody knows whether the device acted. Here everybody
- * knows: nothing was sent. §B10 resolves {@code UNKNOWN} by verifying the device,
+ * knows nothing was sent. {@code UNKNOWN} is resolved by verifying the device,
  * which would be a pointless physical check for a command that never left this
  * process. The distinction from a host that refused lives in {@code detail} —
  * both are {@code FAILED}, and only one of them reached the hardware.

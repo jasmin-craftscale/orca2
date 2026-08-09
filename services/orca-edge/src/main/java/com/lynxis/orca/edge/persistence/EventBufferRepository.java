@@ -18,7 +18,7 @@ import lombok.RequiredArgsConstructor;
  * The durable capture buffer, read and written through the scope seam.
  *
  * <p>Everything here goes through {@link ScopeSeam}. That is not ceremony: it is
- * the reason WP2 had to come before WP5. {@code ScopeSeamRule} would fail this
+ * {@code ScopeSeamRule} fails the build if this
  * class for touching a {@code JdbcTemplate}, and until the seam could write there
  * was no legal way for a service to insert a row at all.
  *
@@ -73,7 +73,7 @@ public class EventBufferRepository {
 	/**
 	 * This lane's undelivered events, oldest first.
 	 *
-	 * <p><strong>Order is the guarantee</strong>, not a convenience: §B10 asks for
+	 * <p><strong>Order is the guarantee</strong>, not a convenience: the buffer promises
 	 * zero loss <em>and preserved order</em> when the link returns. Ordering by the
 	 * identity column rather than by {@code received_at} is what makes that true
 	 * inside a millisecond.
@@ -110,9 +110,9 @@ public class EventBufferRepository {
 
 	/**
 	 * The two timestamps below are the OWNING INSTANCE's clock, and that is
-	 * deliberate rather than an oversight of §B8.
+	 * deliberate rather than an overlooked shared-clock requirement.
 	 *
-	 * <p>§B8 makes the database's clock the reference "for anything two instances
+	 * <p>The database clock is the reference for anything two instances
 	 * must agree on". Nothing agrees on these: one instance owns a lane at a time,
 	 * and {@code dispatched_at} / {@code acked_at} are its own bookkeeping. What
 	 * two instances would have to agree on — the <em>order</em> of the buffer — is
@@ -151,7 +151,7 @@ public class EventBufferRepository {
 	 * many.
 	 *
 	 * <p><strong>Three set-based statements, and it used to be a read-write-back
-	 * loop.</strong> WP5 could not express {@code attempts = attempts + 1} through
+	 * loop.</strong> The original seam could not express {@code attempts = attempts + 1};
 	 * the seam, so it read every row and wrote each one back — which is slower, and
 	 * worse than slower: two deliveries that both read {@code attempts = 3} and both
 	 * write {@code 4} record <em>one</em> failure between them, and an event that has
@@ -179,7 +179,7 @@ public class EventBufferRepository {
 				.where(theseRows, ids));
 
 		// Retired: too many attempts, and the count is now the true one. DEAD rather
-		// than deleted — §D3, and the diagnostics endpoint reports it.
+		// than deleted, and the diagnostics endpoint reports it.
 		seam.update(ScopedUpdate.table(TABLE)
 				.set("status", BufferedEvent.DEAD)
 				.scopedBy(SCOPE_COLUMN)
@@ -203,7 +203,7 @@ public class EventBufferRepository {
 	/**
 	 * DEAD, not deleted.
 	 *
-	 * <p>§C3 says the buffer is bounded and §D3 says records are retired rather than
+	 * <p>The buffer is bounded and exhausted records are retired rather than
 	 * removed. An event nobody could deliver is the one a site operator most needs
 	 * to see, so it is retired into a status the diagnostics endpoint reports —
 	 * never dropped, which would make a delivery failure indistinguishable from a
