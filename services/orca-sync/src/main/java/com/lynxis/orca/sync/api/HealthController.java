@@ -14,7 +14,7 @@ import com.lynxis.orca.sync.api.generated.model.ServiceHealth;
  * Hand-written, and it <strong>implements a generated interface</strong>.
  *
  * <p>That is what makes contract-first a constraint rather than documentation
- * (ADR-014). {@code HealthApi} is generated from
+ * and enforced by the compiler. {@code HealthApi} is generated from
  * {@code src/main/resources/openapi/orca-sync.yaml} on every build, so changing
  * the route, the operation id or the response schema breaks this class until it
  * is brought back into line. Nobody has to notice; the compiler does.
@@ -24,7 +24,7 @@ import com.lynxis.orca.sync.api.generated.model.ServiceHealth;
  * its {@code status}, {@code errors} and {@code page} fields are
  * platform/web's own types rather than a seventh copy of them.
  *
- * <p>There is deliberately no other controller in this service. Phase 0 builds no
+ * <p>There is deliberately no other controller in this service. The current on-site scope builds no
  * business logic.
  */
 @RestController

@@ -7,7 +7,7 @@ pluginManagement {
 
 plugins {
 	// Resolves and downloads the Java 25 toolchain when the machine does not already have one,
-	// so a clean clone builds with nothing installed but a JDK (Phase 0 brief, §7 item 1).
+	// so a clean clone builds with nothing installed but a JDK.
 	id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 

@@ -1,4 +1,4 @@
-// orca-portal — carriers and drivers (§C4).
+// orca-portal — carriers and drivers.
 //
 // The only internet-facing service, with its own security zone and a per-principal
 // authorization model rather than a per-tenant one.
@@ -9,7 +9,7 @@ plugins {
 	id("org.openapi.generator")
 }
 
-// --- Contract-first (ADR-014) -----------------------------------------------
+// --- Contract-first API generation ------------------------------------------
 //
 // The OpenAPI document is the source of truth; this generates the API interface
 // and its DTOs from it. The controller is hand-written and implements the
@@ -88,8 +88,8 @@ dependencies {
 	// --- The primitives this service uses, and why ---------------------
 	implementation(project(":platform:web")) // the envelope, the error codes and the system context
 	implementation(project(":platform:scope")) // the query seam; every service serves scoped reads
-	implementation(project(":platform:outbox")) // this service publishes facts (§C: it has an outbox pair)
-	implementation(project(":platform:lease")) // one `service_lease` per service schema (§C2)
+	implementation(project(":platform:outbox")) // records facts transactionally before publishing them
+	implementation(project(":platform:lease")) // one `service_lease` per service schema
 
 	// --- Spring Boot ----------------------------------------------------
 	implementation(libs.spring.boot.starter.webmvc)
@@ -106,7 +106,7 @@ dependencies {
 	// api-docs disabled (SwaggerConfig is @ConditionalOnBean(SpringDocConfiguration),
 	// which springdoc.api-docs.enabled=false switches off), and enabling api-docs
 	// would introspect the code — a second source of truth beside the contract,
-	// which §4b forbids. The brief's own fallback applies: serve the file
+	// which would violate contract-first ownership. Serve the file
 	// statically and drop springdoc. The bundled, fully resolved contract is
 	// served at /openapi/orca-portal.yaml by Spring's static-resource handling.
 

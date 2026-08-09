@@ -32,7 +32,7 @@ val catalog = extensions.getByType<VersionCatalogsExtension>().named("libs")
 // fixture is a static singleton per JVM, and Gradle gives each module its own
 // test JVM.
 //
-// Phase 0 had four such modules and it fit. Phase 1 added three more — core,
+// The initial four modules fit here. Adding core,
 // runtime and edge — and `./gradlew integrationTest` began failing with
 // "Container startup failed": seven SQL Server instances at once, emulated
 // (the image is amd64-only), on a Docker VM with two CPUs. Each suite passed
@@ -80,7 +80,7 @@ subprojects {
 		add("testCompileOnly", platform(bom))
 		add("testAnnotationProcessor", platform(bom))
 
-		// Lombok is in, and used consistently (brief §3).
+		// Lombok is a repository-wide dependency and is used consistently.
 		val lombok = catalog.lib("lombok")
 		add("compileOnly", lombok)
 		add("annotationProcessor", lombok)
@@ -106,7 +106,7 @@ subprojects {
 	// --- integrationTest -------------------------------------------------
 	// A separate source set and a separate task, deliberately NOT wired into
 	// `check`. `./gradlew build` must succeed on a clean machine with nothing
-	// installed but a JDK (brief §7 item 1); integration tests need a Docker
+	// installed but a JDK; integration tests need a Docker
 	// daemon, so they run on their own command and in their own CI step.
 	val sourceSets = extensions.getByType<SourceSetContainer>()
 	val main = sourceSets["main"]
@@ -175,7 +175,7 @@ tasks.register<JacocoReport>("jacocoRootReport") {
 }
 
 // ---------------------------------------------------------------------------
-// sendPlate — the demo camera, cross-platform. Speaks the DERIVED-FROM-1X
+// sendPlate — the demo camera, cross-platform. Speaks the camera framing translated from 1.x
 // STX/ETX ZapPacket framing (docs/lpr-wire-format-from-1x.md) at orca-edge's
 // listener, which runs on THIS host during local dev. A Gradle task rather than
 // a container because it must reach a host process, and rather than a Python

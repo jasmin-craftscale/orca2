@@ -1,4 +1,4 @@
-// orca-sync — replication (§C5).
+// orca-sync — replication.
 //
 // Carries facts between a site and a hosted tier. It never writes another
 // service's tables: it delivers to the owner's apply endpoint.
@@ -9,7 +9,7 @@ plugins {
 	id("org.openapi.generator")
 }
 
-// --- Contract-first (ADR-014) -----------------------------------------------
+// --- Contract-first API generation ------------------------------------------
 //
 // The OpenAPI document is the source of truth; this generates the API interface
 // and its DTOs from it. The controller is hand-written and implements the
@@ -106,7 +106,7 @@ dependencies {
 	// api-docs disabled (SwaggerConfig is @ConditionalOnBean(SpringDocConfiguration),
 	// which springdoc.api-docs.enabled=false switches off), and enabling api-docs
 	// would introspect the code — a second source of truth beside the contract,
-	// which §4b forbids. The brief's own fallback applies: serve the file
+	// which would violate contract-first ownership. Serve the file
 	// statically and drop springdoc. The bundled, fully resolved contract is
 	// served at /openapi/orca-sync.yaml by Spring's static-resource handling.
 

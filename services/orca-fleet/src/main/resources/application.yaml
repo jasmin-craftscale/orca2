@@ -1,4 +1,4 @@
-# orca-fleet — licences and releases (§C6)
+# orca-fleet — licences and releases
 #
 # Six bootable applications run on one developer machine, so each takes its own
 # port and its own database login. Neither problem is visible until someone tries
@@ -13,7 +13,7 @@ spring:
     name: orca-fleet
 
   # --- Datasource -----------------------------------------------------------
-  # The username is THIS SERVICE'S OWN LOGIN. That is ADR-004: schema ownership
+  # The username is THIS SERVICE'S OWN LOGIN. Schema ownership
   # is enforced by credentials, not by convention. A service pointed at a shared
   # administrative login has no enforcement at all, and no build check can see it.
   datasource:
@@ -53,13 +53,13 @@ spring:
       # definition, six schemas — not a shared migrations module, which would
       # centralise schema definition away from the services that own it.
       - classpath:db/platform/lease
-    # An expand-only discipline across an upgrade pair (§B7) means a migration is
+    # An expand-only discipline across an upgrade pair means a migration is
     # never edited after it ships. Checksum drift is a mistake, not a workflow.
     validate-on-migrate: true
 
   # --- Identity -------------------------------------------------------------
   # Tokens are validated BY SIGNATURE, LOCALLY, against the realm's published
-  # keys. Nothing calls out to Keycloak per request (§B6) — which is also what
+  # keys. Nothing calls out to Keycloak per request, which is also what
   # lets a site keep working when the wide-area link drops.
   security:
     oauth2:
@@ -69,7 +69,7 @@ spring:
 
 # --- Actuator ---------------------------------------------------------------
 # Health, and nothing this service does not need. `/actuator/health` is the
-# orchestrator's probe (§C6).
+# orchestrator's probe.
 management:
   endpoints:
     web:
@@ -83,7 +83,7 @@ management:
 
 orca:
   service: orca-fleet
-  # --- Service-to-service authentication (ADR-011) ----------------------------
+  # --- Service-to-service authentication --------------------------------------
   # Keycloak authenticates PEOPLE. A service calling another service presents this
   # per-installation shared credential on /internal/** instead of minting a token,
   # so no identity provider sits on the gate path. The committed value is the
@@ -92,8 +92,9 @@ orca:
   internal:
     shared-credential: ${ORCA_INTERNAL_CREDENTIAL:local-dev-internal-credential-not-for-deployment}
 
-  # ⚠️ LOCAL DEVELOPMENT VALUES. §C2 states no lease duration and no renewal
-  # interval, and requires instead that a service REFUSE TO START when either is
+  # ⚠️ LOCAL DEVELOPMENT VALUES. The architecture deliberately sets no lease
+  # duration or renewal interval. LeaseConfigurationValidator requires the service
+  # to REFUSE TO START when either is
   # unset or when the duration is not longer than the renewal interval — see
   # LeaseConfigurationValidator, which is that specification. These two numbers are
   # therefore a local profile's answer and NOT a recommendation for a site: a
@@ -103,7 +104,7 @@ orca:
     renewal-interval: 10s
 
   # See ReadinessGate: fully-qualified views this service requires before it will
-  # serve. Empty in Phase 0 because orca-core publishes none yet.
+  # serve. Empty because this skeleton consumes no published views yet.
   required-views: ${ORCA_REQUIRED_VIEWS:}
 
 ---
