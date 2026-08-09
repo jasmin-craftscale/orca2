@@ -1,4 +1,4 @@
-# orca-runtime — the gate brain (§C2)
+# orca-runtime — the gate brain
 #
 # Six bootable applications run on one developer machine, so each takes its own
 # port and its own database login. Neither problem is visible until someone tries
@@ -13,7 +13,7 @@ spring:
     name: orca-runtime
 
   # --- Datasource -----------------------------------------------------------
-  # The username is THIS SERVICE'S OWN LOGIN. That is ADR-004: schema ownership
+  # The username is THIS SERVICE'S OWN LOGIN. Schema ownership
   # is enforced by credentials, not by convention. A service pointed at a shared
   # administrative login has no enforcement at all, and no build check can see it.
   datasource:
@@ -55,13 +55,13 @@ spring:
       - classpath:db/platform/outbox
       - classpath:db/platform/lease
       - classpath:db/platform/idempotency
-    # An expand-only discipline across an upgrade pair (§B7) means a migration is
+    # An expand-only discipline across an upgrade pair means a migration is
     # never edited after it ships. Checksum drift is a mistake, not a workflow.
     validate-on-migrate: true
 
   # --- Identity -------------------------------------------------------------
   # Tokens are validated BY SIGNATURE, LOCALLY, against the realm's published
-  # keys. Nothing calls out to Keycloak per request (§B6) — which is also what
+  # keys. Nothing calls out to Keycloak per request, which is also what
   # lets a site keep working when the wide-area link drops.
   security:
     oauth2:
@@ -71,7 +71,7 @@ spring:
 
 # --- Actuator ---------------------------------------------------------------
 # Health, and nothing this service does not need. `/actuator/health` is the
-# orchestrator's probe (§C2).
+# orchestrator's probe.
 management:
   endpoints:
     web:
@@ -84,15 +84,13 @@ management:
         enabled: true
 
 # --- Flowable ---------------------------------------------------------------
-# The engine is embedded and its tables live in the `runtime` schema (§C2). It is
+# The engine is embedded and its tables live in the `runtime` schema. It is
 # reached behind an interface so the platform is not written against a specific
 # engine's API throughout.
 #
-# RESOLVED IN WP3 — the engine does not migrate itself.
-#
-# Phase 0 left this at Flowable's default of `true` and reported it as an open
-# contradiction: §C2 puts the engine's ~45 tables in the runtime schema and says
-# nothing about who creates them, while §B7 requires a schema change to be
+# The engine does not migrate itself. An earlier configuration left this at
+# Flowable's default of `true`, even though engine tables belong in the runtime
+# schema and schema changes must be
 # compatible with both versions for the duration of a rolling upgrade. Those two
 # cannot both hold while the engine reshapes its own tables on whichever instance
 # happens to start first.
@@ -116,7 +114,7 @@ flowable:
 
 orca:
   service: orca-runtime
-  # --- Service-to-service authentication (ADR-011) ----------------------------
+  # --- Service-to-service authentication --------------------------------------
   # Keycloak authenticates PEOPLE. A service calling another service presents this
   # per-installation shared credential on /internal/** instead of minting a token,
   # so no identity provider sits on the gate path. The committed value is the
@@ -125,8 +123,9 @@ orca:
   internal:
     shared-credential: ${ORCA_INTERNAL_CREDENTIAL:local-dev-internal-credential-not-for-deployment}
 
-  # ⚠️ LOCAL DEVELOPMENT VALUES. §C2 states no lease duration and no renewal
-  # interval, and requires instead that a service REFUSE TO START when either is
+  # ⚠️ LOCAL DEVELOPMENT VALUES. The architecture deliberately sets no lease
+  # duration or renewal interval. LeaseConfigurationValidator requires the service
+  # to REFUSE TO START when either is
   # unset or when the duration is not longer than the renewal interval — see
   # LeaseConfigurationValidator, which is that specification. These two numbers are
   # therefore a local profile's answer and NOT a recommendation for a site: a
@@ -135,9 +134,9 @@ orca:
     duration: 30s
     renewal-interval: 10s
 
-  # ⚠️ STILL EMPTY, and that is the honest state after WP7. Nothing on-site consumes
-  # `visit.completed` in Phase 1 — the cloud tier that would is scoped later
-  # (register NEW-1b) — so the relay runs and has nothing to deliver. This is
+  # ⚠️ STILL EMPTY. Nothing in the current on-site scope consumes
+  # `visit.completed`; a future cloud tier may do so, so the relay runs and has
+  # nothing to deliver. This is
   # deliberately not defaulted to something: the registry decides whose
   # acknowledgement retention waits for, and a guess in the permissive direction
   # deletes data a peer never received.
@@ -151,24 +150,23 @@ orca:
       batch-size: ${ORCA_OUTBOX_RELAY_BATCH_SIZE:50}
 
   # See RequiredViewsGate: fully-qualified views this service requires before it
-  # will serve. No longer empty — WP1 gave orca-core its first two published
-  # views, so the gate finally guards something real.
+  # will serve. These are orca-core's two published views used on the gate path.
   #
   # This is the deployment ordering, expressed where a person can act on it: core
-  # migrates first, because it publishes the views the gate path reads (ADR-009).
+  # migrates first, because it publishes the views the gate path reads.
   # Start this service first and it refuses, naming both — rather than starting
   # and failing on its first lane lookup, which is far harder to diagnose.
   required-views: ${ORCA_REQUIRED_VIEWS:core.topology_lane,core.topology_device}
 
-  # --- Which installation this is (WP6) ---------------------------------------
+  # --- Which installation this is ---------------------------------------------
   # The site this installation serves, in core's published vocabulary. It is the
   # SCOPE the /internal/events/v1 path establishes before it reads or writes
   # anything, and it is CONFIGURATION rather than something the request carries.
   #
   # A site identifier on the wire would be a value the caller chooses, and the
-  # credential on /internal/** is a per-installation shared secret (ADR-011) that
+  # credential on /internal/** is a per-installation shared secret that
   # cannot prove WHICH peer is calling — so trusting it to name a site would be
-  # reading far more into it than it can carry. §C1: exactly one site is primary,
+  # reading far more into it than it can carry. Exactly one site is primary,
   # and it is the one the licence binds to.
   installation:
     site-external-id: ${ORCA_SITE_EXTERNAL_ID:SITE-DEMO}
@@ -179,13 +177,13 @@ orca:
     # to the hostname rather than to a uuid.
     holder-id: ${ORCA_RUNTIME_HOLDER_ID:${HOSTNAME:runtime-local}}
 
-    # Where the site's edge instance accepts device commands. §C3's
-    # /internal/commands/v1. One address, because a lane's hardware is owned by one
+    # Where the site's edge instance accepts device commands:
+    # /internal/commands/v1. There is one address because a lane's hardware is owned by one
     # edge instance at a time and that instance is reached through the site's own
     # load balancer or its single host — which of those is a deployment's choice.
     edge-base-url: ${ORCA_EDGE_BASE_URL:http://localhost:8083}
 
-    # --- Connector resilience (WP7) -------------------------------------------
+    # --- Connector resilience -------------------------------------------------
     # ⚠️ LOCAL VALUES. The architecture states no threshold and no window, and is
     # right not to: a customer system that is routinely slow at shift change and
     # one that never is want different numbers. What is NOT tunable is the shape —
@@ -205,21 +203,21 @@ orca:
 
     # ⚠️ SLICE SHAPE, NOT TARGET SHAPE. In the product these come from the process
     # definition itself — the visual builder's compiler emits a connector step
-    # naming its connector and a device step naming its action, and §C2 assigns
+    # naming its connector and a device step naming its action; process definitions are assigned
     # definitions to lanes. There is one process and one lane here, so carrying
     # them as configuration keeps admission from inventing a definition-to-lane
-    # binding that Phase 2 will design properly.
+    # binding that the product configuration model must eventually provide.
     gate-visit:
       connector-name: ${ORCA_GATE_VISIT_CONNECTOR:tos}
       command-action: ${ORCA_GATE_VISIT_ACTION:RAISE_GATE}
       # Which device the action goes to. NOT optional, and not decoration: the
       # device-host contract addresses the device in the URL path
-      # (POST /api/{device}/raiseGate — DERIVED-FROM-1X), so a command that names
+      # (`POST /api/{device}/raiseGate`, translated from the legacy 1.x caller), so a command that names
       # no device cannot be sent. Same slice-shaped caveat as the two above.
       command-device: ${ORCA_GATE_VISIT_DEVICE:DEV-DEMO-BARRIER}
-      # §B8: every external call has a deadline and a defined outcome when it is
+      # Every external call has a deadline and a defined outcome when it is
       # exceeded. This one's defined outcome is UNKNOWN, which routes to
-      # verify-the-device rather than to a retry (§B10).
+      # verify-the-device rather than to a blind retry.
       command-deadline-ms: ${ORCA_GATE_VISIT_DEADLINE_MS:5000}
 
 ---

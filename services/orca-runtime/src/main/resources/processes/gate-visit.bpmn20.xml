@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  gate-visit — one truck through one lane (§B9).
+  gate-visit — one truck through one lane.
 
   ⚠️ THIS FILE IS WRITTEN AS IF IT WERE A COMPILER'S OUTPUT.
 
   A separate developer is building the ORCA visual builder, which compiles an
-  administrator's design to BPMN 2.0 (ADR-006). Everything here is something that
+  administrator's design to BPMN 2.0. Everything here is something that
   compiler must be able to emit, and nothing here is something a person would
   write by hand and a compiler could not reproduce. It is named in
   docs/BPMN_EXECUTION_PROFILE.md as the conformance harness's first fixture.
@@ -18,8 +18,8 @@
   renamed casually, because they are the compiler's link targets.
 
   Process variables carry CORRELATION KEYS and BRANCH DISCRIMINATORS only — never
-  business data (§C2). See the profile document; that is a refinement of §C2's
-  "correlation keys only", written down rather than assumed, because a gateway has
+  business data. See docs/BPMN_EXECUTION_PROFILE.md; its "correlation keys only"
+  rule is written down rather than assumed because a gateway has
   to branch on something.
 -->
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
@@ -30,14 +30,14 @@
   <process id="gate-visit" name="Gate visit" isExecutable="true">
 
     <!-- Admission has already committed. The visit row and this instance were
-         created in one transaction (WP0); nothing here re-checks that. -->
+         created in one transaction; nothing here re-checks that. -->
     <startEvent id="visitAdmitted" name="visit admitted"/>
 
     <sequenceFlow id="admittedToConnector" sourceRef="visitAdmitted" targetRef="connectorCall"/>
 
     <!--
-      §B9: "the lane lock is released at commit — no outbound call happens while
-      holding it". `flowable:async="true"` is what makes that true rather than
+      The lane lock is released at commit before any outbound call happens.
+      `flowable:async="true"` is what makes that true rather than
       hoped for: without it this delegate would run inside admission's own
       transaction, with the lane row still locked, and a slow customer system
       would hold a lane shut for as long as it took to answer.
@@ -46,8 +46,8 @@
                  flowable:delegateExpression="${connectorCallDelegate}"
                  flowable:async="true"/>
 
-    <!-- Every step that can fail has a failure branch. §C1's publish-time
-         validation requires one on every device-output step; this process has one
+    <!-- Every step that can fail has a failure branch. Publish-time validation
+         requires one on every device-output step; this process has one
          on both service tasks, because a customer system that answers with an
          error is no more acceptable a dead end than a barrier that does. -->
     <boundaryEvent id="connectorCallFailed" attachedToRef="connectorCall" cancelActivity="true">
@@ -65,7 +65,7 @@
     </sequenceFlow>
 
     <!-- The default flow. A response nobody wrote a branch for goes to a human,
-         never to an implicit success — WP7 wires the per-connector status routing
+         never to an implicit success; per-connector status routing feeds
          behind the same discriminator. -->
     <sequenceFlow id="outcomeNotApproved" sourceRef="connectorOutcome"
                   targetRef="manualInput"/>
@@ -84,13 +84,13 @@
 
     <endEvent id="visitReleased" name="visit released"/>
 
-    <!-- The manual-input WAIT STATE — Phase 3's clerk workflow, where Phase 1's
-         "manual handling required" terminal state used to end.
+    <!-- The manual-input WAIT STATE replaces the former "manual handling
+         required" terminal state.
 
          A userTask genuinely parks: the engine writes the task and stops, which
          is what makes it everything the service tasks above cannot be — a step a
-         boundary timer can fire on (phase-1 report §7.1 found the service-task
-         timer cannot), and a step an out-of-order submit can be REFUSED against.
+         boundary timer can fire on, unlike a synchronous service task, and a step
+         an out-of-order submit can be REFUSED against.
 
          There is deliberately NOTHING on this element: no assignee, no candidate
          groups, no listener. Work-item creation is PLATFORM behaviour — an engine
@@ -101,12 +101,12 @@
          identity tables. -->
     <userTask id="manualInput" name="manual handling"/>
 
-    <!-- The SLA — a REAL engine timer, which is the inversion this phase exists
-         for (1.x computed thresholds in the operator UI and nothing ever fired).
+    <!-- The SLA is a REAL engine timer. The legacy 1.x system computed thresholds
+         in the operator UI but nothing ever fired.
 
          It can exist here and could not exist on the service tasks above:
-         phase-1 report §7.1 found a boundary timer on a service task is created
-         and deleted inside one transaction, so it never fires. A userTask
+         a boundary timer on a synchronous service task is created and deleted
+         inside one transaction, so it never fires. A userTask
          genuinely parks — the timer job is committed while the task waits, and
          the async executor fires it on breach.
 
@@ -140,8 +140,8 @@
     <sequenceFlow id="manualInputResolved" sourceRef="manualInput"
                   targetRef="manualHandlingResolved"/>
 
-    <!-- Still a NAMED end state, still not an error — but since Phase 3 it is
-         reached AFTER a person resolved the work item (complete-and-advance, one
+    <!-- Still a NAMED end state, still not an error. It is reached AFTER a person
+         resolved the work item (complete-and-advance, one
          transaction), not instead of one. -->
     <endEvent id="manualHandlingResolved" name="manual handling resolved"/>
 

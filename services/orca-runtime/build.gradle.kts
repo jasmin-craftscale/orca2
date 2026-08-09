@@ -1,4 +1,4 @@
-// orca-runtime — the gate brain (§C2).
+// orca-runtime — the gate brain.
 //
 // The one service the architecture decomposes into modules: execution, workitem,
 // integration, notify, readmodel. The module wall depends on those five names.
@@ -14,7 +14,7 @@ plugins {
 	id("org.openapi.generator")
 }
 
-// --- Contract-first (ADR-014) -----------------------------------------------
+// --- Contract-first API generation ------------------------------------------
 //
 // The OpenAPI document is the source of truth; this generates the API interface
 // and its DTOs from it. The controller is hand-written and implements the
@@ -89,11 +89,11 @@ sourceSets["main"].resources.srcDir(layout.buildDirectory.dir("generated/openapi
 tasks.named("compileJava") { dependsOn(tasks.named("openApiGenerate")) }
 tasks.named("processResources") { dependsOn(bundleOpenApiSpec) }
 
-// --- Flowable's own schema, under Flyway (WP3) -------------------------------
+// --- Flowable's own schema, under Flyway -------------------------------------
 //
 // The engine does NOT migrate itself: `flowable.database-schema-update: false`.
-// Its ~45 tables are versioned migrations like everything else, because §B7
-// requires a schema change to be compatible with both versions for the duration
+// Its ~45 tables are versioned migrations like everything else, because a
+// schema change must be compatible with both versions for the duration
 // of a rolling upgrade — and an engine that silently reshapes its own tables on
 // whichever instance starts first cannot offer that.
 //
@@ -173,8 +173,8 @@ dependencies {
 	// --- The primitives this service uses, and why ---------------------
 	implementation(project(":platform:web")) // the envelope, the error codes and the system context
 	implementation(project(":platform:scope")) // the query seam; every service serves scoped reads
-	implementation(project(":platform:outbox")) // this service publishes facts (§C: it has an outbox pair)
-	implementation(project(":platform:lease")) // one `service_lease` per service schema (§C2)
+	implementation(project(":platform:outbox")) // records facts transactionally before publishing them
+	implementation(project(":platform:lease")) // one `service_lease` per service schema
 	implementation(project(":platform:idempotency")) // recorded keys, not assumed ones
 
 	// --- Spring Boot ----------------------------------------------------
@@ -192,15 +192,15 @@ dependencies {
 	// api-docs disabled (SwaggerConfig is @ConditionalOnBean(SpringDocConfiguration),
 	// which springdoc.api-docs.enabled=false switches off), and enabling api-docs
 	// would introspect the code — a second source of truth beside the contract,
-	// which §4b forbids. The brief's own fallback applies: serve the file
+	// which would violate contract-first ownership. Serve the file
 	// statically and drop springdoc. The bundled, fully resolved contract is
 	// served at /openapi/orca-runtime.yaml by Spring's static-resource handling.
 
-	// §3 of the brief permits these two for orca-runtime and nowhere else.
-	implementation(libs.flowable.spring.boot.starter.process) // the process engine, embedded (ADR-006)
-	implementation(libs.spring.boot.starter.websocket)        // mechanism 5 of §B4: console live updates
+	// Only orca-runtime embeds the process engine and owns console live updates.
+	implementation(libs.flowable.spring.boot.starter.process) // the embedded process engine
+	implementation(libs.spring.boot.starter.websocket)        // console live updates
 
-	// WP7's one catalog addition, and only this service calls a customer system.
+	// Only this service calls customer systems, so only it needs connector resilience.
 	// The why is recorded on the catalog entry, which is where the rule puts it.
 	implementation(libs.resilience4j.circuitbreaker)
 	implementation(libs.resilience4j.bulkhead)
