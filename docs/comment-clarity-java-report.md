@@ -72,18 +72,25 @@ violations were reverted.
 
 | Check | Result |
 |---|---|
-| Baseline comments-only checker | PASS for B+C (213 files); expected FAIL on exactly the 8 D string files after D |
+| Baseline comments-only checker | PASS for the original B+C delivery (213 files) and all 214 B+C files after the review; expected FAIL on exactly the 8 D string files after D |
 | Banned-token scan over comment lines | **FAIL:** four deliberately untranslated, factually contradictory comments remain; listed below |
 | `./gradlew check` | PASS, `BUILD SUCCESSFUL` |
-| `./gradlew check integrationTest --rerun-tasks` | PASS in 7m 7s; 60 unit and 222 integration tests, 0 failures, 0 errors, 0 skipped |
-| Six service starts | PASS; core, runtime, edge, portal, sync and fleet each returned `status: UP` on ports 18081–18086 |
-| One truck through the gate | PASS; `T-JAVA-01` was acknowledged, visit `vis-da5503a9-e620-4b87-aaf4-09a04b15a9c6` was `COMPLETED`, the latest `RAISE_GATE` command was `EXECUTED`, and `runtime.outbox` held `visit.completed` for `lane:LANE-DEMO-01` |
+| `./gradlew check integrationTest --rerun-tasks` | PASS initially in 7m 7s and again after the review in 6m 41s; the fresh result contained 60 unit and 222 integration tests, 0 failures, 0 errors, 0 skipped |
+| Six service starts | PASS initially and after the review; core, runtime, edge, portal, sync and fleet each returned `status: UP` on ports 18081–18086 |
+| One truck through the gate | PASS initially for `T-JAVA-01`, and after the review for `T-REVIEW-01`; the latter was acknowledged, visit `vis-af85f874-8a95-4056-ab6d-fdf5e266e357` was `COMPLETED`, the latest `RAISE_GATE` command was `EXECUTED`, and `runtime.outbox` held `visit.completed` for `lane:LANE-DEMO-01` |
+| Additional Javadoc diagnostic | **FAIL:** `:services:orca-edge:javadoc` rejects the pre-existing table in `LprListener.java:63` because it has no caption; compilation succeeds, and the required build does not run Javadoc |
 
 The first demo invocation was issued from `deploy/` as `./gradlew` and failed
 because that path has no wrapper. A second attempt with `../gradlew` still used
 `deploy/` as Gradle's project directory and was rejected. Running the documented
 command from the repository root succeeded. These were invocation errors, not
 product failures.
+
+During the review, the first attempt to start portal, sync and fleet on the
+offset ports omitted the matching `ORCA_DB_URL`. All three reached application
+initialisation and then failed to connect to SQL Server's default port. Repeating
+the starts with the documented offset URL made all three healthy. This too was an
+invocation error, and it is recorded rather than hidden by the successful retry.
 
 ## 4. Decisions the plan did not dictate
 
@@ -149,6 +156,13 @@ phase, work-package or architecture references. They are strings, not comments,
 and are outside D's explicitly narrow permission. Gradle's Flowable extraction
 header also contains such text inside a string that generates SQL; editing it
 would change generated code and migration checksums.
+
+An additional Javadoc run found that the table in
+`services/orca-edge/src/main/java/com/lynxis/orca/edge/domain/LprListener.java:63`
+has no caption, which the Java 25 Javadoc tool treats as an error. That file was
+not changed by this work, ordinary compilation is green, and the plan explicitly
+says Javadoc is not wired into the build. The defect was therefore reported and
+not mixed into this comment-only change.
 
 ## 8. What was not done
 
