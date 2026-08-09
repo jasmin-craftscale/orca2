@@ -29,9 +29,9 @@ import com.lynxis.orca.runtime.workitem.domain.WorkItemService;
 import com.lynxis.orca.runtime.workitem.domain.WorkItemTables;
 
 /**
- * The clerk workflow's console surface (§C2's work-item routes).
+ * The clerk workflow's work-item console surface.
  *
- * <p>Hand-written, implementing the generated interface — ADR-014. Scope is the
+ * <p>Hand-written against the generated interface. Scope is the
  * installation's own site, from configuration, for the reasons
  * {@code DeviceEventController} states at length; the acting operator is the
  * authenticated caller, never a field of the request — an operator who could name

@@ -20,8 +20,9 @@ public enum WorkItemErrorCode implements ErrorCode {
 	WORK_ITEM_CONFLICT("WORK_ITEM_CONFLICT", 409),
 
 	/**
-	 * The engine is not waiting on this item's step (inversion 3 of the sheet's
-	 * §0). Distinguished from {@code WORK_ITEM_CONFLICT} deliberately: a conflict
+	 * The engine is not waiting on this item's step. This is the runtime guard that
+	 * prevents a stale work item from advancing a different process state.
+	 * Distinguished from {@code WORK_ITEM_CONFLICT} deliberately: a conflict
 	 * means another operator moved the item; this means the <em>process</em> moved
 	 * on — reset, already advanced, or never parked there — and the console should
 	 * refresh the visit, not just the queue row.
@@ -29,8 +30,9 @@ public enum WorkItemErrorCode implements ErrorCode {
 	WORK_ITEM_OUT_OF_ORDER("WORK_ITEM_OUT_OF_ORDER", 409),
 
 	/**
-	 * The operator is outside the item's eligible teams (WP2 — the claim respects
-	 * the routing rules). 403, not 409: nothing raced, the claim was never theirs.
+	 * The operator is outside the item's eligible teams: the claim enforces the
+	 * configured routing rules. 403, not 409; nothing raced and the claim was never
+	 * theirs.
 	 */
 	WORK_ITEM_NOT_ELIGIBLE("WORK_ITEM_NOT_ELIGIBLE", 403),
 

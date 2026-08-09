@@ -5,7 +5,7 @@ package com.lynxis.orca.runtime.integration.api;
  *
  * <p>An interface rather than a call, so that {@code ConnectorCallDelegate} — which
  * the compiler's output binds to by name and must therefore stay still — does not
- * change when the transport does. WP7 puts a {@code RestClient} with a deadline, a
+ * change when the transport does. A {@code RestClient} with a deadline, a
  * circuit breaker and a bulkhead behind it; the delegate does not learn about any
  * of that.
  */
@@ -15,7 +15,7 @@ public interface ConnectorPort {
 	 * Invokes the named connector for this visit.
 	 *
 	 * @return the branch discriminator the process routes on. A short token, never
-	 *         a response body: §C2 keeps business data in platform tables keyed by
+	 *         a response body: business data stays in platform tables keyed by
 	 *         execution id, and the engine's history tables bounded
 	 * @throws ConnectorUnavailableException when the call could not be made or
 	 *                                       produced no usable answer. The delegate
@@ -31,8 +31,8 @@ public interface ConnectorPort {
 	 *                         else is looked up by
 	 * @param laneExternalId   which lane, in core's published vocabulary
 	 * @param connectorName    which configured connector to invoke. A name rather
-	 *                         than an endpoint: the endpoint, its authentication and
-	 *                         its certificate trust are configuration (§C2), and a
+	 *                         than an endpoint: the endpoint, authentication and
+	 *                         certificate trust belong to configuration, and a
 	 *                         process that carried a URL would have to be
 	 *                         republished to change one
 	 */

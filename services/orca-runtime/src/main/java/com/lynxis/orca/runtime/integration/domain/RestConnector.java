@@ -30,8 +30,8 @@ import lombok.extern.slf4j.Slf4j;
  * <p><strong>What the three protect, and why one of them is not enough.</strong>
  *
  * <ul>
- *   <li><strong>The deadline</strong> bounds one call. §B8 requires every external
- *       call to have one and a defined outcome when it is exceeded; here that
+ *   <li><strong>The deadline</strong> bounds one call. Every external call must have
+ *       one and a defined outcome when it is exceeded; here that
  *       outcome is {@link ConnectorPort.ConnectorUnavailableException}, which the
  *       delegate turns into the process's failure branch.</li>
  *   <li><strong>The breaker</strong> bounds the <em>hundredth</em> call. A customer
@@ -50,7 +50,7 @@ import lombok.extern.slf4j.Slf4j;
  * also keeps the resilience library out of every other class's imports, which is
  * what makes replacing it a change to one file.
  *
- * <p><strong>The response body is never read.</strong> §C2 keeps business data in
+ * <p><strong>The response body is never read.</strong> Business data stays in
  * platform tables keyed by execution id and process variables to correlation keys
  * and branch discriminators; a connector that returned a body into a variable
  * would put a customer system's payload into the engine's history tables, where
@@ -87,7 +87,7 @@ public class RestConnector implements ConnectorPort {
 	@Override
 	public String call(ConnectorCall call) {
 		// The delegate runs on the async executor, which has no request and therefore
-		// no scope. §B6: background work establishes the installation's own scope
+		// no scope. Background work establishes the installation's own scope
 		// deliberately — there is no implicit entitlement for work with no user.
 		return ScopeContext.callIn(Scope.of("site_external_id", Set.of(siteExternalId)),
 				() -> invoke(call));
@@ -155,7 +155,7 @@ public class RestConnector implements ConnectorPort {
 				.contentType(MediaType.APPLICATION_JSON)
 				// Correlation keys only. What the customer system needs to look this
 				// truck up is the visit and the lane; anything else it needs, it asks
-				// us for through the partner API (§C2).
+				// us for through the partner API.
 				.body(Map.of("visitExternalId", call.visitExternalId(),
 						"laneExternalId", call.laneExternalId()))
 				.exchange((request, response) -> response.getStatusCode().value());
@@ -179,7 +179,7 @@ public class RestConnector implements ConnectorPort {
 						.version(java.net.http.HttpClient.Version.HTTP_1_1)
 						.connectTimeout(Duration.ofMillis(config.deadlineMillis()))
 						.build());
-		// Both halves of §B8's deadline. A connect timeout alone leaves a call that
+		// Both halves of the required deadline. A connect timeout alone leaves a call that
 		// connected and then went quiet waiting forever, which is the failure mode a
 		// hung customer system actually has.
 		factory.setReadTimeout(Duration.ofMillis(config.deadlineMillis()));

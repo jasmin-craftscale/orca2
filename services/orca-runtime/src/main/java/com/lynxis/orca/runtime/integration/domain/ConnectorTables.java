@@ -22,7 +22,7 @@ public final class ConnectorTables {
 	 * @param requestPath  appended to {@code baseUrl}. Separate so that the two are
 	 *                     configured by different people at different times — a site
 	 *                     moves a host, a vendor moves a route
-	 * @param deadlineMillis §B8's deadline, per connector. A terminal operating
+	 * @param deadlineMillis deadline for this connector. A terminal operating
 	 *                     system that answers in four seconds and a weighbridge that
 	 *                     answers in two hundred milliseconds cannot share one
 	 */

@@ -20,13 +20,12 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
  * Wires the `integration` module — its first classes.
  *
  * <p><strong>{@link ConnectorPort} lives here, not in {@code execution}.</strong>
- * WP4 put it in {@code execution.domain} because {@code integration} was empty and
- * there was nothing to talk to. Now there is, and {@code ModuleWallRule} is right
+ * The first slice temporarily put it in {@code execution.domain} while
+ * {@code integration} was empty. Now there is an adapter, and {@code ModuleWallRule} is right
  * to forbid {@code integration} from reaching into another module's {@code domain}:
  * modules talk through their {@code api} packages. The direction is the natural one
  * — {@code integration} owns what a connector <em>is</em> and publishes the
- * interface; {@code execution}'s delegate calls it. Recorded in the phase report as
- * a change to WP4's placement.
+ * interface; {@code execution}'s delegate calls it.
  */
 @Configuration(proxyBeanMethods = false)
 public class IntegrationConfiguration {

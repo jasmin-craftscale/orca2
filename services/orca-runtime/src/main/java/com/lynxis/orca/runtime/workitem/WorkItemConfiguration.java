@@ -81,9 +81,8 @@ public class WorkItemConfiguration {
 	/**
 	 * The acting operator: the identity-provider subject of the current request,
 	 * resolved to the platform user through core's published operator directory
-	 * ({@code topology_operator}) — which retires WP1's subject-as-actor slice
-	 * shape exactly as that decision promised: this one bean changed, no caller
-	 * did.
+	 * ({@code topology_operator}). This replaced the first slice's raw
+	 * subject-as-actor placeholder in one bean without changing any caller.
 	 *
 	 * <p>A subject with no linked user answers empty, and the controller refuses
 	 * with {@code OPERATOR_UNRESOLVED}: an operator core does not know cannot

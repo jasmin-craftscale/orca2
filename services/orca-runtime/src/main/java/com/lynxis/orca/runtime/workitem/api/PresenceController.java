@@ -25,7 +25,7 @@ import com.lynxis.orca.runtime.api.generated.model.SetPresenceRequest;
 import com.lynxis.orca.runtime.workitem.domain.PresenceService;
 import com.lynxis.orca.runtime.workitem.domain.PresenceTables.UserActivity;
 
-/** Operator presence — hand-written against the generated interface (ADR-014). */
+/** Operator presence, hand-written against its generated contract interface. */
 @RestController
 public class PresenceController implements PresenceApi {
 
