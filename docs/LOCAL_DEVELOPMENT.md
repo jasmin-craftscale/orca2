@@ -19,6 +19,10 @@ that is a defect in this document — say so.
 **That is the whole list, including on Windows.** The setup and demo tools run
 inside containers, so nothing else needs installing.
 
+The commands below assume a **bash-like shell**. On Windows use WSL2 or Git Bash —
+everything works there, but PowerShell will not run the loops and helper functions
+as written.
+
 ## 2 · Clone both repositories, side by side
 
 You need **two** repositories, and the layout matters:
@@ -80,6 +84,11 @@ That gives you four containers: SQL Server, Keycloak, and two stubs standing in 
 a customer's system and a device host. **There is deliberately no message broker** —
 services hand work to each other through the database.
 
+⚠️ **The first start takes a minute or two** while SQL Server initialises — longer
+on Apple silicon, where it runs emulated. `docker compose up -d` returns
+immediately, but the database is not ready yet. The next command waits for it, so
+just run it; it is not stuck.
+
 Then the one-time privileged step:
 
 ```bash
@@ -100,10 +109,11 @@ Expect `PASS — 36 checks.`
 
 ## 4 · Run the services
 
-From the repository root. **Core first** — it publishes views that runtime and edge
-refuse to start without.
+**Core first** — it publishes views that runtime and edge refuse to start without.
+You were in `deploy/`, so come back up to the repository root:
 
 ```bash
+cd ..
 ./gradlew bootRun -p services/orca-core    --args='--spring.profiles.active=local'
 ./gradlew bootRun -p services/orca-runtime --args='--spring.profiles.active=local'
 ./gradlew bootRun -p services/orca-edge    --args='--spring.profiles.active=local'
@@ -128,19 +138,45 @@ cd deploy && docker compose run --rm demo-seed && cd ..
 ```
 
 `sendPlate` speaks the real camera wire protocol at edge's listener. You should see
-an acknowledgement come back.
+the plate go out and an acknowledgement come back:
+
+```
+→ lane LANE-DEMO-01, plate T-HELLO-01, EventGuid evt-1e27278d-...
+← <ZapPacket Type="ACK" Id="pkt-evt-1e27278d-..." Version="4.4" SenderId="999"></ZapPacket>
+```
+
+⚠️ **If you get no acknowledgement on the very first try, wait five seconds and run
+it again.** Edge claims each lane through a lease and only polls for newly seeded
+lanes every five seconds — so immediately after `demo-seed` it may not own the lane
+yet. This is expected, and it is not a defect. It caught me too.
 
 What happens next, without you doing anything: edge delivers the capture to
 runtime, admission starts exactly one visit, the process calls the stubbed customer
 system, commands the barrier through edge, the barrier confirms, and the visit
 closes with its outbound fact — all in about a second.
 
-Check it:
+### Looking at the database
+
+You will do this constantly, so define this helper once, from the repository root.
+It reads the password out of `deploy/.env`, so it works in any fresh terminal:
 
 ```bash
-docker exec -i orca-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa \
-  -P "$MSSQL_SA_PASSWORD" -C -No -d orca -h -1 -W -Q \
-  "SELECT external_id, status, plate FROM runtime.execution"
+q() {
+  ( set -a; . deploy/.env; set +a
+    docker exec -i orca-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+      -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -No -I -d orca -h -1 -W -Q "$1" )
+}
+```
+
+⚠️ **The `-I` matters.** Several tables have filtered indexes, and SQL Server
+refuses to write to those unless `QUOTED_IDENTIFIER` is on. Without `-I` a write
+fails with an error that names SET options and no table, which is a genuinely
+confusing twenty minutes.
+
+Now check your truck:
+
+```bash
+q "SELECT external_id, status, plate FROM runtime.execution"
 ```
 
 Expect your plate with status `COMPLETED`. **If you got that, everything works.**
