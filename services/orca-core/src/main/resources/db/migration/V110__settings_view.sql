@@ -1,18 +1,31 @@
--- orca-core · Phase 3 WP3 — publish the settings registry's values.
+-- A read-only view that lets the gate software read this installation's settings.
 --
--- V107 seeded the two work-item SLA defaults with the words "runtime reads this
--- in the work-item phase" on the row. This is that read's contract: the screen
--- identity's per-screen thresholds (V109) fall back to the global settings, and
--- runtime reaches settings the same way it reaches everything of core's —
--- a published view, never core's tables (ADR-009).
+-- WHY IT EXISTS
+-- A screen's timings may be left unset, in which case the installation-wide
+-- default applies. Those defaults are rows in the settings registry, which lives
+-- in orca-core's schema — and no other service may read orca-core's tables, since
+-- each service logs in as itself and is granted access only to its own schema. So
+-- the settings are published as a view and granted by name, exactly like the
+-- lanes, devices and routing rules before them.
 --
--- The whole registry is published, not just the two keys: the registry rejects
--- secrets BEFORE the table by design (V107, rule 8), so there is nothing in it
--- a service may not read — and a view filtered to named keys would need a
--- migration every time a service legitimately needs one more setting.
+-- The view resolves the fallback itself: a setting that has been given a value
+-- returns that value, and one that has not returns its registered default. A
+-- caller never has to know there are two tables behind it.
 --
--- Installation realm (phase-2 §5.1): settings have no site dimension, and the
--- consumer reads under the config_realm dimension like topology_operator.
+-- WHY THE WHOLE REGISTRY, RATHER THAN THE TWO KEYS THAT ARE NEEDED TODAY
+-- Because there is nothing in the registry a service may not read. Secrets never
+-- reach the settings table at all — the service refuses a secret-shaped key with
+-- a typed error before it even consults the registry — so publishing everything
+-- exposes nothing. The alternative, a view filtered to a list of named keys,
+-- would mean a database migration every time a service legitimately needed one
+-- more setting, which is a cost with nothing bought.
+--
+-- WHAT MIGHT SURPRISE YOU
+-- The view carries `config_realm`, which is a constant. Settings belong to the
+-- installation as a whole and have no site to be scoped by, and the shared
+-- data-access code every read goes through has no unscoped read at all — so a
+-- view with no site dimension has to offer another one to be read under. That
+-- keeps reading installation-wide data a declared act rather than a hole.
 
 IF DATABASE_PRINCIPAL_ID(N'orca_runtime') IS NULL
 	THROW 50110, 'orca_runtime does not exist in this database. Run deploy/bootstrap/run.sh before starting orca-core.', 1;

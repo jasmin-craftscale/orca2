@@ -1,30 +1,50 @@
--- orca-core · WP1 — the entitlement catalog seed: the GATE tree.
+-- The contents of the permission catalog: every application, module, sub-module
+-- and action item the gate console can gate a button on. The empty tables were
+-- created by the previous migration; this fills them.
 --
--- ⚠️ GENERATED, ZERO HAND TRANSCRIPTION. Produced by parsing
--- docs/entitlement-catalog-from-1x.md (itself script-extracted from the 1.x
--- seeders) and verifying the sheet's counts before emitting a single row:
--- GATE = 3 modules / 30 sub-modules / 174 action items. The generator asserts
--- those counts and refuses to emit otherwise.
+-- One branch only — the one rooted at GATE, which is the console operators and
+-- administrators use: 1 application, 3 modules, 30 sub-modules, 174 action items.
 --
--- Identity, per translation rule 7:
---   * external_id — PINNED, re-minted (new-clients-only frees the 1.x UUIDs):
---     UUIDv5 in the namespace uuid5(NAMESPACE_URL, 'orca:2.0:entitlement-catalog'),
---     name = the node's code. Deterministic: regenerating this file yields
---     byte-identical UUIDs, and two clean migrations yield identical rows.
---   * code — stable machine code from the tree position
---     (GATE.ADMIN.ROLE_MANAGEMENT.ADD_ROLE). THE contract; names are display-only.
---   * licence_route — the 1.x licence-gate string, verbatim, NOT unique.
+-- ⚠️ GENERATED, NOT HAND-TRANSCRIBED. Every row below was produced by a script
+-- that parses docs/entitlement-catalog-from-1x.md — itself extracted by script
+-- from the seed data of the Go system in production today — and that asserts the
+-- expected counts (3 / 30 / 174) before it will emit a single line. Editing a row
+-- here by hand breaks that chain of custody. Regenerate instead.
 --
--- One collision the catalog really contains: TWO sub-modules named "Event Data"
--- under GATE·Admin (1.x uuids 27c4f2e7-… and de3d9e1f-…). Disambiguated
--- deterministically in document order: EVENT_DATA and EVENT_DATA_2. Reported in
--- docs/phase-2-report.md rather than silently merged.
+-- HOW EACH ROW IS IDENTIFIED, AND WHY IT IS NOT RANDOM
+--   * `external_id` is computed, not generated at random: a version-5 UUID,
+--     derived by hashing the node's code inside a fixed namespace. That means
+--     regenerating this file produces byte-identical identifiers, and two clean
+--     installations end up with the same catalog rather than two catalogs that
+--     merely look alike. The old system minted a fresh random UUID per install,
+--     which is why nothing there could reference the catalog by identifier.
+--   * `code` is a stable machine string built from the node's position in the
+--     tree — GATE.ADMIN.ROLE_MANAGEMENT.ADD_ROLE. This is the contract. Anything
+--     matching on the catalog matches on the code.
+--   * `name` is for display only. It may be corrected without consequence.
+--   * `licence_route` is the old system's licence-check string, carried through
+--     verbatim so an existing licence keeps meaning the same thing. It repeats
+--     across the tree; it is not an identifier.
 --
--- The PWA tree (2/3/13) is deliberately NOT seeded — it is the portal's,
--- deferred with cloud scope (register NEW-1b). The sheet keeps it for that phase.
+-- ⚠️ THE CATALOG REALLY DOES CONTAIN A COLLISION. Two different sub-modules under
+-- GATE · Admin are both named "Event Data" in the source system — distinct rows,
+-- distinct identifiers, identical display names. They are disambiguated here in
+-- the order they appear in the source, as EVENT_DATA and EVENT_DATA_2, rather
+-- than merged. Merging them would silently drop whichever grants hung off the
+-- second one.
 --
--- config_realm is defaulted by V103. Document order is preserved by ascending
--- identity keys, which is what carries the 1.x console's menu order.
+-- WHAT IS DELIBERATELY NOT SEEDED
+-- The source system has a second branch, for the driver-facing web app. It
+-- belongs to orca-portal, which is an empty skeleton until work on the hosted
+-- cloud tier begins, so seeding its permissions now would create a catalog
+-- describing screens that do not exist. It is preserved in the extracted document
+-- for that later work.
+--
+-- WHAT MIGHT SURPRISE YOU
+-- The rows carry no explicit scope column: `config_realm` is defaulted to
+-- 'INSTALLATION' by the previous migration's column default. And the insert order
+-- is load-bearing in a small way — the identity keys ascend in document order, so
+-- ordering by key reproduces the menu order the console displays.
 
 INSERT INTO entitlement_application (external_id, code, name) VALUES ('b8589e83-01a2-5c85-8b53-4468a5770a86', 'GATE', N'GATE');
 INSERT INTO entitlement_module (application_id, external_id, code, name)

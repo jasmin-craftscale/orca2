@@ -1,40 +1,74 @@
--- orca-core · WP1 — identity: users, roles, role↔site scoping, the entitlement
--- catalog and role↔entitlement grants.
+-- Who may use this installation, and what each of them is allowed to do: user
+-- accounts, roles, which sites a role covers, the catalog of everything that can
+-- be permitted, and which of those permissions each role holds.
 --
--- Translated from ORCA 1.x per docs/core-config-schema-from-1x.md §1, whose §0
--- translation rules OVERRIDE the 1.x shapes — and V101's conventions override
--- both where they conflict (internal key + external id, retired_at rather than
--- is_active/is_deleted, created_at only, unqualified names).
+-- WHAT THIS IS FOR
+-- A person signs in to the console; the console has to decide which screens they
+-- see, which buttons work, and which sites' data they may look at. Every one of
+-- those answers comes from these tables. Administrators write them; orca-core
+-- reads them on the authorization path, and — through published views — so does
+-- the service that runs the gate, when it needs to know which operator is acting.
 --
--- WHAT DOES NOT PORT, and why (each recorded in docs/phase-2-report.md):
---   * customer_id everywhere — one installation never carries more than one
---     customer (register NEW-1a/1b, ruled 6–7 Aug 2026). The customer dimension
---     is degenerate on an appliance; role names are unique per installation.
---   * The 1.x credential cluster (credential_password, session_store, login
---     attempts, user_login_type, is_ldap_user) — Keycloak owns credentials
---     (sheet rule 9, §B6). The user row is profile + claim mapping.
---   * email_hash / email-at-rest encryption — security-shaped; PROPOSED in the
---     report, decided by the product owner, not implemented here.
---   * is_override_user / override_user_details — licensing cluster, deferred.
---   * user_site_mappings — DEAD in 1.x (zero references). Site scoping is
---     role-based, via role_site below.
---   * role_entitlement_mappings.event_data_id — row-level data scope grafted
---     onto the grant table; surfaced in the report, not copied.
---   * The denormalized module/sub-module FKs on grants — leaf FK only.
+-- The permission model has one shape worth learning up front. Permissions are not
+-- a flat list of strings: they form a four-level tree — application, module,
+-- sub-module, and finally the individual action item ("Add Role", "Export
+-- Excel"). Those four tables are a CATALOG of everything the product can gate on.
+-- A role holds a set of grants, and a grant points at one leaf of that tree. A
+-- user holds exactly one role.
 --
--- SCOPE COLUMNS — the two dimensions core's seam reads use:
---   * site_external_id  — for site-dimensional rows (role_site here). FK to
---     site(external_id) so the denormalized scope column cannot drift, and a
---     scope-LEADING index because every seam read leads with the predicate
---     (ScopeIndexRule reads this file).
---   * config_realm      — constant 'INSTALLATION', for rows that belong to the
---     installation as a whole (users, roles, the catalog, grants). The seam has
---     no unscoped read, deliberately; a constant realm column makes the
---     installation-wide read a declared act rather than a bypass, and DENY
---     still returns nothing. A row cannot claim a site it does not have.
+-- WHERE THE SHAPE CAME FROM
+-- These tables are translated from the Go system in production today — the schema
+-- there is defined by object-relational mappings rather than by any CREATE TABLE,
+-- so it is evidence of what the fielded product needs, not a specification. The
+-- translation deliberately does not copy: several long-standing defects are fixed
+-- here, and each fix is called out at the table it applies to. Where a
+-- translation choice was made, the reasoning is written down beside it rather
+-- than left for someone to reverse-engineer.
 --
--- Growth is declared beside each table in Java (IdentityTables). All BOUNDED:
--- rows appear when an administrator configures something, never per truck.
+-- WHAT THE OLD SYSTEM HAD THAT IS DELIBERATELY ABSENT
+--   * A customer id on every table. One installation serves exactly one customer
+--     — that was ruled on 6–7 August 2026 — so the column would be a constant on
+--     every row. Role names are unique across the installation instead.
+--   * Everything to do with passwords: stored credentials, session records, login
+--     attempt counters, a login-type column, an LDAP flag. The identity provider
+--     owns authentication. A user row here is a profile plus the mapping from
+--     the token's subject to that profile.
+--   * An encrypted email column with a hash alongside it for searching. Whether
+--     personal data is encrypted at rest is a security decision for the product
+--     owner; until it is taken, the column is an ordinary one.
+--   * The "override user" columns — a licence break-glass account. They belong
+--     with the licensing work, which has not started.
+--   * A user-to-site mapping table. It exists in the old system and nothing reads
+--     it. Site access is granted through the role, in `role_site` below.
+--   * A row-level data-scope column grafted onto the grants table. It points at
+--     reference data and mixes two different ideas of permission; how 2.0 wants
+--     per-data-scope grants is an open question, so it is not copied.
+--   * Denormalized module and sub-module foreign keys on each grant. They are
+--     derivable from the leaf, so only the leaf is stored.
+--
+-- THE TWO SCOPE COLUMNS, AND WHY EVERY TABLE CARRIES ONE
+-- Every read of these tables goes through a single piece of shared code that
+-- turns "what is this caller allowed to see" into the query's leading condition.
+-- That code has no unscoped read at all, deliberately: there is no way to ask for
+-- everything. So every table has to declare which dimension it is scoped by.
+--
+--   * `site_external_id` — for rows that belong to one site (here, `role_site`).
+--     It is a foreign key to the site's external id, so a denormalized scope
+--     value cannot drift or name a site that does not exist. Its index LEADS with
+--     it, because every scoped read leads with that condition — a table without
+--     such an index can only be scanned, and a scan taken under a lock locks
+--     every row at the site. A build check reads this file and fails when a table
+--     declaring the column has no index leading with it.
+--   * `config_realm` — a constant 'INSTALLATION', for rows that belong to the
+--     installation as a whole: users, roles, the catalog, the grants. Reading
+--     installation-wide data then becomes a declared act with a named dimension
+--     rather than a hole in the mechanism, and a caller granted nothing still
+--     sees nothing. A row also cannot quietly claim a site it does not have.
+--
+-- HOW BIG THESE GET
+-- Growth is declared in Java beside each table, where a build check can read it.
+-- All bounded: rows appear when an administrator configures something, never when
+-- a truck arrives.
 
 -- --------------------------------------------------------------------------
 -- role
@@ -51,12 +85,17 @@ CREATE TABLE role (
 	created_at    DATETIME2(3)   NOT NULL CONSTRAINT df_role_created_at DEFAULT SYSUTCDATETIME()
 );
 
--- 1.x had NO unique on role_name (sheet §1). Filtered so a retired role's name
--- can be reused — external ids are never reused, names may be.
+-- Two active roles may not share a name. The old system enforced nothing here, so
+-- duplicate role names were possible and the console showed two identical rows.
+--
+-- Filtered to unretired rows so that a retired role's name becomes free again.
+-- That is the deliberate difference between the two identifiers: an external id
+-- is never reused, a display name may be.
 CREATE UNIQUE INDEX ux_role_name ON role (name) WHERE retired_at IS NULL;
 
 -- --------------------------------------------------------------------------
--- user_account  (USER is a reserved word; user_details' 2.0 shape)
+-- user_account — one row per person who can sign in.
+-- Named `user_account` rather than `user` because USER is a reserved word in SQL.
 -- --------------------------------------------------------------------------
 CREATE TABLE user_account (
 	user_id             BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_user_account PRIMARY KEY,
@@ -64,62 +103,94 @@ CREATE TABLE user_account (
 	config_realm        VARCHAR(16)   NOT NULL
 		CONSTRAINT df_user_account_realm DEFAULT 'INSTALLATION'
 		CONSTRAINT ck_user_account_realm CHECK (config_realm = 'INSTALLATION'),
-	-- The claim mapping: Keycloak's subject for this user (§B6 — Keycloak owns
-	-- authentication; this is how a token resolves to a platform user). Nullable
-	-- because a user can be provisioned before their first login links them.
+	-- The identity provider's own id for this person — the "subject" claim in the
+	-- sign-in token. Authentication belongs to the identity provider (Keycloak);
+	-- this column is the single link that turns a validated token into a user of
+	-- this platform. Nullable, because an administrator can create the account
+	-- before the person has ever signed in, and it is their first sign-in that
+	-- links the two.
 	keycloak_subject    VARCHAR(64)   NULL,
 	first_name          NVARCHAR(100) NULL,
 	middle_name         NVARCHAR(100) NULL,
 	last_name           NVARCHAR(100) NULL,
 	display_name        NVARCHAR(200) NOT NULL,
-	-- Plain, not encrypted: 1.x encrypts email with an email_hash blind index.
-	-- Whether 2.0 encrypts PII at rest is security-shaped — PROPOSED in the
-	-- report (§5 of the sheet), and until ruled the column is ordinary. 320 is
-	-- the addr-spec ceiling; 1.x's 500 was sized for ciphertext.
+	-- Stored in the clear. The old system encrypts this and keeps a hash beside it
+	-- so that search still works. Whether personal data is encrypted at rest here
+	-- is a security decision for the product owner, and it has not been taken, so
+	-- the column stays ordinary rather than half-implementing a scheme.
+	-- 320 characters is the maximum length an email address can have by
+	-- specification; the old system's 500 was sized for the ciphertext.
 	email               NVARCHAR(320) NOT NULL,
 	profile_image_url   VARCHAR(512)  NULL,
-	-- 1.x language_name varchar(200) held a display name ("english"). A code is
-	-- the 2.0 shape; display names belong to the localization tables (WP4).
+	-- A language code, not a display name. The old system stored the word
+	-- "english" in a 200-character column and matched on it; a code is the thing
+	-- software should compare, and the human-readable name belongs in the
+	-- localization tables that arrive later.
 	language_code       VARCHAR(32)   NULL,
 	privacy_accepted_at DATETIME2(3)  NULL,
 	terms_accepted_at   DATETIME2(3)  NULL,
-	-- Exactly one role per user — a 1.x invariant §C1 keeps ("exactly one role
-	-- per user"), held structurally by this being a single NOT NULL column.
+	-- Exactly one role per user. That is a rule the old system holds and the new
+	-- design keeps, and it is held here structurally: a single column that cannot
+	-- be null. There is no user-to-roles table to drift out of step, and no
+	-- question about what happens when a user has two roles that disagree.
 	role_id             BIGINT        NOT NULL CONSTRAINT fk_user_account_role REFERENCES role (role_id),
 	retired_at          DATETIME2(3)  NULL,
 	created_at          DATETIME2(3)  NOT NULL CONSTRAINT df_user_account_created_at DEFAULT SYSUTCDATETIME()
 );
 
--- One platform user per identity-provider subject, among active users.
+-- One identity-provider subject resolves to at most one active user. Without
+-- this, a token could match two rows and the answer to "who is this?" would
+-- depend on which one the query happened to return first.
+--
+-- Filtered twice over: rows with no subject yet (an account created before its
+-- first sign-in) are excluded, so any number of them may coexist, and retired
+-- accounts are excluded, so a person who left and came back is expressible.
 CREATE UNIQUE INDEX ux_user_account_keycloak_subject ON user_account (keycloak_subject)
 	WHERE keycloak_subject IS NOT NULL AND retired_at IS NULL;
 
 CREATE INDEX ix_user_account_role ON user_account (role_id);
 
 -- --------------------------------------------------------------------------
--- role_site — the real tenant-scoping table (1.x role_site_mappings, which had
--- no FKs, no unique pair and no index despite sitting on the auth hot path)
+-- role_site — which sites a role covers. This is the table that decides whether
+-- an operator at one site can see another site's data, so it is on the path of
+-- every authorization decision.
+--
+-- Its equivalent in the old system had no foreign keys, no unique constraint on
+-- the pair and no index at all, despite being read on exactly that path. All
+-- three are fixed below.
 -- --------------------------------------------------------------------------
 CREATE TABLE role_site (
 	role_site_id      BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_role_site PRIMARY KEY,
 	role_id           BIGINT       NOT NULL CONSTRAINT fk_role_site_role REFERENCES role (role_id),
-	-- The scope column IS the reference: FK to site's unique external id, so the
-	-- denormalized scope value cannot name a site that does not exist.
+	-- The scope column and the reference to the site are the same column. It is a
+	-- foreign key to the site's external id, which is why a copied scope value
+	-- here cannot name a site that does not exist or drift after the site changes.
 	site_external_id  VARCHAR(64)  NOT NULL CONSTRAINT fk_role_site_site REFERENCES site (external_id),
 	retired_at        DATETIME2(3) NULL,
 	created_at        DATETIME2(3) NOT NULL CONSTRAINT df_role_site_created_at DEFAULT SYSUTCDATETIME()
 );
 
--- Unique pair AND the scope-leading index, in one statement. Filtered so a
--- revoked mapping can be granted again.
+-- One index doing two jobs: it refuses a duplicate (role, site) pair, and because
+-- it leads with the site column it is also the index every scoped read uses.
+-- Filtered to unretired rows, so access revoked today can be granted again
+-- tomorrow rather than being blocked by the corpse of the old row.
 CREATE UNIQUE INDEX ux_role_site ON role_site (site_external_id, role_id) WHERE retired_at IS NULL;
 
 CREATE INDEX ix_role_site_role ON role_site (role_id);
 
 -- --------------------------------------------------------------------------
--- The entitlement catalog — four levels, normalized prefixes (1.x had
--- application_module_id vs module_uuid etc.). Product-owned reference data:
--- seeded by V104 with pinned identity per sheet rule 7.
+-- The permission catalog — everything the product can gate on, as a four-level
+-- tree: application → module → sub-module → action item. "GATE · Admin · Role
+-- Management · Add Role" is one path through it, and the leaf is what a role is
+-- granted.
+--
+-- This is reference data owned by the product, not by the customer: an
+-- administrator picks from it, and never adds to it. The rows themselves are
+-- inserted by the next migration, with identifiers that are computed rather than
+-- random, so that two clean installations end up with byte-identical catalogs.
+--
+-- The four tables name their columns consistently. The old system did not — the
+-- key and the identifier at each level used different prefixes from each other.
 -- --------------------------------------------------------------------------
 CREATE TABLE entitlement_application (
 	application_id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_entitlement_application PRIMARY KEY,
@@ -175,9 +246,15 @@ CREATE TABLE entitlement_action_item (
 		CONSTRAINT ck_entitlement_action_item_realm CHECK (config_realm = 'INSTALLATION'),
 	code           VARCHAR(128)  NOT NULL CONSTRAINT uq_entitlement_action_item_code UNIQUE,
 	name           NVARCHAR(200) NOT NULL,
-	-- The 1.x licence-gate string ("Routes"). NOT unique across the tree —
-	-- ExportExcel, DeleteRecord and View recur — so licence filtering by route is
-	-- coarser than the catalog (sheet §1). Kept verbatim for the licence work.
+	-- The string the old system's licence check matches on. It is carried through
+	-- verbatim because the licensing work will need it, and it must keep matching
+	-- what a licence already says.
+	--
+	-- ⚠️ It is NOT unique across the tree. "ExportExcel", "DeleteRecord" and
+	-- "View" each appear against many different action items, so filtering by
+	-- licence route is coarser than the catalog it sits in: switching off a route
+	-- switches off every action item that shares the string. That is a property of
+	-- the fielded system, recorded here so nobody assumes a one-to-one mapping.
 	licence_route  VARCHAR(64)   NOT NULL,
 	retired_at     DATETIME2(3)  NULL,
 	created_at     DATETIME2(3)  NOT NULL CONSTRAINT df_entitlement_action_item_created_at DEFAULT SYSUTCDATETIME()
@@ -186,10 +263,18 @@ CREATE TABLE entitlement_action_item (
 CREATE INDEX ix_entitlement_action_item_sub_module ON entitlement_action_item (sub_module_id);
 
 -- --------------------------------------------------------------------------
--- role_entitlement — grants. Leaf FK only: 1.x also carried module and
--- sub-module FKs (derivable — dropped, rule 6) and event_data_id (a row-level
--- data-scope graft — surfaced in the report, not copied). 1.x had no unique on
--- the pair, so duplicate grants were possible; here the database refuses them.
+-- role_entitlement — the grants themselves. One row means "this role may do this
+-- one thing".
+--
+-- It references only the leaf of the catalog tree. The old system also stored the
+-- module and sub-module on every grant row; those are reachable by following the
+-- leaf upwards, and a stored copy of a derivable value is a copy that can end up
+-- disagreeing. It also carried a column pointing at a row of reference data,
+-- which turned the grant table into a half-built row-level access rule; how
+-- per-data-scope grants should work is an open question, so it is not copied.
+--
+-- The old system had no unique constraint on the (role, action item) pair, so the
+-- same grant could exist several times over. Here the database refuses it.
 -- --------------------------------------------------------------------------
 CREATE TABLE role_entitlement (
 	role_entitlement_id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_role_entitlement PRIMARY KEY,
@@ -203,9 +288,11 @@ CREATE TABLE role_entitlement (
 	created_at          DATETIME2(3) NOT NULL CONSTRAINT df_role_entitlement_created_at DEFAULT SYSUTCDATETIME()
 );
 
--- The unique pair, role-leading — which is also the 2.0 equivalent of 1.x's
--- hot-path covering index (role_id, is_active) INCLUDE (…): grant resolution
--- reads by role, and this index leads with it.
+-- The unique pair, with the role first. The column order is deliberate and does
+-- two jobs at once: it refuses duplicate grants, and it serves the only read
+-- anybody makes of this table — "what may this role do?" — which arrives with the
+-- role in hand. The old system needed a separate index for that read; here it is
+-- the same one.
 CREATE UNIQUE INDEX ux_role_entitlement ON role_entitlement (role_id, action_item_id)
 	WHERE retired_at IS NULL;
 

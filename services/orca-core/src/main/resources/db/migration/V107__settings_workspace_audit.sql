@@ -1,48 +1,60 @@
--- orca-core · WP4 — the settings registry, the per-user workspace, site
--- branding/localization, and the audit trail.
+-- Four unrelated things that all belong to running the console: the settings an
+-- installation can be tuned with, each operator's own view of the data grids,
+-- per-site branding, and the record of who changed what.
 --
--- Translated from docs/core-config-schema-from-1x.md §4. §C1's own words for
--- settings are the specification: "a registry of known keys, validated writes,
--- history appended, secrets rejected."
+-- 1 · SETTINGS — three tables, not one
+-- `setting_definition` is a registry of the keys that exist at all, seeded below.
+-- `setting_value` holds the current value of a key, at most one per key.
+-- `setting_history` appends a row every time one changes and is never updated.
 --
---   * setting_definition is the registry — seeded (pinned UUIDv5, namespace
---     uuid5(NAMESPACE_URL, 'orca:2.0:setting-registry')) with the keys the
---     sheet names worth carrying: log level, the two work-item SLA defaults,
---     retention windows. 1.x's 403 keys across 21 services mostly dissolve —
---     2.0 has six services and env/keystore for infrastructure tunables.
---     EVERY secret-shaped 1.x key (*_CLIENT_SECRET, CLUSTER_PASSWORD,
---     SMTP_PASSWORD, AZURE_*_KEY, VAPID_PRIVATE_KEY) is deliberately ABSENT,
---     and the service refuses secret-shaped keys with a typed error before it
---     even consults the registry (rule 8).
---   * setting_value holds the current value (one per key); setting_history
---     appends every change — TRAFFIC-GROWING, retention class 'audit'
---     (PROVISIONAL, like every class name until the list is reconciled).
---   * grid_definition names its title column honestly (1.x called the display
---     name "table_name"). Only grids whose backing features THIS phase built
---     are seeded, with 2.0-minted codes — the 1.x 38-grid list is not
---     row-level extractable from the sheet, and most of it belongs to later
---     phases anyway (recorded in the report). Default column layouts are a
---     JSON document per grid (rule 11 — a UI schema, read and written whole),
---     NULL until a console defines them.
---   * user_grid_column_preference is RELATIONAL, deliberately (rule 11): 1.x
---     kept prefs as JSON blobs and paid for it with migrations that
---     string-rewrite inside them. A column preference is three scalars per
---     (user, grid, column) — exactly what rows are for.
---   * saved_filter keeps its expression as JSON WITH a schema version: a
---     filter is an expression tree (document-shaped, rule 11 satisfied
---     deliberately), and the version column is what spares 2.0 the blind
---     string-rewrite 1.x needed. Unique (user, grid, name); at most one
---     default per (user, grid) by filtered unique index — 1.x enforced
---     neither.
---   * site_color / site_language are per-site branding — created EMPTY (rule
---     10: migrations create no tenant data; 1.x seeded 8 colors + "english"
---     per site, which is exactly the seeding 2.0 refuses). Hex is normalized
---     to #RRGGBBAA by CHECK; 1.x mixed 6- and 8-digit values.
---   * audit_event is core's FIRST traffic-growing table: growth + retention
---     class 'audit' declared in Java, scope-leading index here. Its
---     site_external_id deliberately has NO FK: the value is the configured
---     installation site (the scope), and an audit write must not fail because
---     configuration data is mid-bootstrap. Typed columns, one casing.
+-- The design for this is one sentence: a registry of known keys, validated
+-- writes, history appended, secrets rejected. The registry is the important half
+-- — a settings table anyone can insert a new key into is a settings table nobody
+-- can validate, and that is what the old system had: 403 keys spread across 21
+-- services, with no list of which were real.
+--
+-- ⚠️ NO SECRET EVER GOES IN HERE. The old system stored identity-provider client
+-- secrets, mail passwords and push-notification signing keys in its settings
+-- table, encrypted. None of those keys exist in this registry, and the service
+-- refuses a secret-shaped key with a typed error BEFORE it even consults the
+-- registry — so adding one here would not be enough to make it work, which is the
+-- point. Secrets belong in configuration and a key store.
+--
+-- `setting_history` is the only table in this migration that grows with use
+-- rather than with configuration. Its growth and how long it is kept are declared
+-- in Java beside the entity, where a build check can read them.
+--
+-- 2 · WORKSPACE — what each operator has arranged for themselves
+-- `grid_definition` names the data grids the console shows. Only the grids whose
+-- underlying features exist at this point are seeded; the old system has 38 of
+-- them, most belonging to features not built yet, and its list could not be
+-- extracted row by row. The default column layout for a grid is a JSON document,
+-- left null until a console defines one.
+--
+-- `user_grid_column_preference` and `saved_filter` are per-operator. The first is
+-- deliberately RELATIONAL — one row per user, grid and column, holding three
+-- scalars. The old system kept these as JSON strings and paid for it with
+-- migrations that had to rewrite text inside them to rename a column.
+--
+-- `saved_filter` keeps its expression as JSON, and that is also deliberate: a
+-- filter is an expression tree, document-shaped, read and written whole. What
+-- makes it safe is the version number stored beside it — a document whose shape
+-- is versioned can be migrated by parsing it, which is exactly what the old
+-- system could not do.
+--
+-- 3 · BRANDING — created empty, on purpose
+-- `site_color` and `site_language` are per-site presentation. No migration in
+-- this system creates data belonging to a customer; the old one silently inserted
+-- eight colours and a language for every site, which is precisely the habit being
+-- broken. Colour values are normalized to eight hex digits with an alpha channel
+-- and held to it by a CHECK; the old system mixed six- and eight-digit values and
+-- every reader had to cope with both.
+--
+-- 4 · AUDIT — who changed what
+-- `audit_event` is the first table in this schema that grows with use rather than
+-- with configuration, and the first with a retention policy. Its details are at
+-- the table itself, including the one surprising thing about it: its site column
+-- deliberately has no foreign key.
 
 -- --------------------------------------------------------------------------
 -- settings
@@ -110,9 +122,12 @@ CREATE TABLE grid_definition (
 		CONSTRAINT df_grid_definition_realm DEFAULT 'INSTALLATION'
 		CONSTRAINT ck_grid_definition_realm CHECK (config_realm = 'INSTALLATION'),
 	code            VARCHAR(64)   NOT NULL CONSTRAINT uq_grid_definition_code UNIQUE,
-	-- The honest name for what 1.x misleadingly called "table_name".
+	-- What the grid is called on screen. The old system named this column
+	-- "table_name", which reads like the name of a database table and is not.
 	title           NVARCHAR(200) NOT NULL,
-	-- The default column layout, as a JSON document per grid (rule 11).
+	-- The default column layout for this grid, as a JSON document — a description
+	-- of a user interface, read whole and written whole, with nothing querying
+	-- inside it. Null until a console defines one.
 	default_columns NVARCHAR(MAX) NULL,
 	retired_at      DATETIME2(3)  NULL,
 	created_at      DATETIME2(3)  NOT NULL CONSTRAINT df_grid_definition_created_at DEFAULT SYSUTCDATETIME()
@@ -148,8 +163,9 @@ CREATE TABLE user_grid_column_preference (
 		CONSTRAINT df_user_grid_column_preference_created_at DEFAULT SYSUTCDATETIME()
 );
 
--- The unique 1.x never had on (user, grid) — here per column, since the model
--- is relational rather than a blob.
+-- One preference row per user, grid and column. The old system had no unique
+-- constraint here at all, so a user could accumulate several conflicting
+-- preferences for the same grid and the winner depended on row order.
 CREATE UNIQUE INDEX ux_user_grid_column_preference
 	ON user_grid_column_preference (user_id, grid_definition_id, column_code)
 	WHERE retired_at IS NULL;
@@ -165,9 +181,13 @@ CREATE TABLE saved_filter (
 		CONSTRAINT df_saved_filter_realm DEFAULT 'INSTALLATION'
 		CONSTRAINT ck_saved_filter_realm CHECK (config_realm = 'INSTALLATION'),
 	name               NVARCHAR(200)  NOT NULL,
-	-- An expression tree is document-shaped; JSON is the deliberate choice
-	-- (rule 11) — and the version column is what makes it evolvable without
-	-- 1.x's blind string-rewrites.
+	-- The filter itself, as JSON. An expression tree is document-shaped, so this
+	-- is one of the deliberate exceptions to keeping data in columns.
+	--
+	-- The version number beside it is what makes that safe. When the filter format
+	-- changes, a migration can parse each document, understand it from its
+	-- version, and rewrite it properly. The old system had no version and
+	-- therefore no choice but to rewrite text inside the strings and hope.
 	filter_json           NVARCHAR(4000) NOT NULL,
 	filter_schema_version INT            NOT NULL CONSTRAINT df_saved_filter_schema_version DEFAULT 1,
 	is_default            BIT            NOT NULL CONSTRAINT df_saved_filter_default DEFAULT 0,
@@ -175,24 +195,40 @@ CREATE TABLE saved_filter (
 	created_at            DATETIME2(3)   NOT NULL CONSTRAINT df_saved_filter_created_at DEFAULT SYSUTCDATETIME()
 );
 
--- (user, grid, filter_name) unique — 1.x enforced it racily.
+-- A user cannot have two filters with the same name on one grid. The old system
+-- checked this by selecting first and inserting after, which two requests
+-- arriving together can both pass.
 CREATE UNIQUE INDEX ux_saved_filter ON saved_filter (user_id, grid_definition_id, name)
 	WHERE retired_at IS NULL;
 
--- At most one default per (user, grid) — 1.x enforced nothing.
+-- At most one filter per user per grid may be the default one. This is the same
+-- trick used for the primary site: a unique index over the pair, filtered to rows
+-- where the flag is actually set, so any number of non-default filters coexist
+-- and the second default is refused. The old system enforced nothing, and a user
+-- with two defaults got whichever the query returned first.
 CREATE UNIQUE INDEX ux_saved_filter_default ON saved_filter (user_id, grid_definition_id)
 	WHERE is_default = 1 AND retired_at IS NULL;
 
 -- --------------------------------------------------------------------------
--- site branding & localization (per-site, created EMPTY — rule 10)
+-- Per-site branding and language. Created EMPTY: no migration in this system
+-- inserts data belonging to a customer. The demo seed under deploy/demo is a
+-- deliberate script somebody runs, not something that happens on startup.
 -- --------------------------------------------------------------------------
 CREATE TABLE site_color (
 	site_color_id    BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_site_color PRIMARY KEY,
 	site_external_id VARCHAR(64)   NOT NULL CONSTRAINT fk_site_color_site REFERENCES site (external_id),
 	code             VARCHAR(64)   NOT NULL,
-	-- Normalized to #RRGGBBAA (1.x mixed 6- and 8-digit hex). The service
-	-- appends FF alpha to 6-digit input and upper-cases; the CHECK holds the
-	-- invariant.
+	-- A colour in exactly one form: a hash followed by eight upper-case hex
+	-- digits — red, green, blue, then alpha. The service normalizes what it is
+	-- given, upper-casing it and appending a fully-opaque alpha to a six-digit
+	-- value; this CHECK is what guarantees nothing else ever lands in the column.
+	--
+	-- The `COLLATE` clause is what makes the pattern case-sensitive. Under this
+	-- database's default collation, a case-insensitive comparison would accept
+	-- lower-case hex and the normalization would be advisory rather than true.
+	--
+	-- The old system stored a mixture of six- and eight-digit values, so every
+	-- reader had to handle both and some of them did it differently.
 	hex_value        CHAR(9)       NOT NULL CONSTRAINT ck_site_color_hex CHECK (
 		hex_value COLLATE Latin1_General_100_BIN2 LIKE
 			'#[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]'),
@@ -215,18 +251,30 @@ CREATE TABLE site_language (
 CREATE UNIQUE INDEX ux_site_language ON site_language (site_external_id, code) WHERE retired_at IS NULL;
 
 -- --------------------------------------------------------------------------
--- audit_event — core's first traffic-growing table. Growth and the retention
--- class are declared in Java (AuditTables) where the build check reads them;
--- the scope-leading index is here, where ScopeIndexRule reads it.
+-- audit_event — an append-only record of every configuration change: who did it,
+-- to what, when, and what kind of change it was. Nothing updates a row here.
+--
+-- This is the first table in this schema that grows with use rather than with
+-- configuration, which means it is also the first that must be bounded. How fast
+-- it grows and how long its rows are kept are declared in Java beside the entity,
+-- where a build check can fail when a growing table has no retention declared.
+-- The index it is read by is here, where a different build check reads it.
 -- --------------------------------------------------------------------------
 CREATE TABLE audit_event (
 	audit_event_id     BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_audit_event PRIMARY KEY,
-	-- Deliberately NO FK: the value is the configured installation site (the
-	-- scope dimension), and an audit write must not depend on config rows.
+	-- ⚠️ Deliberately NOT a foreign key, unlike every other site column in this
+	-- schema. The value is the installation's configured site — the scope the
+	-- write happened under — and an audit record must never fail to be written
+	-- because the configuration it refers to is missing, half-created or being
+	-- changed by the very operation being audited. An audit trail that can be
+	-- prevented from recording something is not an audit trail.
 	site_external_id   VARCHAR(64)    NOT NULL,
 	occurred_at        DATETIME2(3)   NOT NULL CONSTRAINT df_audit_event_occurred_at DEFAULT SYSUTCDATETIME(),
-	-- A user's external id, or a system identity (system:orca-core/task).
-	-- §B6: no path runs with no identity, so this is never blank.
+	-- Who did it: a user's external id, or a system identity such as
+	-- "system:orca-core/task" when a scheduled job or a reconciler made the
+	-- change. Every entry point in this platform runs under some identity —
+	-- there is no path that runs under none — which is why this can be NOT NULL
+	-- and why the CHECK at the bottom of the table can insist it is non-empty.
 	actor              NVARCHAR(200)  NOT NULL,
 	entity_type        VARCHAR(64)    NOT NULL,
 	entity_external_id VARCHAR(200)   NULL,

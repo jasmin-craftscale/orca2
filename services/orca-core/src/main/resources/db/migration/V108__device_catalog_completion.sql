@@ -1,44 +1,60 @@
--- orca-core · Phase 3 WP0 — the device-catalog completion V106 owed.
+-- Fills the three device catalogs that an earlier migration deliberately left
+-- incomplete, and corrects three codes it had to guess at.
 --
--- V106 seeded the catalogs AS GAPS, deliberately (phase-2 report §5.4): the
--- sheet of the day had only elliptical prose, and the report's own
--- recommendation was "give the device catalogs the same treatment the
--- entitlement catalog got — a script-extracted file — and seed the remainder in
--- a later migration". docs/device-catalog-completion-from-1x.md is that file
--- (script-read from 1.x's migration.go, every row verbatim), and this is that
--- later migration. After it: io_device_kind 19 rows (was 0),
--- device_io_port_name 40 (was 36), device_type 16 (was 12).
+-- WHY THERE WAS A GAP AT ALL
+-- The catalogs were translated from the Go system in production today. The
+-- extraction available at the time described some of the rows only in prose —
+-- "and so on" where a list should have been — and this project does not invent
+-- catalog rows to fill a hole, because a guessed value in a catalog other tables
+-- point at becomes permanent very quickly. So the earlier migration seeded what
+-- was known and left the rest visibly missing, with the fix recorded as owed
+-- work: extract the rows properly by script, then seed the remainder in a later
+-- migration. This is that later migration.
 --
--- GENERATED, NOT TRANSCRIBED — deploy/tools/gen-device-catalog-completion-seed.py
--- parses the sheet, asserts its counts (19 / 5 / 16) before emitting a row, and
--- mints external ids in V106's own namespace
--- (uuid5(uuid5(NAMESPACE_URL, 'orca:2.0:device-catalog'), '<table>:<code>')),
--- so regeneration is byte-identical.
+-- docs/device-catalog-completion-from-1x.md is the proper extraction — read by
+-- script out of the old system's own migration source, every row verbatim.
 --
--- Three rows are UPDATED, not inserted: V106's PTZ_CAMERA / PELCO_CAMERA /
--- MILESIGHT_CAMERA were provisional guesses at codes the sheet could not then
--- name; the 1.x-exact codes are AXIS_PTZ_CAMERA / PELCO_PTZ_CAMERA /
--- MILESIGHT_PTZ_CAMERA. The code is the contract (rule 7), so the external id
--- follows the corrected code — each row gets the UUID that code would always
--- have minted. Nothing references the provisional codes: grepped across
--- services, deploy and build-checks before this shipped (one integration test
--- did, updated with this migration), and no deployment exists (the register:
--- there is no release pipeline yet). Display names move to the 1.x-verbatim
--- casing everywhere — display-only by rule 7, so a correction, not a break.
--- device_type: correct the three provisional PTZ codes to the 1.x-exact codes.
--- The external id FOLLOWS the code (identity is the code, translation rule 7),
--- so each corrected row gets the UUID its code would always have minted.
+-- After this file runs: 19 input/output device kinds (was none at all), 40 port
+-- names (was 36), 16 device types (was 12).
+--
+-- GENERATED, NOT HAND-TRANSCRIBED. deploy/tools/gen-device-catalog-completion-seed.py
+-- parses that document, asserts the expected counts before it will emit a single
+-- line, and computes each external identifier by hashing the row's table and code
+-- inside the same namespace the earlier migration used. Regenerating produces
+-- byte-identical output. Edit a row here by hand and that chain of custody is
+-- broken; regenerate instead.
+--
+-- WHY THREE ROWS ARE UPDATED RATHER THAN INSERTED
+-- The earlier migration had to guess three camera codes. The real ones are
+-- AXIS_PTZ_CAMERA, PELCO_PTZ_CAMERA and MILESIGHT_PTZ_CAMERA. Because the code is
+-- the contract and the identifier is derived FROM the code, correcting a code
+-- also means correcting the identifier — each row is given the identifier that
+-- code would always have produced, rather than keeping one derived from a name
+-- that was never right.
+--
+-- That is only safe because nothing referenced the provisional codes. That was
+-- checked by searching the services, the deployment scripts and the build checks
+-- before this shipped — one integration test did, and it was updated alongside
+-- this migration — and because no installation of this system has been deployed
+-- anywhere yet.
+--
+-- The display names also move to the exact casing the source system uses. Names
+-- here are for display only and nothing matches on them, so that is a correction
+-- rather than a breaking change.
+-- Correct the three guessed camera codes, and the identifiers derived from them.
 UPDATE device_type SET code = 'AXIS_PTZ_CAMERA', external_id = '06d4788b-de8e-5d8c-a7b8-6389bd99841e', name = N'AXIS PTZ Camera' WHERE code = 'PTZ_CAMERA';
 UPDATE device_type SET code = 'PELCO_PTZ_CAMERA', external_id = '826f1091-32ae-5a1f-b48c-60694f8c6b2f', name = N'Pelco PTZ Camera' WHERE code = 'PELCO_CAMERA';
--- device_type: correct the three provisional PTZ codes to the 1.x-exact codes.
--- The external id FOLLOWS the code (identity is the code, translation rule 7),
--- so each corrected row gets the UUID its code would always have minted.
+-- The same three corrections, continued. Each matches on the code it is
+-- replacing, so a statement whose row has already been corrected simply matches
+-- nothing and changes nothing.
 UPDATE device_type SET code = 'AXIS_PTZ_CAMERA', external_id = '06d4788b-de8e-5d8c-a7b8-6389bd99841e', name = N'AXIS PTZ Camera' WHERE code = 'PTZ_CAMERA';
 UPDATE device_type SET code = 'PELCO_PTZ_CAMERA', external_id = '826f1091-32ae-5a1f-b48c-60694f8c6b2f', name = N'Pelco PTZ Camera' WHERE code = 'PELCO_CAMERA';
 UPDATE device_type SET code = 'MILESIGHT_PTZ_CAMERA', external_id = 'd2501f59-5006-5db3-8653-427878ee2729', name = N'Milesight PTZ Camera' WHERE code = 'MILESIGHT_CAMERA';
 
--- device_type: move the already-correct rows' display names to the 1.x-verbatim casing
--- (display-only by rule 7; V106 carried them lowercase-provisional).
+-- The rows whose codes were already right get their display names put into the
+-- exact casing the source system uses. The earlier migration wrote these in a
+-- provisional lower case. Names are for display only and nothing matches on them,
+-- so this is a correction rather than a breaking change.
 UPDATE device_type SET name = N'AXIS Camera' WHERE code = 'AXIS_CAMERA';
 UPDATE device_type SET name = N'Barcode Scanner' WHERE code = 'BARCODE_SCANNER';
 UPDATE device_type SET name = N'RFID' WHERE code = 'RFID';
@@ -49,20 +65,25 @@ UPDATE device_type SET name = N'LPR Camera' WHERE code = 'LPR_CAMERA';
 UPDATE device_type SET name = N'Portal Scan' WHERE code = 'PORTAL_SCAN';
 UPDATE device_type SET name = N'Printer' WHERE code = 'PRINTER';
 
--- device_type: the four rows the V106 sheet could not name (16 total).
+-- The four device types the earlier extraction could not name, bringing the
+-- catalog to its full 16.
 INSERT INTO device_type (external_id, code, name) VALUES ('5b4f2f95-7279-5b79-a240-b1f94068b797', 'PROXIMITY_READER', N'Proximity Reader');
 INSERT INTO device_type (external_id, code, name) VALUES ('a80334dc-a098-5c37-b4fa-c60bd7476be3', 'CAPTURE_ID', N'Capture ID');
 INSERT INTO device_type (external_id, code, name) VALUES ('7f85b592-1742-5287-b149-d26979f7d84d', 'PINHOLE_CAMERA', N'Pinhole Camera');
 INSERT INTO device_type (external_id, code, name) VALUES ('e8836362-ff8f-59d6-ad8b-a9aba6639eeb', 'LPR_READER', N'LPR Reader');
 
--- device_io_port_name: the four Audio rows Phase 2 could not extract (40 total;
--- FRONT_MIC was already seeded by V106 via the sheet's naming-drift note).
+-- The four audio port names the earlier extraction could not reach, bringing the
+-- catalog to its full 40. There are five audio ports; the front microphone was
+-- already seeded, because the earlier document happened to name it in passing
+-- while explaining that the source system spells it two different ways.
 INSERT INTO device_io_port_name (external_id, port_type, code, name) VALUES ('acebd90e-b35e-582e-b577-14fda723b6b8', 'AUDIO', 'HANDSET_SPEAKER', N'Handset Speaker');
 INSERT INTO device_io_port_name (external_id, port_type, code, name) VALUES ('40a3add0-3ddc-5371-8ad4-fb88adfc99c9', 'AUDIO', 'HANDSET_MIC', N'Handset Mic');
 INSERT INTO device_io_port_name (external_id, port_type, code, name) VALUES ('1fdb5fce-c9d0-55cc-9149-ef9c65f316c3', 'AUDIO', 'FRONT_SPEAKER', N'Front Speaker');
 INSERT INTO device_io_port_name (external_id, port_type, code, name) VALUES ('d988cc03-9d86-5634-8a84-6ffa831f05b8', 'AUDIO', 'REAR_SPEAKER', N'Rear Speaker');
 
--- io_device_kind: all 19 rows (created to shape in V106, seeded empty).
+-- All 19 kinds of thing that can be wired to a port. The table was created empty
+-- by the earlier migration because the values were not extractable then; these
+-- are the whole list.
 INSERT INTO io_device_kind (external_id, port_type, code, name) VALUES ('a51bc591-fac8-5e8b-9e10-01af7d2e9b8c', 'INPUT', 'CALL_BUTTON', N'Call Button');
 INSERT INTO io_device_kind (external_id, port_type, code, name) VALUES ('63499b8c-c9ce-53d5-9e0c-f0ded12804b0', 'INPUT', 'HOOK_SWITCH', N'Hook Switch');
 INSERT INTO io_device_kind (external_id, port_type, code, name) VALUES ('1a186b4b-4405-55ac-ade5-4b960f715fa9', 'INPUT', 'LOOP', N'Loop');

@@ -1,53 +1,75 @@
--- orca-core · WP3 — the device registry completed.
+-- The device registry, finished: what kinds of device exist, what a device's
+-- input and output ports are wired to, where a camera's saved viewpoints are, and
+-- a general place to hang extra configuration on anything in the world model.
 --
--- Translated from docs/core-config-schema-from-1x.md §3. The headlines:
+-- WHAT THIS IS FOR
+-- An earlier migration created a bare `device` table with just enough on it to
+-- get one truck through one lane. This turns it into the registry the console
+-- actually administers: the manufacturer and model of each unit, its network
+-- address and stream settings, which physical port on it is the loop detector and
+-- which is the barrier relay, and what "preset 3" means on a pan-tilt-zoom
+-- camera. The service that talks to hardware reads several of these columns; the
+-- rest is administration.
 --
---   * The three catalogs land with pinned identity (rule 7): UUIDv5 in the
---     namespace uuid5(NAMESPACE_URL, 'orca:2.0:device-catalog'), name
---     '<kind>:<code>' — deterministic, byte-stable, regenerable.
---     ⚠️ THE SHEET'S ROW LISTS ARE PARTIAL, AND THE GAPS ARE SEEDED AS GAPS,
---     NOT FILLED (the programme's most defended rule):
---       - device_type: 12 of 16 rows are namable from the sheet; the other 4
---         hide behind an "etc." and are NOT invented. Camera-type display
---         names are provisional (display-only by rule 7).
---       - device_io_port_name: 36 of 40 — the sheet enumerates every group
---         except four of the five audio names ("Front Mic" is the one it
---         names, via the naming-drift note).
---       - io_device_kind: created UNSEEDED. The sheet carries a count (19)
---         and example names but not the (name, input_type) pairs, and this
---         phase's seeds are written from extractions, never from memory. A
---         re-extraction like the entitlement catalog's file fills it.
---     All three gaps are recorded in docs/phase-2-report.md.
+-- THE THREE CATALOGS, AND A RULE WORTH UNDERSTANDING
+-- `device_type`, `device_io_port_name` and `io_device_kind` are catalogs: fixed
+-- lists the product owns and an administrator picks from. Their rows are seeded
+-- below with computed rather than random identifiers — a version-5 UUID derived
+-- by hashing the row's kind and code inside a fixed namespace — so regenerating
+-- the seed produces byte-identical rows and two clean installations agree.
 --
---   * core.device grows to the sheet's translated column set. ONE FK to the
---     type catalog — 1.x's three denormalized copies (device_type,
---     device_type_name, topic_device_type) die here, and V101's provisional
---     free-VARCHAR vocabulary is settled by the catalog: the demo's
---     provisional 'BARRIER' becomes the 1.x catalog's GATE_ARM.
---   * device gains the scope column (site_external_id, FK-backed, backfilled
---     from lane→area→site, scope-leading index) — the fielded pattern, now on
---     the registry itself.
---   * NOT ported, deliberately: encrypted_username/encrypted_password
---     (security-shaped; the storage design is PROPOSED in the report and the
---     product owner decides — until then the columns do not exist);
---     device_host (the fielded 2.0 design already puts the device host per
---     LANE — two sources for one address is how they disagree; architecture
---     wins); topic_name / device_type_name / topic_device_type (computed and
---     denormalized; 2.0 has no Kafka topics).
---   * device_io_assignment: the unified port-type enum (rule 5 — TitleCase in
---     one 1.x table, lowercase in another; here ONE casing with a binary-
---     collated CHECK), a catalog FK instead of the copied name string,
---     defaults for the two flags 1.x left NOT NULL with no default, and the
---     edge-suppression flags kept because edge reads them. is_output_port is
---     derivable from port_type and does not port (rule 6).
---   * ptz_preset: pan/tilt/zoom numeric — varchar(255) in 1.x.
---   * resource_configuration: typed scope, per-scope unique, sized value,
---     scope-leading index. 1.x's two seeded rows — the login-lockout policy
---     hardcoded against site_id = 1 — do NOT port: lockout policy is
---     Keycloak's (rule 9).
+-- ⚠️ THE SEEDS BELOW ARE KNOWINGLY INCOMPLETE, AND THE GAPS ARE LEFT AS GAPS.
+-- These lists were translated from the Go system in production today, and the
+-- extraction of the day could only name some of the rows: 12 device types of 16,
+-- 36 port names of 40, and none at all of the 19 input/output device kinds, whose
+-- count and examples were known but whose exact values were not. The missing rows
+-- are NOT invented. Seeding a plausible guess into a catalog other tables point
+-- at is how a wrong value becomes permanent, and this project would rather ship a
+-- visible hole. (A later migration fills all three from a proper extraction.)
+--
+-- WHAT HAPPENS TO `device`
+-- It gains the full translated column set, plus two structural changes:
+--
+--   * The free-text `device_type` column an earlier migration called provisional
+--     is replaced by a foreign key into the type catalog, and then dropped. The
+--     old system carried the same fact three times over — a code, a display name
+--     and a message-topic string — which is three chances to disagree.
+--   * It gains a site column, backfilled by walking lane → area → site, backed by
+--     a foreign key, and indexed leading with it. That is the shape every scoped
+--     table in this schema has: reads lead with the site condition, so the index
+--     must too.
+--
+-- WHAT THE OLD SYSTEM HAD THAT IS DELIBERATELY ABSENT
+--   * Encrypted username and password columns on a device. How device credentials
+--     are stored is a security decision for the product owner and has not been
+--     taken; until it is, the columns do not exist rather than existing in a
+--     provisional form somebody starts writing to.
+--   * A device-host address on the device. The address of the host that drives
+--     hardware is already recorded per LANE, which is how the vendor's interface
+--     is actually deployed. Two places to record one address is how the two end
+--     up disagreeing.
+--   * The message-topic strings. They were computed values written to the
+--     database, and they described a message broker this system does not have.
+--
+-- OTHER TRANSLATION FIXES, EACH EXPLAINED AT THE POINT IT APPLIES
+--   * The port-type values are a single casing, enforced under a binary
+--     collation. The old system had them in two different casings in two
+--     different tables.
+--   * A port assignment points at the catalog rather than copying its name.
+--   * Two flags that the old system left NOT NULL with no default — so an insert
+--     that forgot either simply failed — get their electrically-neutral defaults.
+--   * A camera preset's pan, tilt and zoom are numbers. They were 255-character
+--     strings.
+--   * The old system's two seeded rows of extra configuration were a login
+--     lockout policy hardcoded against the first site. They do not port: lockout
+--     policy belongs to the identity provider.
 
 -- --------------------------------------------------------------------------
--- The catalogs (installation-realm)
+-- The three catalogs. They belong to the installation as a whole rather than to
+-- any one site, which is what the constant `config_realm` column on each of them
+-- declares: every read of these tables goes through shared scoping code that has
+-- no unscoped read, so a table with no site dimension has to name the dimension
+-- it does have.
 -- --------------------------------------------------------------------------
 CREATE TABLE device_type (
 	device_type_id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_device_type PRIMARY KEY,
@@ -57,11 +79,17 @@ CREATE TABLE device_type (
 		CONSTRAINT ck_device_type_realm CHECK (config_realm = 'INSTALLATION'),
 	code           VARCHAR(64)   NOT NULL CONSTRAINT uq_device_type_code UNIQUE,
 	name           NVARCHAR(200) NOT NULL,
-	-- The per-type JSON form-schema that drives the admin UI (1.x
-	-- device_configuration). KEPT AS JSON deliberately (rule 11): it is a
-	-- document describing a form, read whole and written whole, and modelling
-	-- it relationally would buy no query anybody runs. Content was not
-	-- extractable from the sheet, so seeded NULL; recorded.
+	-- Describes the form the console shows when an administrator configures a
+	-- device of this type — which fields, of what kind, in what order.
+	--
+	-- Held as a JSON document on purpose. The general rule in this schema is that
+	-- data goes in columns and rows, because the old system kept far too much in
+	-- unsized JSON strings and then needed migrations that rewrote text inside
+	-- them. This is one of the deliberate exceptions: a form description is read
+	-- whole and written whole, nothing queries inside it, and modelling it as
+	-- tables would buy no query anybody runs.
+	--
+	-- Seeded NULL: the contents could not be extracted from the source system.
 	form_schema    NVARCHAR(MAX) NULL,
 	retired_at     DATETIME2(3)  NULL,
 	created_at     DATETIME2(3)  NOT NULL CONSTRAINT df_device_type_created_at DEFAULT SYSUTCDATETIME()
@@ -73,7 +101,12 @@ CREATE TABLE device_io_port_name (
 	config_realm VARCHAR(16)   NOT NULL
 		CONSTRAINT df_device_io_port_name_realm DEFAULT 'INSTALLATION'
 		CONSTRAINT ck_device_io_port_name_realm CHECK (config_realm = 'INSTALLATION'),
-	-- One casing for the port-type enum, everywhere it appears (rule 5).
+	-- What kind of port this is. The `COLLATE` clause is load-bearing: this
+	-- database's default collation is case-insensitive, so a plain list would
+	-- accept 'input' and 'Input' as well, and the old system genuinely does carry
+	-- this value in two different casings in two different tables. Comparing under
+	-- a binary collation makes the single casing something the database enforces.
+	-- The same three lines appear on every table below that holds a port type.
 	port_type    VARCHAR(16)   NOT NULL CONSTRAINT ck_device_io_port_name_type
 		CHECK (port_type COLLATE Latin1_General_100_BIN2 IN ('INPUT', 'OUTPUT', 'RELAY', 'AUDIO', 'TONE')),
 	code         VARCHAR(64)   NOT NULL CONSTRAINT uq_device_io_port_name_code UNIQUE,
@@ -82,9 +115,16 @@ CREATE TABLE device_io_port_name (
 	created_at   DATETIME2(3)  NOT NULL CONSTRAINT df_device_io_port_name_created_at DEFAULT SYSUTCDATETIME()
 );
 
--- 1.x io_devices: 19 rows, the estate's only genuinely-unique uuid, lowercase
--- input_type (unified here), and naming drift (FrontMic vs Front Mic). Created
--- to the target shape, UNSEEDED — see the header.
+-- What is physically wired to a port: a loop detector, a gate arm, a lamp, a
+-- microphone. The old system has 19 such rows — and this is the one table in it
+-- whose identifiers were genuinely unique, which is worth knowing if you ever
+-- compare the two. It also spells the same thing two ways there ("FrontMic" and
+-- "Front Mic"), and holds the port type in lower case where every other table
+-- uses another casing; both are unified here.
+--
+-- Created to shape, deliberately UNSEEDED — the source of the day could give a
+-- count but not the values, and this schema does not invent catalog rows. See the
+-- header; a later migration seeds all 19.
 CREATE TABLE io_device_kind (
 	io_device_kind_id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_io_device_kind PRIMARY KEY,
 	external_id       VARCHAR(64)   NOT NULL CONSTRAINT uq_io_device_kind_external_id UNIQUE,
@@ -101,9 +141,13 @@ CREATE TABLE io_device_kind (
 GO
 
 -- --------------------------------------------------------------------------
--- The catalog seeds — generated, pinned, byte-stable. attachment_types (one
--- near-dead "Ethernet" row behind a read-only dropdown) does not port at all;
--- surfaced in the report per the sheet's own suggestion.
+-- The catalog rows. Generated by script, with computed identifiers, so they are
+-- byte-identical every time they are regenerated. Knowingly short of four device
+-- types and four audio port names — see the header; the missing rows are left
+-- missing rather than guessed.
+--
+-- One small table of the old system's does not port at all: a list of attachment
+-- types holding a single "Ethernet" row behind a dropdown nothing wrote to.
 -- --------------------------------------------------------------------------
 INSERT INTO device_type (external_id, code, name) VALUES ('0751b608-4796-523f-923f-9cdb2e19476f', 'AXIS_CAMERA', N'AXIS camera');
 INSERT INTO device_type (external_id, code, name) VALUES ('616e3c6c-2358-57a5-a143-4871f47cc411', 'PTZ_CAMERA', N'PTZ camera');
@@ -156,9 +200,16 @@ INSERT INTO device_io_port_name (external_id, port_type, code, name) VALUES ('93
 GO
 
 -- --------------------------------------------------------------------------
--- device — the registry completed. Columns first (nullable), then backfill,
--- then the constraints; GO separates the batches because a batch cannot
--- reference a column it also adds.
+-- device — the table an earlier migration created minimally, brought up to the
+-- full registry.
+--
+-- ⚠️ THE ORDER AND THE `GO` SEPARATORS ARE REQUIRED, NOT STYLE. Columns are added
+-- nullable first, then filled in, then tightened to NOT NULL and given their
+-- constraints — the standard way to add a mandatory column to a table that
+-- already has rows. The `GO` lines split this into separate batches because SQL
+-- Server compiles a batch as a unit: a statement cannot reference a column that
+-- is added in the same batch, and the error it gives is "Invalid column name",
+-- which reads like a typo rather than a batching problem.
 -- --------------------------------------------------------------------------
 ALTER TABLE device ADD
 	site_external_id  VARCHAR(64)   NULL,
@@ -182,12 +233,18 @@ ALTER TABLE device ADD
 	wait_time         INT           NULL;
 GO
 
--- Backfill the scope column from the hierarchy, and the catalog FK from the
--- provisional V101 vocabulary: LPR_CAMERA is the same word in the catalog;
--- 'BARRIER' was named provisional in V101 and the 1.x catalog's word for the
--- barrier is GATE_ARM. Any OTHER value on an existing row has no catalog
--- home and fails the NOT NULL below — deliberately: a device of a type the
--- catalog does not know is a question for a person, not a guess.
+-- Fill in the two new mandatory columns on rows that already exist.
+--
+-- The site is found by walking the device's lane up through its area to its site.
+--
+-- The device type is matched from the old free-text column into the catalog:
+-- LPR_CAMERA is the same word in both, and 'BARRIER' — which the earlier
+-- migration explicitly labelled provisional — is what the catalog calls GATE_ARM.
+--
+-- ⚠️ Any OTHER value on an existing row finds no catalog row, stays null, and
+-- fails the NOT NULL tightening a few statements below. That is deliberate. A
+-- device whose type the catalog does not know is a question for a person to
+-- answer, and a migration that guessed would bury it.
 UPDATE device SET site_external_id = (
 	SELECT s.external_id
 	FROM lane l
@@ -216,17 +273,22 @@ ALTER TABLE device ADD CONSTRAINT ck_device_mode CHECK (
 	device_mode COLLATE Latin1_General_100_BIN2 IN ('IO', 'DATA_CAPTURE'));
 GO
 
--- The three denormalized 1.x copies die here; V101's provisional free VARCHAR
--- is the local one, and the catalog now carries the vocabulary.
+-- The provisional free-text type column goes away now that every row points at
+-- the catalog. This is where the old system's habit of storing the same fact
+-- three times — a code, a display name and a topic string — stops.
 ALTER TABLE device DROP COLUMN device_type;
 GO
 
--- The scope-leading read path (ScopeIndexRule reads this file).
+-- The read path: site first, then lane. Reads arrive asking for a lane's devices
+-- with the site already fixed by the caller's scope. A build check reads this file
+-- and fails when a table carrying `site_external_id` has no index leading with it.
 CREATE INDEX ix_device_scope ON device (site_external_id, lane_id);
 GO
 
 -- --------------------------------------------------------------------------
--- device_io_assignment — the port layout
+-- device_io_assignment — what each physical port on a device is wired to, and
+-- how it behaves. One row per port: "on this controller, digital input 3 is the
+-- exit loop, and it reads high when nothing is over it".
 -- --------------------------------------------------------------------------
 CREATE TABLE device_io_assignment (
 	device_io_assignment_id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_device_io_assignment PRIMARY KEY,
@@ -237,21 +299,30 @@ CREATE TABLE device_io_assignment (
 	port_type             VARCHAR(16)   NOT NULL CONSTRAINT ck_device_io_assignment_type
 		CHECK (port_type COLLATE Latin1_General_100_BIN2 IN ('INPUT', 'OUTPUT', 'RELAY', 'AUDIO', 'TONE')),
 	io_port               INT           NOT NULL,
-	-- FK to the catalog instead of 1.x's copied name string (rule 6). Nullable
-	-- because the catalog itself is knowingly 4 rows short (see header): a port
-	-- whose 1.x name is one of the unextracted audio names has an alias and no
-	-- catalog row until the re-extraction lands.
+	-- Points at the port-name catalog rather than copying its text, so renaming a
+	-- port name does not leave stale copies behind.
+	--
+	-- Nullable only because the catalog itself is knowingly four rows short (see
+	-- the header): a port whose name is one of the audio names that could not be
+	-- extracted has an alias below and no catalog row until those rows land.
 	port_name_id          BIGINT        NULL CONSTRAINT fk_device_io_assignment_port_name
 		REFERENCES device_io_port_name (port_name_id),
 	port_alias_name       NVARCHAR(200) NULL,
-	-- NOT NULL with no default in 1.x — an insert that forgot either simply
-	-- failed. The defaults are the electrically-neutral readings.
+	-- Whether the signal on this port is inverted, and whether it idles high.
+	-- Both were mandatory with no default in the old system, so an insert that
+	-- forgot either simply failed. The defaults chosen here are the
+	-- electrically-neutral readings — no inversion, idles low.
 	is_reverse_state      BIT           NOT NULL CONSTRAINT df_device_io_assignment_reverse DEFAULT 0,
 	is_initial_high       BIT           NOT NULL CONSTRAINT df_device_io_assignment_initial DEFAULT 0,
 	is_data_capture       BIT           NOT NULL CONSTRAINT df_device_io_assignment_capture DEFAULT 0,
 	is_gos_audio          BIT           NOT NULL CONSTRAINT df_device_io_assignment_gos DEFAULT 0,
-	-- Edge-suppression semantics — edge reads these. Defaulting to PRODUCE is
-	-- the conservative direction: silence is configured, never accidental.
+	-- Whether a transition on this port is reported at all. The hardware-facing
+	-- service reads these to decide which signal changes are worth forwarding —
+	-- a port that flickers can otherwise flood the system.
+	--
+	-- Both default to reporting. That is the conservative direction on purpose:
+	-- silence has to be configured deliberately, and can never be an accident of
+	-- a row somebody inserted without thinking about it.
 	produce_true_message  BIT           NOT NULL CONSTRAINT df_device_io_assignment_true DEFAULT 1,
 	produce_false_message BIT           NOT NULL CONSTRAINT df_device_io_assignment_false DEFAULT 1,
 	wait_time             INT           NULL,
@@ -259,25 +330,32 @@ CREATE TABLE device_io_assignment (
 	created_at            DATETIME2(3)  NOT NULL CONSTRAINT df_device_io_assignment_created_at DEFAULT SYSUTCDATETIME()
 );
 
--- A device has one assignment per (type, number) — the natural key.
+-- One assignment per physical port: a device cannot have two rows both claiming
+-- to be digital input 3.
 CREATE UNIQUE INDEX ux_device_io_assignment ON device_io_assignment (device_id, port_type, io_port)
 	WHERE retired_at IS NULL;
 
--- Scope-leading, device second: the 2.0 equivalent of 1.x's covering index
--- (device_id, is_active) INCLUDE (…) — reads arrive per device, under the site.
+-- The read path: site first, then device. Reads arrive asking for one device's
+-- port layout, with the site already fixed by the caller's scope.
 CREATE INDEX ix_device_io_assignment_scope ON device_io_assignment (site_external_id, device_id);
 
 -- --------------------------------------------------------------------------
--- ptz_preset (1.x perspective_details) — storage is plain config; EXECUTION is
--- a direct camera call and lives with edge (register NEW-5, narrowed 7 Aug).
+-- ptz_preset — named viewpoints for a pan-tilt-zoom camera: "gate 3, looking at
+-- the cab window". Storing them is ordinary configuration, which is why they live
+-- here. MOVING a camera to one of them is not: that is a direct call to the
+-- camera, and it belongs to the service that talks to hardware.
 -- --------------------------------------------------------------------------
 CREATE TABLE ptz_preset (
 	ptz_preset_id    BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_ptz_preset PRIMARY KEY,
 	device_id        BIGINT        NOT NULL CONSTRAINT fk_ptz_preset_device REFERENCES device (device_id),
 	site_external_id VARCHAR(64)   NOT NULL CONSTRAINT fk_ptz_preset_site REFERENCES site (external_id),
 	name             NVARCHAR(200) NOT NULL,
-	-- Numeric, at last — varchar(255) in 1.x. Nullable: the 1.x strings were
-	-- unconstrained and a preset that only zooms is expressible.
+	-- Numbers, at last. These were 255-character strings in the old system, so
+	-- nothing stopped a preset holding text a camera could not act on.
+	--
+	-- Each is nullable so that a preset which only changes one axis — zoom in
+	-- without turning — is expressible, rather than forcing a caller to invent
+	-- values for the other two.
 	pan              DECIMAL(9,3)  NULL,
 	tilt             DECIMAL(9,3)  NULL,
 	zoom             DECIMAL(9,3)  NULL,
@@ -285,16 +363,27 @@ CREATE TABLE ptz_preset (
 	created_at       DATETIME2(3)  NOT NULL CONSTRAINT df_ptz_preset_created_at DEFAULT SYSUTCDATETIME()
 );
 
--- (device, name) was app-level-unique only in 1.x; here it is the database's.
+-- Two presets on one camera cannot share a name. The old system checked this in
+-- application code by selecting first and inserting after, which two concurrent
+-- requests can both pass; here the database decides.
 CREATE UNIQUE INDEX ux_ptz_preset ON ptz_preset (device_id, name) WHERE retired_at IS NULL;
 
 CREATE INDEX ix_ptz_preset_scope ON ptz_preset (site_external_id, device_id);
 
 -- --------------------------------------------------------------------------
--- resource_configuration — §C1's custom variables, designed properly: typed
--- scope, per-scope unique, sized value, scope-leading index. Polymorphic
--- reference by design, so no FK on resource_external_id — the price of one
--- table for four scopes, stated rather than hidden.
+-- resource_configuration — arbitrary named settings hung on any one thing in the
+-- world model: a site, an area, a lane or a single device. It is the escape hatch
+-- for site-specific values that do not deserve a column of their own.
+--
+-- `scope_type` says which kind of thing the row is attached to, and
+-- `resource_external_id` says which one.
+--
+-- ⚠️ There is deliberately NO foreign key on `resource_external_id`, and there
+-- cannot be: the column points at a different table depending on the row beside
+-- it, and a foreign key names one table. That is the price of having one table
+-- serve four kinds of owner instead of four near-identical tables, and it is
+-- stated here rather than left for someone to discover when a stale row does not
+-- go away with the lane it described.
 -- --------------------------------------------------------------------------
 CREATE TABLE resource_configuration (
 	resource_configuration_id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_resource_configuration PRIMARY KEY,
@@ -304,15 +393,16 @@ CREATE TABLE resource_configuration (
 		CHECK (scope_type COLLATE Latin1_General_100_BIN2 IN ('SITE', 'AREA', 'LANE', 'DEVICE')),
 	resource_external_id VARCHAR(64)    NOT NULL,
 	config_key           VARCHAR(200)   NOT NULL,
-	-- Sized. 1.x's value was unsized, which is how a settings row becomes a
-	-- payload store.
+	-- Given a maximum length. The old system's equivalent had none, which is how a
+	-- settings row quietly becomes somewhere people store payloads.
 	config_value         NVARCHAR(2000) NULL,
 	retired_at           DATETIME2(3)   NULL,
 	created_at           DATETIME2(3)   NOT NULL CONSTRAINT df_resource_configuration_created_at DEFAULT SYSUTCDATETIME()
 );
 
--- The per-scope natural key 1.x enforced with a half-useful index and an
--- idempotency key that ignored the site.
+-- One value per key per thing. In the old system this was enforced by an index
+-- that did not quite cover it, plus a de-duplication key that ignored the site
+-- entirely — so the same key on two sites collided.
 CREATE UNIQUE INDEX ux_resource_configuration
 	ON resource_configuration (scope_type, resource_external_id, config_key)
 	WHERE retired_at IS NULL;
@@ -322,10 +412,18 @@ CREATE INDEX ix_resource_configuration_scope
 GO
 
 -- --------------------------------------------------------------------------
--- topology_device, republished. SAME COLUMNS — the view is a contract (ADR-009)
--- and runtime/edge keep reading exactly what they read; only device_type's
--- source moves from the dead free-VARCHAR to the catalog's code. Grants
--- survive ALTER VIEW.
+-- The published device view, republished.
+--
+-- Other services cannot read this schema's tables — they read views core
+-- publishes and grants them access to. A published view is a contract, so this
+-- redefinition answers EXACTLY the same columns as before; the services reading
+-- it are unaffected and need no coordinated change. All that moves is where
+-- `device_type` comes from: the free-text column dropped above, now the catalog's
+-- code.
+--
+-- ALTER VIEW rather than DROP and CREATE, because dropping a view discards the
+-- permissions granted on it and every reader would lose access until they were
+-- granted again. Altering keeps them.
 -- --------------------------------------------------------------------------
 ALTER VIEW topology_device AS
 SELECT
