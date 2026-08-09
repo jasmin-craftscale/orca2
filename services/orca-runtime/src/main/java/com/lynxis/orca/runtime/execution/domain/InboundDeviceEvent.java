@@ -5,8 +5,8 @@ import java.time.Instant;
 /**
  * One device event as runtime sees it, after edge has normalised it.
  *
- * <p>There is no vendor dialect in this record and there is not meant to be. §C3
- * makes edge the hardware boundary: the camera's {@code ZapPacket}, its
+ * <p>There is no vendor dialect in this record and there is not meant to be. Edge
+ * is the hardware boundary: the camera's {@code ZapPacket}, its
  * {@code LP} elements and its confidence ranking are decoded once, at edge, and
  * what crosses the link is this. A field here that only a plate camera could
  * populate would put the boundary in the wrong service.

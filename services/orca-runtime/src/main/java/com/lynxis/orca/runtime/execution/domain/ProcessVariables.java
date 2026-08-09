@@ -8,7 +8,7 @@ package com.lynxis.orca.runtime.execution.domain;
  * already published. They are listed in {@code docs/BPMN_EXECUTION_PROFILE.md},
  * which is the document the builder developer works against.
  *
- * <p>§C2: process variables carry <em>correlation keys only</em> — business data
+ * <p>Process variables carry <em>correlation keys only</em> — business data
  * lives in platform tables keyed by execution id, which is what keeps the engine's
  * history tables bounded and payloads inside the platform's retention model. The
  * profile refines that by one category, written down rather than assumed: a
@@ -32,22 +32,22 @@ public final class ProcessVariables {
 	/** Which configured connector to invoke — a name, never an endpoint. */
 	public static final String CONNECTOR_NAME = "connectorName";
 
-	/** Which device action to issue — RAISE_GATE, LOWER_GATE, … (§C3). */
+	/** Which device action to issue — RAISE_GATE, LOWER_GATE, … */
 	public static final String COMMAND_ACTION = "commandAction";
 
 	/**
 	 * Which device the action is issued to, in core's published vocabulary
 	 * (core.topology_device).
 	 *
-	 * <p>⚠️ <strong>Added by H1, and not decoration.</strong> The device-host
-	 * contract addresses the device <em>in the URL path</em>
-	 * ({@code POST /api/{device}/raiseGate} — DERIVED-FROM-1X), so a command that
+	 * <p>⚠️ <strong>Not decoration.</strong> The fielded 1.x device-host
+	 * protocol addresses the device <em>in the URL path</em>
+	 * ({@code POST /api/{device}/raiseGate}), so a command that
 	 * does not name a device cannot be sent. A lane with one barrier still has to
 	 * say which barrier, because the barrier's id is the address.
 	 */
 	public static final String COMMAND_DEVICE_EXTERNAL_ID = "commandDeviceExternalId";
 
-	/** How long the device command may take before its outcome is UNKNOWN (§B8, §C3). */
+	/** How long the device command may take before its outcome is {@code UNKNOWN}. */
 	public static final String COMMAND_DEADLINE_MILLIS = "commandDeadlineMillis";
 
 	// --- branch discriminators ---------------------------------------------

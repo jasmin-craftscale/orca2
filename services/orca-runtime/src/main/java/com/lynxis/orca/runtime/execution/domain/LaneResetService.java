@@ -11,21 +11,21 @@ import com.lynxis.orca.runtime.workitem.api.WorkItemIntake;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * §C2's lane reset: <em>"abort the visit, fail its open nodes and its work items
- * together, set the lane status"</em> — <strong>one transaction</strong>, and the
- * writer that makes {@code work_item.FAILED} a status with a writer rather than a
- * takeable state nothing produces (sheet §2).
+ * Lane reset aborts the visit, fails its open nodes and work items together, and
+ * clears the lane session in <strong>one transaction</strong>. This is also the
+ * writer that makes {@code work_item.FAILED} a real status rather than a state
+ * nothing produces.
  *
  * <p>It takes the <strong>lane lock first</strong>, like every admission does:
  * a reset racing an arriving truck must serialise on the same row, or the reset
  * could abort a visit while admission is mid-way through attaching an event to it.
- * Coarse resource before fine, on every path — the WP6 ordering rule.
+ * Coarse resource before fine, in the same order on every path.
  *
  * <p>What it deliberately does not do: touch the lane's out-of-service flag (that
- * is core's configuration, not runtime's state — §C2's "set the lane status" reads
- * on the lane <em>session</em>, whose bound plate this clears), and fail node
- * executions (the {@code node_execution} table is not built in any phase yet —
- * recorded, not guessed at).
+ * is core's configuration, not runtime's state; the mutable lane state here is the
+ * lane <em>session</em>, whose bound plate this clears), or fail node executions.
+ * No {@code node_execution} table exists yet, so that behavior remains absent
+ * rather than guessed at.
  */
 @Slf4j
 public class LaneResetService {
@@ -67,7 +67,7 @@ public class LaneResetService {
 							+ active.get().externalId() + " has no row — the correlate read and the "
 							+ "row read disagree inside one transaction, which should be impossible"));
 
-			// All three writers in ONE transaction — the §C2 sentence, executed:
+			// All three writers in ONE transaction:
 			// the items fail, the engine instance dies, the visit closes FAILED.
 			int failedItems = workItems.failOpenItemsFor(visit.executionId(), actor);
 			if (visit.processInstanceId() != null) {

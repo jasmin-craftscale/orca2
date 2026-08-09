@@ -6,15 +6,15 @@ import java.util.Optional;
 /**
  * The platform's way in to the process engine.
  *
- * <p>§C2: the engine <em>"is reached behind an interface so the platform is not
- * written against a specific engine's API throughout"</em>. This is that interface,
- * and its shape is the point: no Flowable type appears in it, so the ArchUnit rule
+ * <p>The engine is reached behind this interface so the service is not written
+ * against Flowable's API throughout. Its shape is the point: no Flowable type
+ * appears in it, so the build rule
  * {@code EngineConfinementRule} can hold Flowable inside
  * {@code runtime.execution} and everything else in the service talks in
  * {@code String}s and {@code Map}s.
  *
- * <p>It is deliberately small. ADR-006 records that the engine is the half of the
- * decision that <em>can</em> be unwound, and an interface that grew to mirror
+ * <p>It is deliberately small. The engine is the reversible half of the workflow
+ * design, and an interface that grew to mirror
  * {@code RuntimeService} would quietly remove that.
  */
 public interface ProcessEngineGateway {
@@ -26,7 +26,7 @@ public interface ProcessEngineGateway {
 	 * whole reason admission works: the visit row and the process instance commit
 	 * together because the engine's tables are in the same schema and the same
 	 * Spring transaction. A gateway that started the instance afterwards would
-	 * reintroduce the window WP0 exists to close.
+	 * reintroduce a window in which one exists without the other.
 	 *
 	 * @param processKey       the deployed process definition key, e.g. {@code gate-visit}
 	 * @param businessKey      the visit's external identifier
@@ -43,8 +43,8 @@ public interface ProcessEngineGateway {
 	Optional<String> currentActivity(String processInstanceId);
 
 	/**
-	 * Terminates a running instance — lane reset's engine half (§C2's
-	 * <em>"abort the visit … in one transaction"</em>).
+	 * Terminates a running instance — lane reset's engine half of aborting the visit
+	 * and its related state in one transaction.
 	 *
 	 * <p><strong>Called inside the caller's transaction</strong>, like
 	 * {@link #startVisit}: the instance's deletion, the visit's own closing write

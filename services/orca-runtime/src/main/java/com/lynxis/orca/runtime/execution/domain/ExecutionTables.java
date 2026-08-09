@@ -14,7 +14,7 @@ import com.lynxis.orca.platform.scope.table.RetentionClass;
  * forever, at every lane. That is what {@code RetentionClassRule} is for, and it
  * is the reason a visit's business data lives here rather than in process
  * variables — the engine's history tables have no retention class and no policy
- * that reaches them (§C2).
+ * that reaches them.
  */
 public final class ExecutionTables {
 
@@ -45,15 +45,14 @@ public final class ExecutionTables {
 	/**
 	 * The visit.
 	 *
-	 * <p>⚠️ The retention class name is <strong>PROVISIONAL</strong>, as Phase 0's
-	 * three and WP5's one are. §C2 invariant 4 closes the list with a database
-	 * {@code CHECK} over 18 values; that list lives in the Data Dictionary, which is
-	 * not in this repository, and the register records that its two published copies
-	 * disagree. The build check enforces that a class is <em>named</em> — which is
-	 * what §B10 specifies — and naming one here is not the same as choosing the list.
+	 * <p>⚠️ The retention class name is <strong>PROVISIONAL</strong>. The catalog
+	 * is supposed to be a closed 18-value set enforced by a database {@code CHECK},
+	 * but it lives in a Data Dictionary outside this repository and its two published
+	 * copies disagree. {@code RetentionClassRule} fails the build unless a class is
+	 * <em>named</em>; that does not validate the name against the unavailable catalog.
 	 *
 	 * @param status {@code ACTIVE} · {@code COMPLETED} · {@code MANUAL} ·
-	 *               {@code FAILED}. Since Phase 3 a visit that needs a person no
+	 *               {@code FAILED}. A visit that needs a person no
 	 *               longer <em>ends</em> — the process parks at the manual-input
 	 *               wait state and the visit stays {@code ACTIVE} with a work item
 	 *               open; {@code MANUAL} now marks the visit whose process ended at

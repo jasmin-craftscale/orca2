@@ -3,7 +3,7 @@ package com.lynxis.orca.runtime.execution.domain;
 /**
  * The way out to the physical world, as the process sees it.
  *
- * <p>§B10: <em>a gate command is confirmed, not assumed.</em> The outcome
+ * <p><em>A gate command is confirmed, not assumed.</em> The outcome
  * vocabulary below is the whole reason this is an interface with a documented
  * return rather than a {@code void} call — {@link #UNKNOWN} has to survive every
  * layer between the device host and the process, and a layer that collapsed it
@@ -20,7 +20,7 @@ public interface DeviceCommandPort {
 	/**
 	 * The deadline passed with no answer.
 	 *
-	 * <p><strong>Not a failure, and not a success.</strong> §B10: an unknown outcome
+	 * <p><strong>Not a failure, and not a success.</strong> An unknown outcome
 	 * is resolved by <em>looking</em> — verifying the device's actual state — never
 	 * by retrying blindly. A caller that coerces this to {@link #FAILED} produces
 	 * exactly the hazard the enum exists to prevent.
@@ -35,18 +35,18 @@ public interface DeviceCommandPort {
 	String issue(DeviceCommand command);
 
 	/**
-	 * @param commandId       the idempotency key. §C3 names it the node-execution
-	 *                        id; {@code runtime.node_execution} does not exist until
-	 *                        Phase 2, so the engine's own execution id stands in —
+	 * @param commandId       the node-execution id used as the idempotency key.
+	 *                        {@code runtime.node_execution} does not exist, so the
+	 *                        engine's own execution id stands in —
 	 *                        it is stable for the life of the node execution, which
 	 *                        is the property the key needs
 	 * @param laneExternalId  which lane, in core's published vocabulary
 	 * @param deviceExternalId which device on that lane. <strong>Required</strong>:
 	 *                        the device-host contract addresses the device in the
-	 *                        URL path (DERIVED-FROM-1X), so a command that names no
-	 *                        device cannot be sent at all
-	 * @param action          {@code RAISE_GATE}, {@code LOWER_GATE}, … (§C3)
-	 * @param deadlineMillis  after which the answer is {@link #UNKNOWN}. §B8: every
+	 *                        URL path in the fielded 1.x protocol, so a command that
+	 *                        names no device cannot be sent at all
+	 * @param action          {@code RAISE_GATE}, {@code LOWER_GATE}, …
+	 * @param deadlineMillis  after which the answer is {@link #UNKNOWN}. Every
 	 *                        external call has a deadline and a defined outcome when
 	 *                        it is exceeded
 	 */

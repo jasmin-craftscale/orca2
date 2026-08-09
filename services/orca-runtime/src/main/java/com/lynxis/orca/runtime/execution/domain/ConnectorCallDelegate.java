@@ -22,8 +22,8 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <p>It reads correlation keys, calls the port, and writes back one token. It does
  * not touch a database, does not know what a TOS is, and does not decide what the
- * answer means — that is the gateway's job, and the routing is configuration
- * (§C2), not code.
+ * answer means — that is the gateway's job, and routing belongs in process
+ * configuration rather than Java code.
  */
 @Slf4j
 @RequiredArgsConstructor

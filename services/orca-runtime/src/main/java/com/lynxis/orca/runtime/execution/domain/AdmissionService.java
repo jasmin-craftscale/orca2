@@ -17,8 +17,8 @@ import com.lynxis.orca.runtime.execution.persistence.AdmissionRepository;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * <strong>One truck, one visit</strong> — the property the whole design turns on
- * (§B10, §C2), placed where it ships.
+ * Enforces <strong>one truck, one visit</strong>, the admission property on which
+ * the gate's process model depends.
  *
  * <p>Two device events for the same truck can arrive in the same millisecond, from
  * two instances. Exactly one visit must start. That is not achievable by reading
@@ -41,10 +41,10 @@ import lombok.extern.slf4j.Slf4j;
  *       makes that possible without a distributed transaction.</li>
  * </ol>
  *
- * <p>WP0 proved all three against real Flowable 8 and real SQL Server before any
- * of this existed: 1,000 iterations, two simultaneous events each, exactly 1,000
- * visits, and the backstop watched to fire 99 times in 100 with the lock removed.
- * {@code AdmissionPropertiesIT} is that proof and it still runs.
+ * <p>{@code AdmissionPropertiesIT} proves all three against real Flowable 8 and
+ * SQL Server: 1,000 iterations with two simultaneous events each produce exactly
+ * 1,000 visits, and with the lane lock removed the unique-index backstop fires in
+ * 99 runs out of 100.
  *
  * <h2>Why the idempotency claim is inside the transaction</h2>
  *
@@ -64,10 +64,10 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class AdmissionService {
 
-	/** The process a visit runs. §C2 assigns definitions to lanes; the slice has one. */
+	/** The one process definition currently assigned to every lane. */
 	public static final String PROCESS_KEY = "gate-visit";
 
-	/** The idempotency operation name. One namespace per kind of key (§C2). */
+	/** The idempotency operation name; each kind of key has its own namespace. */
 	public static final String OPERATION = "device-event";
 
 	/**
@@ -105,8 +105,8 @@ public class AdmissionService {
 	 *
 	 * <p><strong>Every lane is resolved before any event is admitted.</strong> That
 	 * pre-pass is the whole reason this method exists rather than a loop at the call
-	 * site: each event is admitted in its own transaction — it has to be, because
-	 * §B9 releases the lane lock at commit and one transaction spanning a hundred
+	 * site: each event is admitted in its own transaction. The lane lock is released
+	 * at commit; one transaction spanning a hundred
 	 * admissions would hold a hundred lanes shut — so an event refused halfway
 	 * through would leave the earlier ones committed while the caller was told the
 	 * batch failed. Edge acknowledges a batch or none of it, and would resend the
@@ -170,8 +170,8 @@ public class AdmissionService {
 		// Coarse resource before fine, in that order on every path. The other order
 		// was tried first and it deadlocks: two events for one truck each claim their
 		// own key, then contend for the lane, while each still holds locks the other
-		// needs to record its own outcome. Measured, not reasoned about — WP6's
-		// eight-lane run exhausted its retries until the order was inverted.
+		// needs to record its own outcome. This was measured: an eight-lane run
+		// exhausted its retries until the order was inverted.
 		//
 		// The cost is that a redelivered event takes the lane lock before it
 		// discovers it is a duplicate. That is one row lock held for one read, on the
@@ -257,7 +257,7 @@ public class AdmissionService {
 	/**
 	 * The variables the compiled process is started with.
 	 *
-	 * <p>Correlation keys and nothing else (§C2). Which connector to call and which
+	 * <p>Correlation keys and short branch/configuration tokens only. Which connector to call and which
 	 * action to issue are <em>configuration</em> here rather than fields on the BPMN
 	 * — see {@link ProcessStartVariables} for why that is a slice-shaped decision
 	 * and not the target shape.
@@ -345,10 +345,10 @@ public class AdmissionService {
 	 *
 	 * <p>⚠️ <strong>Slice shape, not target shape.</strong> In the product these come
 	 * from the process definition itself — the visual builder's compiler emits a
-	 * connector step naming its connector and a device step naming its action, and
-	 * §C2 assigns definitions to lanes. There is one process here and one lane, so
+	 * connector step naming its connector and a device step naming its action, while
+	 * lane configuration selects the definition. There is one process here, so
 	 * carrying them as configuration keeps admission from inventing a
-	 * definition-to-lane binding that Phase 2 will design properly. Reported.
+	 * definition-to-lane binding that the future visual builder still has to design.
 	 */
 	public record ProcessStartVariables(String connectorName, String commandAction,
 			String commandDeviceExternalId, long commandDeadlineMillis) {

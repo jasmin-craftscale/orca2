@@ -14,8 +14,8 @@ import lombok.extern.slf4j.Slf4j;
  * is a stable, generic bean name the compiler binds to, parameterised by variables
  * rather than specialised per action.
  *
- * <p><strong>The idempotency key is the engine's execution id.</strong> §C3 says
- * the key is the node-execution id, and that is what this is: it is stable for the
+ * <p><strong>The idempotency key is the engine's execution id.</strong> A command
+ * must use the node-execution id, and that is what this is: it is stable for the
  * life of this node execution and changes when the step is genuinely re-entered.
  * A key derived from the visit alone would make a second, legitimate barrier
  * command look like a replay of the first.
@@ -31,14 +31,14 @@ public class DeviceCommandDelegate implements JavaDelegate {
 	 * Raised when the physical outcome is not known.
 	 *
 	 * <p>Deliberately a <em>different</em> code from {@link #DEVICE_COMMAND_FAILED}.
-	 * §B10 says an unknown outcome is resolved by verifying the device's actual
+	 * An unknown outcome is resolved by verifying the device's actual
 	 * state, never by retrying and never by assuming it failed — so a process must
 	 * be able to route it somewhere else, and it cannot if the two arrive as one
 	 * code.
 	 */
 	public static final String DEVICE_STATE_UNKNOWN = "device.state.unknown";
 
-	/** Used when the compiled process names no deadline. WP7 makes this configuration. */
+	/** Used when the compiled process names no deadline; deployed configuration may override it. */
 	private static final long DEFAULT_DEADLINE_MILLIS = 5_000L;
 
 	private final DeviceCommandPort deviceCommandPort;
@@ -47,7 +47,7 @@ public class DeviceCommandDelegate implements JavaDelegate {
 	public void execute(DelegateExecution execution) {
 		String laneExternalId = required(execution, ProcessVariables.LANE_EXTERNAL_ID);
 		String action = required(execution, ProcessVariables.COMMAND_ACTION);
-		// Required, because the device id IS the device host's address (H1).
+		// Required because the device id IS the device host's URL-path address.
 		String deviceExternalId = required(execution, ProcessVariables.COMMAND_DEVICE_EXTERNAL_ID);
 		long deadline = deadlineOf(execution);
 
