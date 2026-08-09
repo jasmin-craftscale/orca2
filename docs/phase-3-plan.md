@@ -7,22 +7,46 @@ building the thing it describes.
 
 ## Read first, in this order
 
-1. **This plan, in full.**
-2. **`docs/work-items-schema-from-1x.md`** — the DERIVED-FROM-1X reference. **Read its
+1. **`AGENTS.md` (repository root) and `services/orca-runtime/AGENTS.md`** — the
+   operating rules and how to build here: contract-first flow, the scope seam, the ten
+   build checks, tests-prove-properties, the definition of done. These are enforced,
+   not advisory. If your tool did not auto-load them, read them now; everything below
+   assumes them.
+2. **`docs/REPOSITORY_GUIDE.md`** — the layout: where migrations, contracts, seam
+   repositories and modules live. **`docs/deployment.md`** — how to run the stack, boot
+   a service, and send a truck (you will need all three for §4).
+3. **This plan, in full.**
+4. **`docs/work-items-schema-from-1x.md`** — the DERIVED-FROM-1X reference. **Read its
    §0 first: the three behaviour inversions.** This phase is where 2.0 most
    deliberately diverges from 1.x — the data is 1.x's, the behaviour is the
    architecture's.
-3. **`docs/ORCA_ARCHITECTURE.md`** — §B9 ("an exception becomes a work item" — the
+5. **`docs/ORCA_ARCHITECTURE.md`** — §B9 ("an exception becomes a work item" — the
    sequence you are building), §C2 (orca-runtime, the work-item lifecycle diagram and
    the modules), §A2/§A3 (the SLA-as-engine-timer design).
-4. **`docs/phase-1-report.md` §7.1 and `docs/BPMN_EXECUTION_PROFILE.md`** — the
+6. **`docs/phase-1-report.md` §7.1 and `docs/BPMN_EXECUTION_PROFILE.md`** — the
    service-task boundary-timer finding, so you understand precisely why §4 below is a
    *wait-state* timer and is buildable (and where the builder-developer's open
    question stops).
-5. **`docs/phase-2-report.md`** — the config world you build on; the routing rules you
+7. **`docs/phase-2-report.md`** — the config world you build on; the routing rules you
    complete here were deferred from its WP2.
-6. **`docs/core-config-schema-from-1x.md` §0** — the translation rules, which all still apply.
-7. **`docs/ORCA_OPEN_QUESTIONS_REGISTER.md`** — what is deliberately unsettled.
+8. **`docs/core-config-schema-from-1x.md` §0** — the translation rules, which all still apply.
+9. **`docs/ORCA_OPEN_QUESTIONS_REGISTER.md`** — what is deliberately unsettled.
+
+**Mirror the existing code — it is your template.** Do not invent shapes the codebase
+already has. Study, and match:
+- **Phase 2's core work** for a config-table WP: `services/orca-core/src/main/resources/db/migration/V103`–`V107`
+  (migrations, seeds, enum CHECKs with `COLLATE …BIN2`), the seam repositories under
+  `services/orca-core/src/main/java/.../core/`, the controllers implementing generated
+  interfaces, and `src/integrationTest/.../*PropertiesIT.java` for the property-test
+  style (duplicate-insert constraint proofs, seed byte-stability).
+- **Phase 1's runtime work** for the engine: `services/orca-runtime/src/main/resources/processes/gate-visit.bpmn20.xml`
+  (the process you extend), the delegates and `ProcessEngineGateway` under
+  `.../runtime/execution/`, `AdmissionService` (correlate-or-start in one transaction —
+  the pattern your create-in-engine-transaction mirrors), and
+  `AdmissionThroughHttpIT` / `GateVisitProcessIT` for the concurrency-test style.
+- **The primitives you consume:** `IdempotencyStore`, the scope seam's `ScopedInsert`/
+  `ScopedUpdate` (with the atomic `increment` from hardening H5), `OutboxWriter`,
+  `SystemContext` — `docs/PLATFORM_PRIMITIVES.md` names what each prevents.
 
 ---
 
@@ -75,7 +99,14 @@ inversions are the point:
 - **Creation in the engine transaction.** A process reaching a manual-input step
   creates the work item in the *same* transaction that advances the engine to the
   wait — not a separate HTTP call. Model a manual-input **wait state** in a BPMN
-  process (extend `gate-visit` or a dedicated fixture) so the engine genuinely parks.
+  process (extend `services/orca-runtime/src/main/resources/processes/gate-visit.bpmn20.xml`,
+  whose failure branch currently ends at a "manual handling required" terminal state —
+  that is exactly where the work item belongs — or add a dedicated fixture process) so
+  the engine genuinely parks. A Flowable user task or receive task is a wait state; a
+  `JavaDelegate` service task is not (that is the §7.1 case). The BPMN construct and its
+  delegate/listener binding go in `docs/BPMN_EXECUTION_PROFILE.md` as new conventions
+  the builder-developer's compiler will need to target — that document is a deliverable
+  of this WP, not just a reference.
 - **The guarded claim** (`take`) — a conditional UPDATE, `RowsAffected=0` ⇒ a typed
   conflict; the loser is told, never silently no-op'd. `takeover` (supervisor),
   `park` (state the requeue-vs-parked choice), `assign` (pre-assign, stays QUEUED).
@@ -135,6 +166,16 @@ operators whose current status is idle/working are assignable; DND/offline are n
 eligible operator (property test).
 
 ## 4 · Verification — run these, record real results
+
+**How to run the live items (3, 4, 6, 8, 9).** `docs/deployment.md` Part 1 is the full
+sequence; in short: `cd deploy && docker compose up -d && docker compose run --rm bootstrap`,
+then boot the three gate-path services with `./gradlew bootRun -p services/orca-<svc>
+--args='--spring.profiles.active=local'` (core first — it publishes the views; runtime
+and edge refuse to start before it has migrated), seed with `docker compose run --rm
+demo-seed`, and drive a truck with `./gradlew sendPlate -Pplate=T-…`. If this machine's
+ports 8081–8086 are taken, use the `.env` offsets and `--server.port` as
+`docs/phase-1-demo.md` §3 shows. `docs/phase-1-demo.md` is the inspection-query and
+demonstration reference. **Keep the output of every command — the report needs it.**
 
 | # | Item |
 |---|---|
