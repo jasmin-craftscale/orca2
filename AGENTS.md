@@ -15,8 +15,12 @@ end**: a plate read in over the camera's wire format, one visit, a connector cal
 a barrier commanded and confirmed, and the visit's fact recorded in one
 transaction. **Phase 2 made orca-core's configuration world real** — identity and
 the entitlement catalog, teams and templates, the completed device registry,
-settings/workspace/audit — translated from 1.x, never copied. Everything else is
-still deliberately absent.
+settings/workspace/audit — translated from 1.x, never copied. **Phase 3 made the
+gate's MANUAL branch real work**: the process parks at a wait state and creates
+the work item in the same transaction, completion advances the process
+atomically, routing and presence decide who works it, and the SLA is a real
+engine timer — fired, restart-proven, once. Everything else is still
+deliberately absent.
 
 Two laws shape everything else:
 
@@ -38,6 +42,8 @@ This file is a map. It does not restate the architecture — follow the link.
 | What did Phase 1 build, and what is still guessed? | `docs/phase-1-report.md` — **§3, §5 and §7** |
 | What did the hardening after it change? | `docs/phase-1-hardening-report.md` — **§5 is what it found and did not fix** |
 | What did Phase 2 build, decide, and leave as named gaps? | `docs/phase-2-report.md` — **§5.1 (the realm dimension), §6 (three PROPOSED security designs), §7** |
+| What did Phase 3 build, and what did the engine teach it? | `docs/phase-3-report.md` — **§3 (the three inversions and their proofs), §5.1 (a parked visit holds its lane), §7 (wait-state timers, for the builder-developer)** |
+| What does 1.x's work-item world actually contain? | `docs/work-items-schema-from-1x.md` — DERIVED-FROM-1X; **§0's three inversions are the acceptance criteria Phase 3 built** |
 | How do I run the slice end to end? | `docs/phase-1-demo.md` |
 | What does the camera actually put on the wire? | `docs/lpr-wire-format-from-1x.md` — DERIVED-FROM-1X, not a vendor spec |
 | What does ORCA send a device host to move a barrier? | `docs/device-host-outbound-from-1x.md` — DERIVED-FROM-1X; **§3 is an open question, not a design** |

@@ -28,22 +28,25 @@ module's tables, and never another module's entities. §C2 works one example
 through (the lane monitor, which needs two modules' data); reach for that shape
 rather than inventing an exception.
 
-## One module has code. Four do not, and the checks say which
+## Three modules have code. Two do not, and the checks say which
 
-WP4 put the first classes into **`execution`** — the two delegates, the engine
-gateway and its Flowable adapter — and WP6 added admission there: `AdmissionService`,
-`AdmissionRepository`, `DeviceEventController` and the `V101` tables they use.
-`workitem`, `integration`, `notify` and `readmodel` still hold nothing but
+Phase 1 populated **`execution`** (delegates, the engine gateway, admission) and
+**`integration`** (the connector). Phase 3 populated **`workitem`** — the
+lifecycle, routing reads, presence, and the first BIDIRECTIONAL module-wall
+crossing: `execution` calls `workitem.api.WorkItemIntake` (raise an item, in the
+engine's transaction), `workitem` calls `execution.api.ManualStepPort`
+(complete-and-advance). Both crossings go through `api` packages — the only
+packages the wall leaves open. `notify` and `readmodel` still hold nothing but
 `package-info`.
 
-- Both module-wall tests still carry `allowEmptyShould(true)`, because four of the
+- Both module-wall tests still carry `allowEmptyShould(true)`, because two of the
   five sets are still empty and ArchUnit fails a rule that checked nothing.
   **Remove it once every module is populated, not before.**
 - `ImportedSetGuard.whatIsStillEmptyIsStated` states exactly that position: it
-  asserts `execution` **has** classes and that the other four have none. Adding the
-  first class to one of those four **fails it on purpose** — remove that module
-  from its list. Do not delete the test while any module is still empty, and do not
-  relax the assertion to make it pass.
+  asserts `execution`, `integration` and `workitem` **have** classes and that the
+  other two have none. Adding the first class to one of those two **fails it on
+  purpose** — remove that module from its list. Do not delete the test while any
+  module is still empty, and do not relax the assertion to make it pass.
 
 ⚠️ An earlier version of this file said to delete that test outright on the first
 module class. That instruction assumed all five modules would populate at once;
