@@ -1,68 +1,95 @@
--- orca-runtime · Phase 3 WP1 — the work item and its trail (§C2, sheet §1/§3).
+-- The work item: one unit of work that a human has to do, and the record of every
+-- action taken on it.
 --
--- Numbered AFTER the Flowable set (V110–V114) because Flyway refuses an
--- out-of-order migration on a database that has already applied them — the
--- phase-1 demo database is exactly such a database.
+-- WHAT THIS IS FOR
+-- Most trucks clear the gate automatically. When a step of a site's process
+-- cannot be finished by software — an unreadable plate, a mismatch the customer's
+-- system will not resolve — the workflow engine parks the process at a wait state
+-- and one of these rows is created for an operator to deal with. Completing it
+-- lets the parked process carry on.
 --
--- The unit of human work. A process step automation cannot finish parks the
--- engine at a wait state and creates one of these IN THE SAME TRANSACTION —
--- there is no separate HTTP call and no window where one exists without the
--- other (inversion 1 of docs/work-items-schema-from-1x.md §0). Completing it
--- advances the parked process, also in one transaction.
+-- ⚠️ THE TWO THINGS ABOUT THIS THAT ARE EASY TO GET WRONG, AND ARE NOT
 --
--- Translated from 1.x `work_items`, with the sheet's drops applied:
---   * `iteration` does not port — the dead SLA remnant (never incremented).
---     SLA in 2.0 is an engine timer (WP3), and its record is a column here
---     (`sla_breached_at`), not a status — the dead ESCALATE_* statuses are
---     not inherited (sheet §2).
---   * `group_id` does not port — never wired as an FK in 1.x, set to 0.
---   * the denormalized customer/site/area ids do not port — derivable from
---     the lane and the execution.
---   * `mipn_type` (WORKFLOW/SUBFLOW discriminator) does not port yet —
---     subflows are not modelled in this repository (BPMN profile §2 lists
---     subProcess as unsettled), so the discriminator would be a column with
---     one writable value. The node reference is the BPMN task definition key
---     plus the process definition key, which is what the engine actually
---     parks on. Recorded in the phase report.
---   * `event_data`/`corrected_event_data` are INLINE for now, stated openly:
---     §C2's content-addressed payload store (`payload_blob`) is not built in
---     any phase yet, and ADR-017's thresholds are unset (register #27). When
---     the store lands, these columns join it; until then inline text is the
---     honest shape, bounded by the retention class below.
+--   1. The engine parking and the work item being created happen IN THE SAME
+--      TRANSACTION. There is no HTTP call between them and no window in which one
+--      exists without the other. A parked process with no work item is a truck
+--      nobody will ever attend to; a work item with no parked process is an
+--      operator doing work that goes nowhere.
+--   2. Completing the item and advancing the process are also one transaction,
+--      for the same reason in reverse.
 --
--- Statuses: exactly the four with a writer (sheet §2). QUEUED (creation;
--- park re-queues), IN_PROGRESS (the guarded claim; takeover), COMPLETED
--- (complete-and-advance), FAILED (lane reset fails the visit and its open
--- work items together). ESCALATE_TO_LANE / ESCALATE_TO_CUSTOMER / RE_QUEUED
--- are 1.x declarations with no writer and are deliberately absent.
+-- WHY THIS FILE IS NUMBERED WHERE IT IS
+-- It comes after the workflow engine's own set of migrations, which occupy the
+-- numbers just below it. Flyway refuses to apply a migration whose number is
+-- lower than one already applied, and there are development databases that have
+-- already applied the engine's set. Numbering had to go forward, not into the
+-- gap.
 --
--- Queue membership is status + queued_at + assignee. THERE IS NO QUEUE TABLE
--- (§C2) — 1.x's second representation, an in-memory array in a tracker
--- service, was not a system of record and does not port.
+-- WHY THERE IS NO QUEUE TABLE
+-- The queue is not a thing; it is a query. An item is in the queue if its status
+-- and assignee say so, ordered by when it was queued — which is what the first
+-- index below serves. The old system kept a second representation of the same
+-- queue as an in-memory array inside another service, which was not a system of
+-- record and could disagree with the database it shadowed.
+--
+-- WHAT THE OLD SYSTEM HAD THAT IS DELIBERATELY ABSENT
+--   * An iteration counter, left over from an earlier attempt at service-level
+--     timing. Nothing ever incremented it. Timing here is a real engine timer,
+--     and what it produces is the `sla_breached_at` column below.
+--   * Statuses for escalation and re-queueing. They were declared and never
+--     written by anything. The four statuses below are exactly the four that have
+--     a writer.
+--   * A team reference that was never wired up as a foreign key and was always
+--     set to zero.
+--   * Copies of the customer, site and area on every row. All are reachable from
+--     the lane and the visit.
+--   * A flag distinguishing a top-level process from a sub-process. Sub-processes
+--     are not modelled in this system yet, so the column would have exactly one
+--     writable value. What identifies the parked step instead is the pair of
+--     names the engine itself uses: the process design's key, and the task's
+--     identifier within it.
+--
+-- ONE THING STATED OPENLY RATHER THAN HIDDEN
+-- `event_data` and `corrected_event_data` hold their content inline. The design
+-- calls for large bodies to be stored once per distinct content and referenced,
+-- rather than copied into every record that mentions them — but that store does
+-- not exist yet, and the size threshold at which it would take over has not been
+-- set. Inline text is the honest shape until it does; what bounds it in the
+-- meantime is the retention policy declared for this table in Java.
 
 -- --------------------------------------------------------------------------
--- The visit learns one more terminal state: FAILED, written by lane reset
--- (§C2's POST /lanes/{id}/reset — abort the visit, fail its open work items,
--- one transaction). Phase 1's three states had no writer for an abort;
--- Phase 3's lane reset is that writer, and it is what gives work_item.FAILED
--- its writer too.
+-- The visit gains a fourth and final state: FAILED.
+--
+-- It has one writer — the lane reset an operator triggers when a lane is stuck
+-- and has to be cleared. That one action aborts the visit and fails all of its
+-- open work items together, in a single transaction, which is also what gives the
+-- work item's own FAILED status below a writer. Until lane reset existed there
+-- was no way to abort a visit at all, which is why the three original states did
+-- not include one.
 -- --------------------------------------------------------------------------
 ALTER TABLE execution DROP CONSTRAINT ck_execution_status;
 ALTER TABLE execution ADD CONSTRAINT ck_execution_status
 	CHECK (status IN ('ACTIVE', 'COMPLETED', 'MANUAL', 'FAILED'));
 
 -- --------------------------------------------------------------------------
--- work_item — one unit of human work, parked on one engine task.
+-- work_item — one unit of human work, parked on one waiting engine task.
 --
--- `task_id` is the engine's own handle for the wait state this item parks on.
--- It is UNIQUE: one item per parked task, created by the engine transaction
--- that parked it. Completion presents it back to the engine, which is what
--- makes an out-of-order submit REFUSABLE (inversion 3): a task the engine is
--- not waiting on does not resolve, and the whole completion rolls back.
+-- `task_id` IS THE ENGINE'S OWN HANDLE, AND ITS UNIQUENESS IS A SAFETY PROPERTY
+-- It identifies the exact wait state this item is parked on, and it is unique:
+-- one item per parked task, created by the same transaction that parked it.
 --
--- `assignee` is a user external id in core's published vocabulary; NULL means
--- unassigned. Runtime does not FK into core's schema (ADR-004 — it cannot),
--- and the value is resolved through core's published views at the boundary.
+-- ⚠️ That is what makes a stale or out-of-order completion REFUSABLE rather than
+-- merely unlikely. Completing an item hands this identifier back to the engine.
+-- If the engine is no longer waiting on that task — because the process moved on,
+-- or somebody else already completed it — the engine cannot resolve it, and the
+-- entire completion rolls back. The operator is told; nothing half-applies.
+--
+-- `assignee` IS A NAME, NOT A FOREIGN KEY
+-- It holds a user's external id in the vocabulary orca-core publishes, and null
+-- means unassigned. There is no foreign key and there cannot be one: user
+-- accounts live in another service's schema, which this service's database login
+-- has no access to. The value arrives across the service boundary and is resolved
+-- through the view orca-core publishes for exactly that purpose.
 -- --------------------------------------------------------------------------
 CREATE TABLE work_item (
 	work_item_id            BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_work_item PRIMARY KEY,
@@ -71,11 +98,16 @@ CREATE TABLE work_item (
 	execution_id            BIGINT        NOT NULL
 		CONSTRAINT fk_work_item_execution REFERENCES execution (execution_id),
 	lane_id                 BIGINT        NOT NULL,
-	-- The visit and lane in published vocabulary (§B8 — interfaces speak
-	-- external ids). NOT a rule-6 violation to store them: the module wall
-	-- keeps workitem out of execution's tables, so these linkage values arrive
-	-- once, across the api seam, in the creating transaction — the same
-	-- precedent as lane_session carrying lane_external_id beside lane_id.
+	-- The visit and the lane, as the external string ids that interfaces speak in,
+	-- stored alongside the numeric keys just above.
+	--
+	-- That looks like storing the same fact twice, and it is worth saying why it
+	-- is not the mistake it resembles. This service is split into modules with an
+	-- enforced wall between them: the module owning work items may not read the
+	-- module owning visits — not its tables and not its objects. So these values
+	-- cannot be looked up later. They arrive once, across the narrow interface
+	-- between the two modules, in the transaction that creates the row, and they
+	-- are then this module's own copy of them.
 	visit_external_id       VARCHAR(64)   NOT NULL,
 	lane_external_id        VARCHAR(64)   NOT NULL,
 	process_instance_id     VARCHAR(64)   NOT NULL,
@@ -83,6 +115,15 @@ CREATE TABLE work_item (
 	process_definition_key  VARCHAR(255)  NOT NULL,
 	node_reference          VARCHAR(255)  NOT NULL,
 	screen_external_id      VARCHAR(64)   NULL,
+	-- The four states an item can be in, and all four have a writer: QUEUED when
+	-- it is created and again when an operator puts it back, IN_PROGRESS when an
+	-- operator claims it or takes it over from someone else, COMPLETED when it is
+	-- finished and the process advances, FAILED when a lane reset clears it.
+	--
+	-- The `COLLATE` clause is load-bearing: this database's default collation is
+	-- case-insensitive, so a plain list would also accept 'queued' and 'Queued'.
+	-- Comparing under a binary collation makes the single casing something the
+	-- database enforces rather than something the code remembers.
 	status                  VARCHAR(16)   NOT NULL
 		CONSTRAINT df_work_item_status DEFAULT 'QUEUED'
 		CONSTRAINT ck_work_item_status
@@ -92,44 +133,60 @@ CREATE TABLE work_item (
 		CONSTRAINT df_work_item_queued_at DEFAULT SYSUTCDATETIME(),
 	started_at              DATETIME2(3)  NULL,
 	completed_at            DATETIME2(3)  NULL,
-	-- Server-computed as completed_at - started_at, NEVER taken from the
-	-- request (sheet §1). The one persisted SLA outcome 1.x had, kept.
+	-- How long the operator took, computed on the server from the two timestamps
+	-- above and NEVER taken from the request. A duration a client can supply is a
+	-- duration a client can be wrong about, and this one feeds productivity
+	-- reporting.
 	completion_duration_sec INT           NULL,
-	-- WP3 writes this when the boundary timer on the wait state fires. A
-	-- COLUMN, not a status: the sheet's §2 choice stated — a breach does not
-	-- move the item out of its queue, it marks it, so the dead ESCALATE_*
-	-- statuses stay dead.
+	-- Set when the timer attached to the parked wait state fires — meaning this
+	-- item took longer than the site allows.
+	--
+	-- ⚠️ A COLUMN, DELIBERATELY, AND NOT A STATUS. A breach does not move the item
+	-- out of the queue it is in; it marks it. Making it a status would mean an
+	-- operator's queue silently emptied when work went overdue, which is exactly
+	-- backwards.
 	sla_breached_at         DATETIME2(3)  NULL,
 	event_data              NVARCHAR(MAX) NULL,
 	corrected_event_data    NVARCHAR(MAX) NULL
 );
 
--- The queue read: status + queued_at under the scope, covering what the grid
--- lists. Leads with the scope column — ScopeIndexRule insists, and the
--- lane_session key order comment in V101 is the measured reason why.
+-- The queue itself, as an index. Site, then status, then when it was queued —
+-- exactly the question an operator's queue screen asks — and the columns the
+-- screen displays are carried along in the index, so listing a queue never
+-- fetches a single row.
+--
+-- It leads with the site column, as every index in this service does. A build
+-- check insists on it, and the reason is measured rather than stylistic: the
+-- shared code every read goes through puts the site condition first, and an index
+-- that does not lead with it cannot be used for that condition, so the table gets
+-- scanned instead. The lane-lock table in an earlier migration carries the full
+-- account of what that cost.
 CREATE INDEX ix_work_item_scope_status
 	ON work_item (site_external_id, status, queued_at)
 	INCLUDE (external_id, execution_id, lane_id, lane_external_id, visit_external_id,
 		assignee, screen_external_id);
 
--- Lane reset walks a visit's open items; the §C2 data model's EXECUTION ||--o{
--- WORK_ITEM edge, as an index.
+-- The other read: all of one visit's items. Lane reset uses it to fail every open
+-- item belonging to the visit it is aborting.
 CREATE INDEX ix_work_item_scope_execution
 	ON work_item (site_external_id, execution_id);
 
 -- --------------------------------------------------------------------------
--- work_item_audit — one row per action on an item (sheet §3).
+-- work_item_audit — one row per action taken on an item, in typed columns. Who
+-- did what, when, and how long they had held it.
 --
--- Typed columns where 1.x had a loose child of the audit trail. The action
--- list is 2.0's writers: TAKE / TAKE_OVER / PARK / ASSIGN / COMPLETE / FAIL,
--- plus SLA_BREACH (WP3's timer records the breach here as well as on the
--- item, so the trail carries WHEN it fired even after the item completes).
--- 1.x's ESCALATE action had a writer only in the sense that the SLA path
--- would have written it; 2.0's SLA path is real and writes SLA_BREACH.
+-- Every action in the list has a writer: TAKE and TAKE_OVER when an operator
+-- claims an item or takes it from a colleague, PARK when they put it back, ASSIGN
+-- when it is given to someone, COMPLETE and FAIL at the end, and SLA_BREACH when
+-- the timer fires.
 --
--- `processing_duration_sec` (how long the acting operator held the item) and
--- `elapsed_sec` (how long since it queued) feed the operator-productivity
--- reads 1.x fed; both are server-computed.
+-- The breach is recorded here as well as on the item itself, deliberately: the
+-- column on the item says an item is overdue now, while this row says WHEN it
+-- went overdue — which survives the item being completed afterwards.
+--
+-- The two durations feed the operator-productivity reporting the old system fed:
+-- how long the acting operator held the item, and how long it had been sitting in
+-- the queue. Both are computed on the server, never supplied by the caller.
 -- --------------------------------------------------------------------------
 CREATE TABLE work_item_audit (
 	work_item_audit_id      BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_work_item_audit PRIMARY KEY,

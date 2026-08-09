@@ -1,25 +1,32 @@
--- orca-edge · the normalised half of a buffered device event.
+-- Adds one column to the event buffer: the vendor's message, decoded into a plain
+-- set of name/value pairs.
 --
--- WHY THIS IS A SECOND COLUMN AND NOT A REPLACEMENT FOR `payload`.
+-- WHY A SECOND COLUMN RATHER THAN A REPLACEMENT FOR THE ONE THAT IS THERE
+-- The existing `payload` column holds the bytes exactly as the camera sent them —
+-- for the plate-reading cameras, a framed XML message between its start and end
+-- delimiters. That stays. A durable buffer that stored a paraphrase of its input
+-- would be worth less than one that did not: when a plate read is disputed, the
+-- question is what the camera said, not what this service understood.
 --
--- `payload` holds the bytes that arrived — the ZapPacket the camera sent, between
--- its STX and ETX delimiters. A durable buffer that stored a paraphrase of its
--- input would be worth less than one that did not: when a plate is disputed, the
--- question is what the camera said, not what edge understood.
+-- But this service is the hardware boundary, and a boundary that passed the
+-- vendor's dialect through would put vendor-specific XML elements inside the
+-- service that runs the gate — which is the opposite of a boundary. So the
+-- vendor's format is decoded exactly once, here, and what crosses onward is this
+-- small map of attributes. The gate never learns what the camera's message format
+-- is called.
 --
--- But §C3 makes edge the hardware boundary, and a boundary that forwarded the
--- vendor's dialect would put a `<LP><AutoLPR>` element inside orca-runtime — which
--- is the opposite of a boundary. So the vendor's schema is decoded ONCE, here, at
--- ingest, and what crosses to runtime is this small JSON map. Runtime never learns
--- what a ZapPacket is.
+-- WHY IT IS DECODED ON ARRIVAL RATHER THAN ON DELIVERY
+-- Because delivery retries, sometimes days later. If decoding happened at
+-- delivery, a change to the parser between an event being buffered and eventually
+-- being sent would change what an already-recorded row means. Decoding on arrival
+-- settles the row at the moment it is written.
 --
--- Decoded at ingest rather than at dispatch, deliberately: the pump retries, and a
--- parser change between the buffering and the eventual delivery must not change
--- what a row means. The row is settled when it is written.
---
--- NULLable, and stays that way: rows buffered before this migration have no
--- normalised half, and §B7's expand-only discipline means they are not rewritten.
--- A NOT NULL with a default would claim they had attributes and that those
--- attributes were empty, which is a different and false statement.
+-- WHY IT IS NULLABLE, AND STAYS NULLABLE
+-- Rows buffered before this migration ran have no decoded half, and they are not
+-- rewritten — a schema change has to be readable by both the old and the new
+-- version of the service for the length of a rolling upgrade, which means adding
+-- rather than rewriting. Making the column NOT NULL with an empty default would
+-- claim those rows had attributes and that the attributes were empty. That is a
+-- different statement, and a false one.
 
 ALTER TABLE event_buffer ADD attributes NVARCHAR(MAX) NULL;

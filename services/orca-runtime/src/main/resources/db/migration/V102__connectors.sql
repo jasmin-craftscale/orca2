@@ -1,14 +1,26 @@
--- orca-runtime · connector configuration and its response routing (§C2).
+-- Where the customer's own systems live, and what their answers mean.
 --
--- WHY THIS IS DATA AND NOT CODE, AND NOT PROCESS VARIABLES EITHER.
+-- WHAT A CONNECTOR IS
+-- Somewhere in the middle of a gate process, the site's design says "ask the
+-- terminal operating system whether this container may be collected". A connector
+-- is that outbound call: an address, a path, a deadline. `connector_config` holds
+-- them, one row per named connector per site.
 --
--- §C2 puts a connector's endpoint, its authentication and its certificate trust in
--- configuration, and a process carries a connector NAME rather than a URL — so an
--- administrator can repoint a customer system without republishing every process
--- that calls it. The same argument covers the routing below: which answer means
--- "let the truck through" is a site's decision about its own customer system, and
--- a site that had to have code changed to add a status code would be a site whose
--- integrations are ours rather than theirs (§A2).
+-- `connector_route` holds the other half — what to do with the answer. It maps an
+-- HTTP status code the customer's system returned onto a plain word the process
+-- branches on.
+--
+-- WHY BOTH ARE DATA IN A TABLE, RATHER THAN CODE OR VALUES BAKED INTO A PROCESS
+-- A process carries a connector's NAME, never its address. An administrator can
+-- then repoint a customer system — a new host, a longer deadline — without
+-- republishing every process that calls it.
+--
+-- The routing is the same argument taken one step further. Which answer means
+-- "let the truck through" is a decision about the customer's own system, and the
+-- customer's own system is theirs. A site that had to wait for a code change to
+-- handle one more status code would be a site whose integrations belong to us
+-- rather than to them, and the whole point of this platform is that a site's
+-- processes belong to the site.
 
 CREATE TABLE connector_config (
 	site_external_id VARCHAR(64)  NOT NULL,
@@ -16,10 +28,15 @@ CREATE TABLE connector_config (
 	base_url         VARCHAR(512) NOT NULL,
 	request_path     VARCHAR(256) NOT NULL,
 
-	-- §B8: every external call has a deadline AND a defined outcome when it is
-	-- exceeded. Per connector, because a terminal operating system that answers in
-	-- four seconds and a weighbridge that answers in two hundred milliseconds
-	-- cannot share one number without the slow one dictating it.
+	-- How long to wait for an answer, in milliseconds. Every external call in this
+	-- platform has a deadline AND a defined outcome when the deadline passes; no
+	-- call waits indefinitely, because a truck is sitting at the barrier while it
+	-- does.
+	--
+	-- Per connector rather than one global number, because a terminal operating
+	-- system that answers in four seconds and a weighbridge that answers in two
+	-- hundred milliseconds cannot share one value without the slow one dictating
+	-- it for everybody.
 	deadline_ms      INT          NOT NULL,
 
 	is_enabled       BIT          NOT NULL
@@ -28,13 +45,20 @@ CREATE TABLE connector_config (
 	CONSTRAINT pk_connector_config PRIMARY KEY (site_external_id, connector_name)
 );
 
--- HTTP status -> the branch discriminator the process routes on.
+-- Turns the HTTP status the customer's system returned into the plain word the
+-- process branches on — 200 becomes APPROVED, 409 becomes ALREADY_COLLECTED, and
+-- so on. That word is what reaches the decision point in the process design.
 --
--- The token is what reaches the exclusive gateway (§C2, and the execution
--- profile's "branch discriminator" refinement). A status with no row here becomes
--- `HTTP_<status>`, which no compiled process has a branch for — so it takes the
--- default flow to a human. That is the intended behaviour and not a fallback: an
--- answer nobody wrote a branch for must never become an implicit approval.
+-- ⚠️ WHAT HAPPENS TO A STATUS NOBODY MAPPED, AND WHY IT IS THE INTENDED
+-- BEHAVIOUR RATHER THAN A FALLBACK.
+--
+-- A status with no row here becomes the literal word `HTTP_<status>` — HTTP_503,
+-- say. No process has a branch for that, so the decision takes its default path,
+-- which sends the truck to a human.
+--
+-- That is exactly what should happen. An answer nobody wrote a branch for must
+-- never turn into an implicit approval and open a barrier. Sending it to a person
+-- is the only safe reading of "we do not know what this means".
 CREATE TABLE connector_route (
 	site_external_id VARCHAR(64) NOT NULL,
 	connector_name   VARCHAR(64) NOT NULL,
