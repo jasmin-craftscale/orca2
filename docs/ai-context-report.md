@@ -1,6 +1,9 @@
 # ORCA — AI context report
 
-**Per §7 of `docs/ai-context-brief.md` · 7 August 2026 · branch `phase-0-foundations`**
+**7 August 2026 · branch `phase-0-foundations`**
+
+*The brief this reports against has been deleted — the task it described is
+finished, and this report is what survived it.*
 
 What was written, what was verified by executing it, what was decided that the
 brief did not dictate, and what a new agent still will not find. Every "pass"

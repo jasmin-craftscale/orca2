@@ -1,7 +1,7 @@
 # ORCA Phase 1 Hardening — Build Report
 
 **Six bounded work packages, one commit each · August 2026**
-**Companions: `docs/phase-1-report.md` (what this hardens), `docs/phase-1-plan.md` §2 (the rules it ran under)**
+**Companion: `docs/phase-1-report.md` — what this hardens**
 
 Same shape as the phase reports: what was built, what was not, every decision the
 brief did not dictate, and everything that proved wrong — **reported, not silently

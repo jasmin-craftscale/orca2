@@ -401,5 +401,5 @@ Named here rather than left for a reviewer to discover:
 - **Two edge instances handing a lane over.** That is proven in
   `EdgeIngestPropertiesIT` and needs a second appliance to demonstrate live.
 
-*Companion: `docs/phase-1-plan.md` · `docs/phase-1-report.md` ·
+*Companion: `docs/phase-1-report.md` ·
 `docs/lpr-wire-format-from-1x.md` · `deploy/stubs/README.md`.*

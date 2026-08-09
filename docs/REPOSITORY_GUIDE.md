@@ -215,13 +215,13 @@ A module containing **only tests, no production code.** Its entire output is bui
 | `ORCA_OPEN_QUESTIONS_REGISTER.md` | What is deliberately unsettled. Check it before concluding something was forgotten |
 | `PLATFORM_PRIMITIVES.md` | The five primitives and the named pattern behind each |
 | `REPOSITORY_GUIDE.md` | This file — where things are |
-| `phase-0-brief.md` · `phase-0-report.md` | What Phase 0 was asked for, and what it built |
-| `phase-1-plan.md` · `phase-1-report.md` · `phase-1-demo.md` | The vertical slice: the plan, the build, and how to run it end to end |
+| `phase-0-report.md` | What the foundations phase built, and what it deliberately did not |
+| `phase-1-report.md` · `phase-1-demo.md` | The first vertical slice — a truck through the gate — and how to run it end to end |
 | `phase-1-hardening-report.md` | The six hardening packages after it |
 | `BPMN_EXECUTION_PROFILE.md` | What the visual builder's compiler must emit |
 | `lpr-wire-format-from-1x.md` · `device-host-outbound-from-1x.md` | The two hardware wire formats, **extracted from the 1.x estate**. Evidence, not vendor specifications |
 | `flowable-adoption.md` | Adopting a database the engine migrated itself |
-| `ai-context-brief.md` · `ai-context-report.md` | The instruction files, and the review of them |
+| `ai-context-report.md` | How the instruction files here were built, and the review of them |
 | `ORCA_ORCHESTRATOR_HANDOVER.md` | Where this programme came from |
 
 ---

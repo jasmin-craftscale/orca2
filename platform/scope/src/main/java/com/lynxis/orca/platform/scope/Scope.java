@@ -9,16 +9,41 @@ import java.util.Set;
  * What the current caller is allowed to see, expressed as named dimensions and
  * the values permitted in each.
  *
- * <p><strong>Deliberately opaque about what a dimension is.</strong> The seam
- * applies whatever this carries; it does not know that {@code site_id} means a
- * site or that {@code carrier_id} means a haulier. That is not squeamishness
- * about the domain — it is because §B6 describes three genuinely different
- * enforcement problems, one of which (the driver portal) is per-principal rather
- * than per-tenant and cannot be expressed as a tenant column at all. Baking a
- * tenant dimension into this type would decide open register item NEW-1a by
- * accident.
+ * <p>A dimension is just a name and a set of permitted values — for example, the
+ * dimension {@code site_external_id} permitting {@code SITE-HAMBURG}. Every
+ * database read goes through a seam that turns whatever this object carries into
+ * the query's leading condition, so a caller cannot accidentally read outside
+ * what it was granted.
  *
- * <p>An empty scope is <em>deny</em>, not <em>all</em>. See {@link #DENY}.
+ * <h2>Why this type refuses to know what a dimension means</h2>
+ *
+ * <p>This class does not know that {@code site_id} identifies a site, or that
+ * {@code carrier_id} identifies a haulage company. That is deliberate, and it is
+ * not squeamishness about naming things: the platform has to enforce three
+ * genuinely different kinds of restriction, and only two of them are about
+ * tenancy at all.
+ *
+ * <ul>
+ *   <li>An operator entitled to one site must not read another site's data, even
+ *       though both belong to the same customer. That is an authorization rule.</li>
+ *   <li>One customer's data must never reach another customer. On a site
+ *       installation this is structural — there is only ever one customer in the
+ *       database — so there is nothing to enforce.</li>
+ *   <li>A driver or a haulage company sees their own bookings across <em>every</em>
+ *       terminal they deliver to, and nobody else's. Hauliers legitimately span
+ *       customers, so this cannot be expressed as "belongs to tenant X" at all —
+ *       it is a question about who the requester <em>is</em>, not which tenant
+ *       they are inside.</li>
+ * </ul>
+ *
+ * <p>The third case is the reason for the restraint. Hard-coding a tenant column
+ * into this type would quietly rule out the only model that can express it — and
+ * how the driver portal authorises access is still an open design question, not
+ * settled. Leaving the dimension abstract keeps that decision open for whoever
+ * makes it.
+ *
+ * <p>An empty scope means <em>deny</em>, never <em>allow everything</em>. See
+ * {@link #DENY}.
  */
 public final class Scope {
 

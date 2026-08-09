@@ -1,6 +1,9 @@
 # ORCA Phase 1 — Build Report
 
-**Per §8 of `docs/phase-1-plan.md` · 7 August 2026 · branch `phase-0-foundations`**
+**7 August 2026 · branch `phase-0-foundations`**
+
+*The plan this reports against has been deleted — the work is finished, and this
+report is what survived it.*
 
 Written into the repository so the review does not depend on a conversation.
 Every result below was produced by running the command, not by writing code that
@@ -505,7 +508,7 @@ system, not by reading it** — which is the argument for §6 item 13 existing a
 
 ---
 
-*Companion: `docs/phase-1-plan.md` (the instruction set) · `docs/phase-1-demo.md`
+*Companion: `docs/phase-1-demo.md`
 (the executed slice) · `docs/lpr-wire-format-from-1x.md` (the camera's wire format)
 · `docs/BPMN_EXECUTION_PROFILE.md` (WP4's durable deliverable) ·
 `docs/phase-0-report.md` (what this was built on).*
