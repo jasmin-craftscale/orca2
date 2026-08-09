@@ -104,7 +104,7 @@ class ScopeIndexRule {
 		}
 
 		assertThat(violations)
-				.as("phase-1-report.md §5.13: a table whose hot access path does not lead with the "
+				.as("A table whose hot access path does not lead with the "
 						+ "scope column deadlocks the lane, silently, and nothing in Java can see it")
 				.isEmpty();
 
@@ -129,13 +129,13 @@ class ScopeIndexRule {
 				.hasSizeGreaterThanOrEqualTo(50);
 
 		assertThat(tables.stream().map(table -> table.name).toList())
-				.as("the tables the phase-1 report names as scoped must all be seen")
+				.as("the known scoped traffic tables must all be seen")
 				.contains("lane_session", "execution", "event_buffer", "command_log");
 
 		assertThat(tables.stream().filter(table -> table.name.equals("lane_session")).findFirst())
 				.get()
 				.satisfies(laneSession -> assertThat(first(laneSession.primaryKey))
-						.as("the key order that fixed the WP6 deadlock, read back out of the migration")
+						.as("lane_session must retain the scope-leading key order that fixed its admission deadlock")
 						.isEqualTo("site_external_id"));
 	}
 

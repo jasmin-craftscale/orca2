@@ -37,7 +37,7 @@ class EngineConfinementRule {
 		noClasses()
 				.that().resideOutsideOfPackage(EXECUTION)
 				.should().dependOnClassesThat().resideInAnyPackage(FLOWABLE)
-				.because("§C2 reaches the engine behind an interface so the platform is not written "
+				.because("Runtime reaches the engine behind an interface so the platform is not written "
 						+ "against a specific engine's API throughout. That is worth what the number of "
 						+ "places org.flowable appears is worth, and it only stays small if something "
 						+ "keeps it small.")

@@ -127,13 +127,13 @@ class ImportedSetGuard {
 				.isPositive();
 
 		assertThat(classesIn("integration"))
-				.as("integration holds WP7's connector, its configuration and the ConnectorPort the "
+				.as("integration holds the connector, its configuration and the ConnectorPort the "
 						+ "execution module's delegate calls — which is the first time the module wall "
 						+ "governs a REAL cross-module dependency rather than an empty set")
 				.isPositive();
 
 		assertThat(classesIn("workitem"))
-				.as("workitem holds Phase 3's lifecycle: the service, its repository, the controller "
+				.as("workitem holds the implemented lifecycle: the service, its repository, the controller "
 						+ "and the two api seams (WorkItemIntake in, ManualStepPort consumed) — the "
 						+ "first BIDIRECTIONAL pair of module-wall crossings, both through api packages")
 				.isPositive();

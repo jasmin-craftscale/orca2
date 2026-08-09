@@ -52,10 +52,10 @@ class ContractInterfaceRule {
 		classes()
 				.that().areAnnotatedWith(REST_CONTROLLER)
 				.should(implementAGeneratedApiInterface())
-				.because("ADR-014 makes the OpenAPI document the source of truth, and the ONLY thing "
+				.because("The OpenAPI document is the source of truth, and the ONLY thing "
 						+ "that makes a contract change break the build is the controller implementing "
 						+ "the generated interface. A hand-written route beside a generated one is "
-						+ "invisible in the served document — see docs/ai-context-report.md §7.1.")
+						+ "invisible in the served document.")
 				.check(OrcaClasses.production());
 	}
 

@@ -60,7 +60,7 @@ class RetentionClassRule {
 				.that().areAnnotatedWith("jakarta.persistence.Entity")
 				.should().beAnnotatedWith(PersistentTable.class)
 				.allowEmptyShould(true)
-				.because("§B10's retention guarantee is stated over every table that grows with traffic, "
+				.because("Every table that grows with traffic must declare its retention treatment, "
 						+ "and a table that never declared its growth was never considered")
 				.check(OrcaClasses.production());
 	}

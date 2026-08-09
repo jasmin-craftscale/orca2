@@ -73,7 +73,7 @@ class ModuleWallRule {
 					.resideInAnyPackage(othersDomain.toArray(String[]::new))
 					.allowEmptyShould(true)
 					.because("modules talk through their api packages, or through readmodel's projections. "
-							+ "§C2's integration seam is narrow on purpose: that narrowness is what makes "
+							+ "the integration seam is narrow on purpose: that narrowness is what makes "
 							+ "the partner-facing surface replaceable without touching the engine.")
 					.check(OrcaClasses.production());
 		}
@@ -93,7 +93,7 @@ class ModuleWallRule {
 					.that().resideInAPackage(OrcaClasses.ROOT + "." + service + "..")
 					.should().dependOnClassesThat().resideInAnyPackage(others.toArray(String[]::new))
 					.because("services are independently deployable processes. Five mechanisms are permitted "
-							+ "between them (§B4) and a Java import is not one of them — a compile-time "
+							+ "between them and a Java import is not one of them — a compile-time "
 							+ "dependency between two services is a distributed monolith with extra steps.")
 					.check(OrcaClasses.production());
 		}

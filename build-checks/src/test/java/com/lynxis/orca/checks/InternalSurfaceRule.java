@@ -64,7 +64,7 @@ class InternalSurfaceRule {
 	private static final String PUBLIC_PREFIX = "/api/";
 
 	@Test
-	@DisplayName("every operation on an internal contract surface maps under the ADR-011 filter's pattern")
+	@DisplayName("every operation on an internal contract surface maps under the internal-auth filter's pattern")
 	void internalOperationsMapUnderTheInternalPrefix() {
 		String prefix = internalPrefix();
 		List<Operation> operations = operations();
@@ -77,7 +77,7 @@ class InternalSurfaceRule {
 
 			if (taggedInternal && !underInternalPrefix) {
 				violations.add(("%s %s (%s, tags %s) is an INTERNAL operation and does not map under "
-						+ "'%s'. ADR-011's filter matches that pattern and nothing else, so this route "
+						+ "'%s'. The internal-auth filter matches that pattern and nothing else, so this route "
 						+ "falls through to anyRequest().authenticated() — which needs a USER token that "
 						+ "no service mints or can obtain.")
 						.formatted(operation.method.toUpperCase(Locale.ROOT), operation.path,
@@ -100,7 +100,7 @@ class InternalSurfaceRule {
 		}
 
 		assertThat(violations)
-				.as("ADR-011's guarantee is one filter matching one path pattern. The pattern is the "
+				.as("Internal service authentication uses one filter matching one path pattern. The pattern is the "
 						+ "only thing binding an endpoint to it")
 				.isEmpty();
 

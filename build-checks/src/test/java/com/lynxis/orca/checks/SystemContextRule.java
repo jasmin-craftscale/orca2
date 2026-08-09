@@ -40,7 +40,7 @@ class SystemContextRule {
 				.that().areAnnotatedWith(SCHEDULED)
 				.should(enterTheSystemContext())
 				.allowEmptyShould(true)
-				.because("no path runs with no identity (§B6, §D3). A scheduled job that runs anonymously "
+				.because("no path runs with no identity. A scheduled job that runs anonymously "
 						+ "cannot be authorised and cannot be attributed, and nothing says so until "
 						+ "somebody is trying to explain a write nobody can account for.")
 				.check(OrcaClasses.production());
