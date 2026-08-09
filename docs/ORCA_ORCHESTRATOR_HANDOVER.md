@@ -171,7 +171,7 @@ These are not preferences. Each was learned by getting it wrong.
 
 ---
 
-## 9 · Where things stand right now (updated 9 August 2026 — through Phase 3)
+## 9 · Where things stand right now (updated 10 August 2026 — Phase 3 built; the programme is moving to four parallel developer streams)
 
 **Four phases are built and independently verified**, all on `phase-0-foundations`, which is now the ancestor of `main` and `develop` (the no-`main` ruling was superseded on 10 Aug 2026). Each was built by a focused agent session and then re-run and re-driven by the orchestrator — **the discipline is verify-by-executing, never trust the report**; continue it.
 
@@ -186,9 +186,42 @@ These are not preferences. Each was learned by getting it wrong.
 
 **Decisions locked since this handover was first written** (all in the register / architecture): ADR-001 Java 25 / Boot 4; ADR-011 Keycloak authenticates people, services carry a per-installation shared credential on `/internal/**`; NEW-1b the cloud tier is per-customer and the programme is **on-site first** (portal/sync/fleet stay skeletons); **licensing (register item 20) = a concurrent-instance limit enforced by the database lease, not machine-binding, with hardware identity as heartbeat telemetry** (architecture §B6/§C6). Spike 1 was folded into Phase 1 WP0 and passed.
 
+### What changed on 10 August 2026 — read this before anything else
+
+**The programme is moving from one build session at a time to four developers, each driving their own AI, working in parallel.** That changes what this role produces: fewer phase plans executed by an agent, more *stream* plans other people take away. Three things were built for it, and all are committed:
+
+| Document | For |
+|---|---|
+| `docs/LOCAL_DEVELOPMENT.md` | A developer's first hour — both repos cloned side by side, the stack, the services, a truck through the gate, and **the prompt to paste into a fresh AI**. Every command in it was executed |
+| `docs/DEVELOPER_ONBOARDING.md` | What the AI reads: the system, the ten checks, how the old system may be used, what must never be decided alone |
+| `docs/BUILD_ROADMAP.md` | What is built, what is being built, **what does not exist yet**, and how the four streams depend on each other |
+
+`AGENTS.md` names all three in its first map row, so an assistant reaches them without being told. **Keep that true** — it is the only automatic path.
+
+**Product-owner decisions taken today:**
+
+- **Branch model is `feature/*` → `develop` → `main`.** This supersedes the earlier no-`main` ruling, which is corrected in §2 above.
+- **The old repository is a required clone for every developer**, as a sibling at `../Lynxis-Gate`. Reading it to understand a feature is encouraged; the `docs/*-from-1x.md` sheets remain the authority where one exists, because they carry the defects deliberately *not* carried forward. The restricted security findings file is gitignored in that repo, so cloning does not distribute it.
+- **The repository is being hosted** — the product owner is doing it. Everything below assumes it.
+
+**The four streams, and what each still needs from this role:**
+
+| Stream | Owns | Reference sheet | Plan |
+|---|---|---|---|
+| 1 · Partner event API & integration breadth | `orca-runtime` → `integration` | ✅ `docs/partner-event-api-from-1x.md` (written this session) | **Not written — this is the next job** |
+| 2 · Read models & notifications | `orca-runtime` → `readmodel`, `notify` | Needs extracting | Not written |
+| 3 · Core remainder (custom entities + DDL executor, licence verification) | `orca-core` | Needs extracting | Not written |
+| 4 · Retention & purge | every schema | — | Last. Not concurrent with anything |
+
+⚠️ **Before anyone writes a runtime migration, assign migration number ranges per stream.** Streams 1 and 2 both add migrations to `runtime`, which is at `V117`. Two developers writing `V118` is a conflict that only appears when a database refuses to start.
+
+**Also landed this session:** the SQL half of the comment-clarity sweep (34 files) was validated independently and accepted, with one real defect found and repaired — two migrations had dropped the fact that a rule is *enforced*; `docs/comment-clarity-java-plan.md` is ready for the Java half and has not been started. Seven service `README.md` files. The 1.x partner-event path extracted before it was lost, and the handover's "a second server cannot see the work" claim corrected against the code (§3). A new §7 in the private security findings — the workflow executor's HTTP surface has 23 unauthenticated routes including start, publish and terminate. And `platform/outbox` + `platform/lease` now read database-written timestamps in UTC explicitly, closing the last open finding from the hardening phase (`phase-1-hardening-report.md` §5.1, now marked closed).
+
+**Open, and each is recorded where it belongs rather than here:** the retention-class list (architecture says closed at 18 values and never enumerates them; the hardening report says still blocked; nine provisional classes exist in code — **settle it when stream 4 starts, from the real tables, not before**); the device-host stub returning a corpus tag into `edge.command_log.device_response`; `platform/AGENTS.md` missing a warning that editing a primitive migration invalidates checksums in every schema it reached; and `.github/workflows/ci.yml` still saying five ArchUnit rules when there are eleven.
+
 ### What comes next
 
-**The current goal is the full on-site backend** (product-owner direction). Remaining phases, none blocked on anything external, prepped the same proven way (extract the 1.x reference sheet → write `phase-N-plan.md` → a focused build session → orchestrator verification):
+**The current goal is the full on-site backend** (product-owner direction). The remaining work is now the **four parallel streams** in the section above rather than sequential phases — but the preparation is unchanged and still the thing that makes them work: extract the 1.x reference sheet → write a self-contained plan → hand it over → verify by executing. The phase framing below is kept because it maps one-to-one onto the streams:
 
 - **Phase 4 — partner event API & integration breadth** (the inbound external-event → workflow path, `event_dispatch`, the frozen partner endpoints, connector breadth). The recommended next build; more CRUD-shaped than Phase 3's engine internals.
 - **Phase 5 — read models & notifications** · **Phase 6 — retention/purge jobs** · **Phase 7 — core remainder** (custom entities + DDL executor, the licensing-verification module). Then the on-site backend is complete.
