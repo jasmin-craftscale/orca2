@@ -91,8 +91,8 @@ public class WorkItemService implements WorkItemIntake {
 
 			// The Push half of routing runs in the same transaction. Push means
 			// PRE-ASSIGN to an assignable eligible operator: the item stays QUEUED
-			// and the assignee still explicitly takes it;
-			// Prompt teams broadcast, which is the notify hub's, later. No
+			// and the assignee still explicitly takes it. Prompt teams broadcast
+			// through the notify hub later. No
 			// assignable operator anywhere = the item stays unassigned and
 			// visible, never parked on someone who cannot act.
 			if (screenExternalId != null) {

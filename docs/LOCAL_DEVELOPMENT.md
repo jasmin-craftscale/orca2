@@ -1,0 +1,225 @@
+# Local development — from nothing to a truck through the gate
+
+**Your first hour. Follow it top to bottom and you will have the platform running,
+proven working, and your AI assistant onboarded.**
+
+Every command here was executed against this repository. If one does not work,
+that is a defect in this document — say so.
+
+---
+
+## 1 · What you need
+
+| | |
+|---|---|
+| **Docker** | Running. Docker Desktop, Rancher Desktop or equivalent |
+| **A JDK** | Any recent one. The Java 25 toolchain provisions itself |
+| **Git** | Obviously |
+
+**That is the whole list, including on Windows.** The setup and demo tools run
+inside containers, so nothing else needs installing.
+
+## 2 · Clone both repositories, side by side
+
+You need **two** repositories, and the layout matters:
+
+```
+<any directory>/
+├── orca/            ← this repository. Where you work
+└── Lynxis-Gate/     ← the system being replaced. Reference only, never edit
+```
+
+```bash
+cd ~/where-you-keep-projects
+git clone <orca-repo-url> orca
+git clone <lynxis-gate-repo-url> Lynxis-Gate
+```
+
+**Clone them as siblings exactly as shown.** Every instruction in this repository,
+and every prompt you give an AI, refers to the old system as `../Lynxis-Gate`. A
+relative path works on everyone's machine; an absolute one works on nobody else's.
+
+### Why you need the old repository
+
+ORCA 2.0 is a ground-up rewrite of a system running in production today — 25 Go
+microservices. When you reimplement a feature in Java, that Go code is the record
+of what the feature really does: the actual wire formats, the real columns, the
+edge cases somebody hit at three in the morning.
+
+**How to use it — this part matters:**
+
+- **Read it to understand.** That is what it is for, and reading it makes a port
+  far more accurate than guessing.
+- **`docs/*-from-1x.md` are the authority where one exists.** These are extractions
+  with file-and-line evidence, and they carry both what the old system does *and*
+  the defects deliberately **not** carried forward. Where a sheet and the old code
+  disagree about what to build, **the sheet wins.**
+- **If no sheet covers what you are doing, ask for one** rather than porting
+  straight from the source.
+- **Never assume a pattern is intentional because it ships.** Real examples from
+  one path: a "unique" index that silently degrades to non-unique, statuses that
+  nothing ever writes so the cleanup job never runs, and a deduplication that can
+  start two workflows from one event. All of that is live in production.
+- **Never modify anything in `Lynxis-Gate`.** It is read-only, always.
+
+⚠️ **Before searching that repository — with an AI or by hand — read
+`../Lynxis-Gate/CLAUDE.md`.** It documents the conventions that make its code
+readable: soft-delete flags on nearly every table, singular table names, and dual
+integer/UUID keys. Search it without that and you will confidently reach wrong
+conclusions.
+
+## 3 · Start the stack
+
+```bash
+cd orca/deploy
+cp .env.example .env          # ONCE. Never overwrite an existing .env
+docker compose up -d
+```
+
+That gives you four containers: SQL Server, Keycloak, and two stubs standing in for
+a customer's system and a device host. **There is deliberately no message broker** —
+services hand work to each other through the database.
+
+Then the one-time privileged step:
+
+```bash
+docker compose run --rm bootstrap
+```
+
+This creates the database, seven schemas, seven logins and their grants — each
+service reaches only its own schema, enforced by database credentials rather than
+by convention. It runs once and is a no-op afterwards.
+
+Prove it worked:
+
+```bash
+docker compose run --rm verify-isolation
+```
+
+Expect `PASS — 36 checks.`
+
+## 4 · Run the services
+
+From the repository root. **Core first** — it publishes views that runtime and edge
+refuse to start without.
+
+```bash
+./gradlew bootRun -p services/orca-core    --args='--spring.profiles.active=local'
+./gradlew bootRun -p services/orca-runtime --args='--spring.profiles.active=local'
+./gradlew bootRun -p services/orca-edge    --args='--spring.profiles.active=local'
+```
+
+Each in its own terminal. Check them:
+
+```bash
+for p in 8081 8082 8083; do curl -s -o /dev/null -w "$p %{http_code}\n" http://localhost:$p/actuator/health; done
+```
+
+⚠️ **`--spring.profiles.active=local` is not optional.** The committed
+inter-service credential is recognised by name, and a service refuses to start with
+it outside the `local` profile — so the public fixture cannot reach a customer site
+by accident. Set the profile; do not weaken the check.
+
+## 5 · Drive a truck through the gate
+
+```bash
+cd deploy && docker compose run --rm demo-seed && cd ..
+./gradlew sendPlate -Pplate=T-HELLO-01
+```
+
+`sendPlate` speaks the real camera wire protocol at edge's listener. You should see
+an acknowledgement come back.
+
+What happens next, without you doing anything: edge delivers the capture to
+runtime, admission starts exactly one visit, the process calls the stubbed customer
+system, commands the barrier through edge, the barrier confirms, and the visit
+closes with its outbound fact — all in about a second.
+
+Check it:
+
+```bash
+docker exec -i orca-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa \
+  -P "$MSSQL_SA_PASSWORD" -C -No -d orca -h -1 -W -Q \
+  "SELECT external_id, status, plate FROM runtime.execution"
+```
+
+Expect your plate with status `COMPLETED`. **If you got that, everything works.**
+
+The full walkthrough — including deliberate demonstrations of deduplication, the
+admission race, an unrouted branch and an expired command — is
+`docs/phase-1-demo.md`.
+
+## 6 · Build and verify
+
+```bash
+./gradlew build                    # compile, unit tests, the ten build checks
+./gradlew check integrationTest    # FULL verification — takes about 7 minutes
+```
+
+⚠️ **`./gradlew test` runs almost nothing that matters.** The property suites live
+in a separate source set so the build works on a machine with no Docker. Full
+verification is `check integrationTest` — 222 integration tests against a real SQL
+Server and a real workflow engine.
+
+⚠️ **A green build does not mean a service starts.** Every suite constructs its
+beans directly rather than starting a service, so a broken bean definition passes
+all 222 tests. This repository has shipped a service that passed everything and
+could not boot. **Start the services and drive a truck before you call something
+done.**
+
+## 7 · Onboard your AI
+
+Open your AI assistant in the `orca` directory. It picks up the repository rules
+automatically from `AGENTS.md` and `CLAUDE.md`.
+
+Then paste this, once, at the start of a fresh session:
+
+```
+You are joining the ORCA 2.0 build as a developer's assistant.
+
+Read docs/DEVELOPER_ONBOARDING.md in full before doing anything else. It is
+self-contained: what this system is, the rules that fail the build, how the old
+system may and may not be used, and how to verify your work.
+
+The system being replaced is cloned as a sibling of this repository at
+../Lynxis-Gate. It is READ-ONLY — never modify anything there. Before you search
+it, read ../Lynxis-Gate/CLAUDE.md, or you will misread what you find.
+
+When you have read both, tell me in your own words: what ORCA does, the two
+properties that shape every decision in it, and the rules you must never break.
+Then wait for my task — do not start work.
+```
+
+**The comprehension check at the end is deliberate.** If the answer is vague, the
+onboarding did not land and anything built on it will be wrong. Re-point it at the
+document rather than proceeding.
+
+For a specific piece of work you will also be given a **stream plan** — a
+self-contained document naming what to build, what not to touch, and how to prove
+it. That is what you hand your AI after this.
+
+## 8 · When something does not work
+
+| Symptom | Cause |
+|---|---|
+| SQL Server exits at startup | The `sa` password needs 8+ characters with upper, lower, digit and symbol. The error message does not say so |
+| SQL Server is very slow to start | On Apple silicon it runs emulated — Microsoft publishes the image for amd64 only. It works. Do not swap in `azure-sql-edge`; it is a different engine |
+| Runtime or edge will not start, complaining about views | Core has not migrated yet. Start core first |
+| Ports 8081–8086 already taken | Set `MSSQL_PORT` and `KEYCLOAK_PORT` in `deploy/.env`, pass `--server.port=` to each service, and export `ORCA_DB_URL` / `ORCA_OIDC_ISSUER_URI` to match. `docs/phase-1-demo.md` §3 has the exact incantation |
+| `sendPlate` gets no acknowledgement | Edge has not yet won the lane's lease — it polls every five seconds. Wait and retry before assuming a defect |
+| A service refuses to start on a Flyway checksum | A migration changed since your database ran it. Nothing is deployed anywhere, so rebuild: `docker compose down -v && docker compose up -d && docker compose run --rm bootstrap` |
+| `There is already an object named 'ACT_GE_PROPERTY'` | This database once let the workflow engine create its own tables. `cd deploy && ./adopt-flowable/run.sh` |
+
+More detail lives in `deploy/README.md` — the stack itself, what each container is
+for, and what is deliberately absent.
+
+## 9 · Where to go next
+
+| To learn | Read |
+|---|---|
+| What you are building and why | `docs/DEVELOPER_ONBOARDING.md` |
+| The target design and its guarantees | `docs/ORCA_ARCHITECTURE.md` |
+| What is deliberately still undecided | `docs/ORCA_OPEN_QUESTIONS_REGISTER.md` |
+| Where anything lives in this repository | `docs/REPOSITORY_GUIDE.md` |
+| The rules that fail the build | `AGENTS.md` |
+| One truck, end to end, in detail | `docs/phase-1-demo.md` |

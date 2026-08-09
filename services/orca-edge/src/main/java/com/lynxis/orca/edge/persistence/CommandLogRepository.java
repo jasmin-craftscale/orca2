@@ -10,7 +10,7 @@ import com.lynxis.orca.platform.scope.ScopedSelect;
 
 import lombok.RequiredArgsConstructor;
 
-/** The command log (§C3), read and written through the scope seam. */
+/** The durable device-command log, read and written through the scope seam. */
 @RequiredArgsConstructor
 public class CommandLogRepository {
 
@@ -72,7 +72,7 @@ public class CommandLogRepository {
 				.stream().findFirst();
 	}
 
-	/** The lane's device host, from core's published view (ADR-009, mechanism 2 of §B4). */
+	/** The lane's device host, read from core's published view without importing or calling core. */
 	public Optional<String> deviceHostUrlOf(String laneExternalId) {
 		return seam.select(ScopedSelect.from("core.topology_lane")
 								.columns("device_host_url")

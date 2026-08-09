@@ -18,8 +18,8 @@ import java.util.Set;
  * the fact is written, so a consumer registered <em>after</em> a fact was recorded
  * has no delivery row for it and will not receive it. Registering a new consumer
  * on a live installation is therefore a deliberate act with a backfill decision
- * attached, not a configuration edit. The architecture does not say which; this
- * implementation does not choose for it.
+ * attached, not a configuration edit. No backfill policy has been settled, so
+ * this implementation does not choose one.
  */
 public class ConsumerRegistry {
 

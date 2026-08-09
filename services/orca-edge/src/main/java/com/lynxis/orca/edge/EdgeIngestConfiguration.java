@@ -74,8 +74,8 @@ public class EdgeIngestConfiguration {
 	 * <p>That is a fix, not a preference. Spring Boot 4 does not auto-configure a
 	 * {@code RestClient.Builder} bean here, so the injected form made this service
 	 * <strong>fail to start</strong> — and no test saw it, because every suite
-	 * constructs these beans directly rather than refreshing the context. Found by
-	 * running the demo; recorded in the phase report.
+	 * constructs these beans directly rather than refreshing the context. Running
+	 * the demo exposed the startup failure.
 	 *
 	 * <p>The deadline is new with it. Every external call must have one,
 	 * and the pump's POST had none: a runtime that accepted the connection and then

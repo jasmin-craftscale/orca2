@@ -45,8 +45,8 @@ import com.lynxis.orca.runtime.execution.domain.ProcessVariables;
  * the named "manual handling required" end state rather than a stack trace.
  *
  * <p>The last test answers an implementation question: <em>does a boundary
- * timer on a service task ever fire?</em> It is asked by running it, and whatever
- * the engine does is what goes in the report.
+ * timer on a service task ever fire?</em> It is answered by running the engine and
+ * recording its observed behavior in this test.
  */
 @SpringBootTest(
 		classes = { RuntimeApplication.class, GateVisitProcessIT.StubPorts.class },

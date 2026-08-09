@@ -64,8 +64,8 @@ public class DeviceCommandController implements InternalCommandsApi {
 						command.getDeadlineMs() == null ? 0L : command.getDeadlineMs()),
 						// The clock starts when the request arrives here, because the
 						// contract carries no issued-at. ⚠️ That understates the elapsed
-						// time by the network hop and is recorded in the phase report as
-						// a gap: the caller's own issue time belongs on the wire.
+						// time by the network hop. The caller's own issue time belongs on the
+						// wire, but the current contract cannot carry it.
 						Instant.now());
 			}
 			catch (DeviceCommandService.LaneHasNoDeviceHostException unknownLane) {

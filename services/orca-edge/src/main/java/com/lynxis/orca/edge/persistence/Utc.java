@@ -10,7 +10,7 @@ import java.time.ZoneOffset;
 /**
  * {@code DATETIME2} ⇄ {@link Instant}, in UTC, explicitly.
  *
- * <h2>The bug this exists to prevent, found by running H3's own test</h2>
+ * <h2>The bug this exists to prevent, found by the buffer-diagnostics property test</h2>
  *
  * <p>{@code java.sql.Timestamp} carries no zone. {@code rs.getTimestamp(column)}
  * therefore reads a {@code DATETIME2} as <strong>wall-clock time in the JVM's
@@ -21,7 +21,7 @@ import java.time.ZoneOffset;
  * <p>{@code event_buffer.received_at} defaults to {@code SYSUTCDATETIME()}, so it is
  * one of those. Reading it through the zone-less path on a machine at UTC+2 made
  * {@code /internal/buffer/stats} report an event buffered one second ago as
- * <strong>two hours old</strong>. H3's age assertion failed on exactly that, which is
+ * <strong>two hours old</strong>. The buffer-age assertion failed on exactly that, which is
  * why it is written as a property and not as a smoke test: an operator reading "the
  * oldest event here is two hours old" concludes the link is severed and starts
  * looking at a network that is fine.

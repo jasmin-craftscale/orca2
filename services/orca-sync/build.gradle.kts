@@ -88,7 +88,7 @@ dependencies {
 	// --- The primitives this service uses, and why ---------------------
 	implementation(project(":platform:web")) // the envelope, the error codes and the system context
 	implementation(project(":platform:scope")) // the query seam; every service serves scoped reads
-	implementation(project(":platform:lease")) // one `service_lease` per service schema (§C2)
+	implementation(project(":platform:lease")) // one `service_lease` per service schema
 	implementation(project(":platform:idempotency")) // recorded keys, not assumed ones
 
 	// --- Spring Boot ----------------------------------------------------

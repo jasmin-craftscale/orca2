@@ -37,8 +37,8 @@ public class IntegrationConfiguration {
 
 	/**
 	 * ⚠️ <strong>These numbers are a local profile's answer and not a
-	 * recommendation for a site.</strong> The architecture states no threshold and
-	 * no window, and it is right not to: a terminal operating system that is
+	 * recommendation for a site.</strong> There is deliberately no universal
+	 * threshold or window: a terminal operating system that is
 	 * routinely slow at shift change and one that is never slow want different
 	 * numbers, and choosing them belongs to whoever runs the site. They are
 	 * configuration, with defaults, exactly as the lease's durations are.

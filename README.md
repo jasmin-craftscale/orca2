@@ -103,48 +103,32 @@ docs/             architecture, the open-questions register, phase plans and rep
 
 `docs/REPOSITORY_GUIDE.md` walks it in full.
 
-## Running it locally
+## Getting started
 
-**Prerequisites:** Docker (running) and a JDK. That's all — including on Windows: the
-setup and demo tools run in containers, so nothing else needs installing.
+**→ `docs/LOCAL_DEVELOPMENT.md`** takes you from nothing to a truck through the gate,
+and onboards your AI assistant at the end. It is the only setup document you need.
 
-```bash
-# 1 · the stack — SQL Server, Keycloak, and the TOS + device-host stubs
-cd deploy
-cp .env.example .env                 # ONCE; never overwrite an existing .env
-docker compose up -d
-
-# 2 · the one-time privileged step — 7 schemas, 7 logins, grants, isolation asserted
-docker compose run --rm bootstrap
-
-# 3 · the services (each in its own terminal; core first — it publishes the views
-#     runtime and edge wait for)
-cd ..
-./gradlew bootRun -p services/orca-core    --args='--spring.profiles.active=local'
-./gradlew bootRun -p services/orca-runtime --args='--spring.profiles.active=local'
-./gradlew bootRun -p services/orca-edge    --args='--spring.profiles.active=local'
-
-# 4 · one truck through the gate
-cd deploy
-docker compose run --rm demo-seed                      # one site, lane, camera, barrier
-cd ..
-./gradlew sendPlate -Pplate=T-DEMO-01                  # speaks the real camera framing at edge
-```
-
-The visit completes, the barrier command is confirmed at the stub, and a
-`visit.completed` fact is recorded. The full walkthrough — inspection queries and the
-deliberate demonstrations of dedup, the admission race, an unrouted branch, and an
-expired command — is **`docs/phase-1-demo.md`**. `docs/deployment.md` covers
-prerequisites, port conflicts (if another stack holds 8081–8086), and troubleshooting.
-
-## Building, testing, verifying
+The short version: Docker and a JDK, clone this repository **and the old system
+side by side**, bring up the stack, run three services, send a plate.
 
 ```bash
 ./gradlew build                    # compile, unit tests, the ten build checks
 ./gradlew check integrationTest    # FULL verification — plain `test` skips the
-                                   # platform property suites (real SQL Server)
-docker compose run --rm verify-isolation   # prove one login cannot read another's schema
+                                   # property suites that need a real database
 ```
+
+## The system this replaces
+
+ORCA 2.0 is a ground-up rewrite of a platform running in production today — 25 Go
+microservices. **You need that repository cloned alongside this one**, as
+`../Lynxis-Gate`: when you reimplement a feature, its code is the record of what the
+feature really does.
+
+It is **evidence, not a specification, and it is read-only.** Where an extraction
+sheet exists in `docs/*-from-1x.md`, that sheet is the authority — each one carries
+both what the old system does *and* the defects deliberately not carried forward.
+`docs/LOCAL_DEVELOPMENT.md` explains the setup and the discipline; **read
+`../Lynxis-Gate/CLAUDE.md` before searching it**, or you will misread what you find.
 
 ## The rules that keep it honest
 
@@ -173,13 +157,19 @@ AI-assisted PRs accordingly.
 
 | For | Read |
 |---|---|
-| Run it, deploy it | `docs/deployment.md` |
-| The target design and its guarantees | `docs/ORCA_ARCHITECTURE.md` (§B10 first) |
+| **Set it up and run it — start here** | **`docs/LOCAL_DEVELOPMENT.md`** |
+| **Joining the project, as a developer or an AI** | **`docs/DEVELOPER_ONBOARDING.md`** |
+| The rules that fail the build | `AGENTS.md` |
+| The target design and its guarantees | `docs/ORCA_ARCHITECTURE.md` |
 | What's deliberately undecided | `docs/ORCA_OPEN_QUESTIONS_REGISTER.md` |
 | The repository layout | `docs/REPOSITORY_GUIDE.md` |
 | What each primitive prevents | `docs/PLATFORM_PRIMITIVES.md` |
-| What has been built and verified | `docs/phase-*-report.md` |
-| The current build | `docs/phase-2-plan.md` and its reference sheets |
+| What the old system really does | `docs/*-from-1x.md` |
+| What has been built in each phase, and what was not | `docs/phase-*-report.md` |
+| One truck through the gate, in detail | `docs/phase-1-demo.md` |
+| Production deployment — the target, and the gaps | `docs/deployment.md` |
+
+Each service also has its own `README.md`.
 
 ## Production status
 

@@ -29,7 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ConnectorCallDelegate implements JavaDelegate {
 
-	/** The BPMN error code the failure branch catches. Part of the profile. */
+	/** The BPMN error code the failure branch catches, defined by {@code docs/BPMN_EXECUTION_PROFILE.md}. */
 	public static final String CONNECTOR_FAILED = "connector.failed";
 
 	private final ConnectorPort connectorPort;

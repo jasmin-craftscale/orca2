@@ -58,7 +58,7 @@ import com.lynxis.orca.runtime.execution.persistence.AdmissionRepository;
  *
  * <p><strong>Both lane shapes run.</strong> The service-level suite spreads its thousand across
  * eight lanes, which is more contention but is <em>not</em> the shape a single-lane
- * site has — and the phase report named that as an uncovered case. So:
+ * site has. This suite covers both shapes:
  *
  * <ol>
  *   <li>{@link #eightLanesInParallelAdmitExactlyOneVisitPerTruck()} — 8 lanes ×
@@ -106,7 +106,7 @@ class AdmissionThroughHttpIT {
 	/** A gate with eight lanes. Enough that lanes contend, few enough to be a real site. */
 	private static final int LANES = 8;
 
-	/** §B10 says one thousand times. It says it because a race that fails one time in two hundred passes a run once. */
+	/** Repeats 1,000 times so a race that fails once in 200 cannot pass by luck. */
 	private static final int TRUCKS = 1_000;
 
 	private static final String EVENTS = "/internal/events/v1";
@@ -247,7 +247,7 @@ class AdmissionThroughHttpIT {
 	@Timeout(value = 30, unit = TimeUnit.MINUTES)
 	@DisplayName("1,000 consecutive trucks through ONE lane: 1,000 visits, one at a time")
 	void oneThousandConsecutiveTrucksThroughOneLane() {
-		// The shape the phase report named as uncovered. It is not a weaker version of
+		// The previously uncovered single-lane shape. It is not a weaker version of
 		// the test above: eight lanes never make one lane's filtered unique index
 		// release and re-take a thousand times, and that release is what lets the NEXT
 		// truck in. A predicate that included completed visits would pass the

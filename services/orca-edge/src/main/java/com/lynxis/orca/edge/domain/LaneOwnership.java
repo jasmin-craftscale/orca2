@@ -18,7 +18,7 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <p>Cameras and device hosts each address a single endpoint. So while
  * everything else runs on every instance, device ingestion for a given lane is
- * owned by one instance at a time."</em> This is the one place the platform is not
+ * owned by one instance at a time. This is the one place the platform is not
  * symmetric, and the reason is the hardware contract rather than the design.
  *
  * <p><strong>Per lane, not per site</strong>: the frozen

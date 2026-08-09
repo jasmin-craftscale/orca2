@@ -151,13 +151,13 @@ public class EventBufferRepository {
 	 * many.
 	 *
 	 * <p><strong>Three set-based statements, and it used to be a read-write-back
-	 * loop.</strong> The original seam could not express {@code attempts = attempts + 1};
-	 * the seam, so it read every row and wrote each one back — which is slower, and
+	 * loop.</strong> The original seam could not express {@code attempts = attempts + 1},
+	 * so it read every row and wrote each one back — which is slower, and
 	 * worse than slower: two deliveries that both read {@code attempts = 3} and both
 	 * write {@code 4} record <em>one</em> failure between them, and an event that has
 	 * failed twice as often as its counter says is one that is retired later than the
-	 * limit promises. H5 gave the seam {@link ScopedUpdate#increment}, so the
-	 * arithmetic now happens in the database and cannot be lost.
+	 * limit promises. {@link ScopedUpdate#increment} now performs the arithmetic in
+	 * the database, where concurrent increments cannot be lost.
 	 *
 	 * <p>The retirement is applied <em>after</em> the increment and reads the value
 	 * the increment produced. That ordering is the whole reason it is three

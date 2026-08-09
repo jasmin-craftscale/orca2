@@ -1,6 +1,6 @@
 // orca-runtime — the gate brain.
 //
-// The one service the architecture decomposes into modules: execution, workitem,
+// The only service decomposed into modules: execution, workitem,
 // integration, notify, readmodel. The module wall depends on those five names.
 
 // Imported rather than written as java.util.zip.ZipFile below, because inside a

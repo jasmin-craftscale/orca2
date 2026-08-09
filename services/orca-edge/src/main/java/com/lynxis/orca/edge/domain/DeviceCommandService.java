@@ -45,7 +45,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class DeviceCommandService {
 
-	/** The idempotency operation name. One namespace per kind of key (§C2). */
+	/** The idempotency operation name; each kind of key has its own namespace. */
 	public static final String OPERATION = "device-command";
 
 	private final CommandLogRepository commandLog;

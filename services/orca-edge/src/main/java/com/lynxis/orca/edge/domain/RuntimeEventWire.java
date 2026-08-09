@@ -11,9 +11,9 @@ import com.lynxis.orca.edge.domain.EdgeTables.BufferedEvent;
  * <p><strong>Hand-written on purpose, and it is a duplication.</strong> The
  * contract is authored in {@code orca-runtime.yaml} and orca-runtime generates its
  * server interface from it; edge cannot generate a client from that file without
- * importing another service's module. Services communicate only through the five
- * services of which a Java import is not one. So the caller's side of the contract
- * is written out here, where a reviewer can see it is a copy, rather than smuggled
+ * importing another service's module. Services communicate only through five
+ * permitted mechanisms, and a Java import is not one. So the caller's side of
+ * the contract is written out here, where a reviewer can see it is a copy, rather than smuggled
  * in as a compile-time dependency that would make the two services one deployable.
  *
  * <p>The cost is real: this can drift from the document. What catches it is the
@@ -25,7 +25,7 @@ public final class RuntimeEventWire {
 	private RuntimeEventWire() {
 	}
 
-	/** One lane's worth of events, oldest first (§D3: ordered per key, never globally). */
+	/** One lane's events, oldest first: ordering is per lane and never global. */
 	public record Batch(List<Event> events) {
 
 		public static Batch of(List<BufferedEvent> buffered) {

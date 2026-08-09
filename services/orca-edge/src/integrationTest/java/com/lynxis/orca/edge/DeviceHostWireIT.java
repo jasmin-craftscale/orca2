@@ -23,7 +23,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 /**
- * <strong>H1 · what actually goes on the wire to a device host.</strong>
+ * <strong>What actually goes on the wire to a device host.</strong>
  *
  * <p>Every assertion here is against {@code docs/device-host-outbound-from-1x.md},
  * extracted from the ORCA 1.x production caller. The suite exists because the

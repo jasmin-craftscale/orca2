@@ -69,7 +69,7 @@ class DeviceCommandPropertiesIT {
 	private static final String SITE = "SITE-IT";
 	private static final String LANE = "LANE-IT-01";
 
-	/** §C3's action vocabulary, in full. Item 7 says "every command type". */
+	/** The complete device-action vocabulary; every command type is replayed below. */
 	private static final List<String> EVERY_ACTION =
 			List.of("RAISE_GATE", "LOWER_GATE", "PRINT", "SET_IO", "PTZ_PRESET");
 

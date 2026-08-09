@@ -6,10 +6,9 @@ package com.lynxis.orca.edge.domain;
  *
  * <p><strong>The outbound shape is translated from the legacy 1.x caller, not invented.</strong>
  * The device-host REST contract is frozen because it belongs to a field-proven vendor
- * component that loads a driver plugin per device; changing this contract would mean
  * component that loads a driver plugin per device; changing it would mean
- * re-certifying every device vendor. The architecture names what travels in each
- * direction, but neither states the route, the body or the response document for an
+ * re-certifying every device vendor. The platform contract names what travels in
+ * each direction, but not the route, body or response document for an
  * outbound command. {@code docs/device-host-outbound-from-1x.md} does: it was
  * extracted from the ORCA 1.x production caller, the way
  * {@code docs/lpr-wire-format-from-1x.md} was extracted for the camera.
@@ -39,9 +38,9 @@ public interface DeviceHostPort {
 	/**
 	 * Issues one command and waits for the host's answer, bounded by the deadline.
 	 *
-	 * <p>A command completes when the device host confirms it acted: an
-	 * acknowledgement <strong>and</strong> a body that decodes. Anything else is an
-	 * unknown outcome."</em> Both halves are the implementation's job, and the
+ * <p>A command completes when the device host confirms it acted: an
+ * acknowledgement <strong>and</strong> a body that decodes. Anything else is an
+ * unknown outcome. Both halves are the implementation's job, and the
 	 * distinction between {@link Outcome#FAILED} and {@link Outcome#UNKNOWN} is the
 	 * whole reason this returns a value rather than throwing.
 	 */

@@ -27,7 +27,7 @@ import com.lynxis.orca.platform.outbox.testing.PlatformDatabase;
 import com.lynxis.orca.runtime.RuntimeApplication;
 
 /**
- * <strong>H4 · the migration path off {@code database-schema-update: true},
+ * <strong>The migration path off {@code database-schema-update: true},
  * executed rather than described.</strong>
  *
  * <p>An installation that once used {@code database-schema-update: true} has

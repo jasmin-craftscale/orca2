@@ -123,7 +123,7 @@ orca:
   internal:
     shared-credential: ${ORCA_INTERNAL_CREDENTIAL:local-dev-internal-credential-not-for-deployment}
 
-  # ⚠️ LOCAL DEVELOPMENT VALUES. The architecture deliberately sets no lease
+  # ⚠️ LOCAL DEVELOPMENT VALUES. There is deliberately no universal lease
   # duration or renewal interval. LeaseConfigurationValidator requires the service
   # to REFUSE TO START when either is
   # unset or when the duration is not longer than the renewal interval — see
@@ -184,8 +184,8 @@ orca:
     edge-base-url: ${ORCA_EDGE_BASE_URL:http://localhost:8083}
 
     # --- Connector resilience -------------------------------------------------
-    # ⚠️ LOCAL VALUES. The architecture states no threshold and no window, and is
-    # right not to: a customer system that is routinely slow at shift change and
+    # ⚠️ LOCAL VALUES. There is deliberately no universal threshold or window:
+    # a customer system that is routinely slow at shift change and
     # one that never is want different numbers. What is NOT tunable is the shape —
     # COUNT_BASED rather than time-based, because a gate that sees six trucks an
     # hour would never fill a time window, and a breaker with no data never opens.

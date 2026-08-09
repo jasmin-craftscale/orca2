@@ -128,7 +128,7 @@ public final class EdgeTables {
 		/** The host answered with an error, its response did not decode, or the command had expired. */
 		public static final String FAILED = "FAILED";
 
-		/** The deadline passed with no answer. Resolved by verifying the device, never by retrying (§B10). */
+		/** The deadline passed with no answer; resolve it by verifying the device, never by retrying blindly. */
 		public static final String UNKNOWN = "UNKNOWN";
 
 		/** ⚠️ A WIRE status only. Never written to the log — see the record's javadoc. */

@@ -92,7 +92,7 @@ orca:
   internal:
     shared-credential: ${ORCA_INTERNAL_CREDENTIAL:local-dev-internal-credential-not-for-deployment}
 
-  # ⚠️ LOCAL DEVELOPMENT VALUES. The architecture deliberately sets no lease
+  # ⚠️ LOCAL DEVELOPMENT VALUES. There is deliberately no universal lease
   # duration or renewal interval. LeaseConfigurationValidator requires the service
   # to REFUSE TO START when either is
   # unset or when the duration is not longer than the renewal interval — see

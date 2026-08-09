@@ -4,16 +4,16 @@
 
 Starting commit: `17cb5123ff84eb094a51d9c821afd07744331eba`.
 
-The complete 313-file scope was inspected. Of those files, 213 needed comment
+The complete 313-file scope was inspected. Of those files, 214 needed comment
 changes. Work package D changed strings in eight files already counted in work
-package B, so the repository-wide changed-file total remains 213.
+package B, so the repository-wide changed-file total remains 214.
 
 | Package | Files changed | By file type | Comment lines before | Comment lines after |
 |---|---:|---|---:|---:|
 | B — `platform/`, `build-checks/` | 57 | 51 Java, 6 Gradle Kotlin | 1,648 | 1,626 |
-| C — services and root build | 156 | 139 Java, 8 Gradle Kotlin, 6 `application.yaml`, 3 BPMN XML | 5,736 | 5,729 |
+| C — services and root build | 157 | 140 Java, 8 Gradle Kotlin, 6 `application.yaml`, 3 BPMN XML | 5,753 | 5,745 |
 | D — build-check messages | 8 overlapping Java files | 15 physical string lines containing all 14 remaining matches | unchanged | unchanged |
-| B + C | 213 unique files | 190 Java, 14 Gradle Kotlin, 6 YAML, 3 XML | 7,384 | 7,355 |
+| B + C | 214 unique files | 191 Java, 14 Gradle Kotlin, 6 YAML, 3 XML | 7,401 | 7,371 |
 
 The line totals count physical lines occupied by comments in the changed files.
 The counter tracks Java/Kotlin strings and text blocks, YAML comment lines and XML
@@ -42,10 +42,19 @@ After B and C, the baseline command reported:
 PASS — 213 file(s) checked; every change is a comment change.
 ```
 
+A post-delivery review used a string-aware scanner over all 313 scoped files,
+including inline and one-line Javadocs that the prescribed line-prefix grep does
+not see. It found clear residual references in 11 comments, several opaque
+hardening/report labels, and four prose-structure defects introduced by partial
+line replacements. The follow-up corrected those comments, then replayed the
+stripper across the baseline and the B/C comment revisions: all 214 B/C files
+strip identically once D's eight intentional string deltas are excluded. The
+follow-up itself also passed the comments-only checker.
+
 After D, the same baseline command correctly reports eight `CHANGED` files: the
 eight build-check classes whose failure-message strings were deliberately edited.
 That is the exception required by the plan, not an unexplained checker regression.
-All other 205 changed files still strip identically to the starting commit.
+All other 206 changed files still strip identically to the starting commit.
 
 For D's own proof, two deliberate violations were introduced and reverted:
 

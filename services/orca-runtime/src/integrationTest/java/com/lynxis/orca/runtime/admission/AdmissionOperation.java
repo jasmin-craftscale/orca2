@@ -211,7 +211,7 @@ public final class AdmissionOperation {
 		});
 	}
 
-	/** Marks the visit finished so the lane can admit the next truck. WP7 does this at the end of the process. */
+	/** Marks the visit finished so the lane can admit the next truck, as shipping process completion does. */
 	public void completeVisit(long executionId) {
 		transactions.executeWithoutResult(status -> jdbc.update(
 				"UPDATE execution SET status = 'COMPLETED', completed_at = SYSUTCDATETIME() "
