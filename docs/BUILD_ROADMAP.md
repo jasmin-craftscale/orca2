@@ -72,13 +72,30 @@ The gate path runs end to end today. You can drive it yourself in a minute;
 
 ## 4 · What is being built now
 
-**Four streams. They are not a queue — three of them can run at the same time.**
+**Four streams. They are not a queue — three of them run at the same time.**
 
 ```
-Stream 1 ── Partner event API ──┐
-Stream 2 ── Read models & notify ┼──→ Stream 4 ── Retention & purge
-Stream 3 ── Core remainder ─────┘        (needs the tables the others create)
+Stream 1 · Partner event API        ──┐
+Stream 2 · Read models & notify     ──┼──→  Stream 4 · Retention & purge
+Stream 3 · Core remainder  (independent)    (last — it touches every schema)
 ```
+
+Streams 1, 2 and 3 are concurrent. **Stream 4 is not concurrent with anything**:
+it touches every schema, so it would collide with all three. It also purges tables
+that streams 1 and 2 create, which is the second reason it goes last.
+
+### What makes the concurrency actually work
+
+Three mechanisms. Without them, "parallel" means "merge conflicts".
+
+- **Each stream owns whole modules.** Streams 1 and 2 both work inside
+  `orca-runtime`, but on different modules — and the module walls are already
+  enforced by a build check, so the check polices the boundary for you.
+- **Migration numbers are assigned in ranges before anyone starts.** Streams 1 and
+  2 both add migrations to the `runtime` schema, which is at `V117` today. Two
+  developers both writing `V118` is a conflict that surfaces only when somebody's
+  database refuses to start. Agree the ranges up front.
+- **One branch per feature**, merged to `develop`, then to `main`.
 
 ### Stream 1 · Partner event API and integration breadth
 
@@ -90,8 +107,9 @@ out (SOAP, four authentication modes, per-connector certificate trust).
 - **Reference:** `docs/partner-event-api-from-1x.md` — **already written**, and its
   §0 lists seven defects in the old system that must not be repeated
 - **Can assume:** the engine, admission, connectors and the outbox all exist
-- **Size:** the largest of the four. Splits naturally into the API surface and the
-  connector breadth
+- **Shape:** splits naturally in two — the partner-facing API surface and its
+  dispatch queue, then the connector breadth. Large enough for two people, and the
+  seam between those halves is where to divide them
 
 ### Stream 2 · Read models and notifications
 
@@ -101,6 +119,11 @@ projections for the operator grids, and the hub that pushes live updates.
 - **Owns:** `orca-runtime` → `readmodel` and `notify`
 - **Reference:** needs extracting — the old system's grids and its live-update path
 - **Can assume:** visits and work items exist and are stable
+- ⚠️ **`readmodel` is the one sanctioned exception to the module walls.** The lane
+  monitor legitimately needs running visits *beside* queued work items — two
+  modules' data. It must not read another module's tables; it maintains its own
+  projection built from both. Getting this wrong is the most likely way this stream
+  breaks the architecture rather than extending it
 - **Note:** a build check currently asserts these two modules are **empty**. It has
   to be updated in the same commit that fills them; that is deliberate, so nobody
   fills them by accident
@@ -135,9 +158,13 @@ actually being bounded.
 
 ## 5 · After those four — and an honest statement about the word "complete"
 
-When streams 1–4 land, **the on-site backend is complete.** That is a real
-milestone and it is worth naming precisely, because it is easy to hear it as more
-than it is.
+When streams 1–4 land, a site can **run its gate end to end, configure itself,
+route human work, integrate with a customer's systems, and stay bounded on disk.**
+That is a real milestone.
+
+It is often called "the on-site backend is complete", and that phrase needs care —
+**some of what is missing is also backend.** Be precise about which, because plans
+are built on this sentence.
 
 **What still will not exist:**
 
@@ -148,8 +175,10 @@ than it is.
 | **The operator surfaces** | `/screens/submit`, take-by-lane, the grids and exports are named in the architecture and deliberately unbuilt — they wait on a console to consume them |
 | **The deployment story** | Release images, a registry, secrets provisioning, a reverse proxy, licensing at install. `docs/deployment.md` Part 2 is the backlog, with an honest per-step status |
 | **The cloud tier** | `orca-portal`, `orca-sync` and `orca-fleet` stay skeletons until cloud scope opens |
+| **The verify-device-state branch** | The architecture guarantees that an unknown command outcome is resolved *by looking at the device*, never by retrying or assuming. Today that branch exists only as a comment — `device.state.unknown` is not routed anywhere in the shipped process, so in practice "resolve by looking" means "a person looks". A gate-path gap, and small |
 
-**The compiler is the largest of these and the one most easily overlooked.** One of
+**The frontend is the biggest of these by volume; the compiler is the one most
+easily overlooked, and it is the one that changes what the product can claim.** One of
 the two properties this platform exists for is *the site's processes belong to the
 site* — administrators design them visually, without code. Until the compiler
 exists, that property is unimplemented. It is not in any of the four streams
