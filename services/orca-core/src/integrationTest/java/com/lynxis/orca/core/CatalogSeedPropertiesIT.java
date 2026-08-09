@@ -15,10 +15,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import com.lynxis.orca.platform.outbox.testing.PlatformDatabase;
 
 /**
- * <strong>WP1 · the entitlement catalog seed (V103 + V104).</strong>
+ * Proves the entitlement catalog seed in {@code V103} and {@code V104}.
  *
- * <p>The plan's done-when: the seed is byte-stable across two clean migrations,
- * and the counts match the sheet's script-verified numbers (GATE = 3/30/174).
+ * <p>The seed must be byte-stable across two clean migrations, and its counts must
+ * match the source catalog's script-verified numbers (GATE = 3/30/174).
  * Stability matters because the catalog's identity is the contract — a seed
  * that minted different UUIDs per install would recreate 1.x's load-bearing
  * display-string matching one layer down.
@@ -118,8 +118,8 @@ class CatalogSeedPropertiesIT {
 				.as("the corrected row carries the UUID its code always mints in the catalog namespace")
 				.isEqualTo("06d4788b-de8e-5d8c-a7b8-6389bd99841e");
 
-		// The port-name/io-device-kind naming drift the sheet flags (1.x 'FrontMic'
-		// vs 'Front Mic') is unified: the audio kinds and the audio port names
+		// The legacy port and I/O-device catalogs disagree on names such as 'FrontMic'
+		// versus 'Front Mic'. The new seed unifies them: audio kinds and port names
 		// agree on display names where both catalogs carry the same concept.
 		assertThat(core.queryForList("SELECT name FROM io_device_kind WHERE code IN "
 				+ "('FRONT_MIC', 'FRONT_SPEAKER', 'REAR_SPEAKER') ORDER BY code", String.class))

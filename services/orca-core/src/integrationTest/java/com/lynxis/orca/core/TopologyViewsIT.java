@@ -16,11 +16,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import com.lynxis.orca.platform.outbox.testing.PlatformDatabase;
 
 /**
- * <strong>WP1 · the first published views.</strong>
+ * Proves core's published topology views.
  *
- * <p>ADR-009 says a published read-only view is the <em>only</em> cross-schema
- * read. That is two claims, and both are testable against the database rather
- * than asserted in a document:
+ * <p>A published read-only view is the <em>only</em> permitted cross-schema read.
+ * That is two claims, and both are testable against the database rather than
+ * asserted in prose:
  *
  * <ul>
  *   <li>a consumer's login <strong>can</strong> read the view, and</li>
@@ -140,7 +140,7 @@ class TopologyViewsIT {
 		JdbcTemplate runtime = new JdbcTemplate(asRuntime);
 		assertThat(runtime.queryForObject("SELECT COUNT(*) FROM core.topology_lane", Long.class)).isEqualTo(1);
 
-		// §D3: records are retired rather than removed. The row is still there.
+		// Ordinary records are retired rather than removed. The row is still there.
 		core.update("UPDATE lane SET retired_at = SYSUTCDATETIME() WHERE external_id = 'LANE-IT-01'");
 
 		assertThat(core.queryForObject("SELECT COUNT(*) FROM lane", Long.class))
@@ -174,8 +174,8 @@ class TopologyViewsIT {
 		seedOneLaneWithTwoDevices();
 
 		JdbcTemplate runtime = new JdbcTemplate(asRuntime);
-		// GATE_ARM since WP3: the provisional 'BARRIER' string was settled by the
-		// seeded 1.x device-type catalog, and the view now serves the catalog code.
+		// The provisional 'BARRIER' string became GATE_ARM when the legacy device-type
+		// catalog was seeded; the view now serves that stable catalog code.
 		String barrier = runtime.queryForObject(
 				"SELECT device_external_id FROM core.topology_device "
 						+ "WHERE lane_external_id = 'LANE-IT-01' AND device_type = 'GATE_ARM'", String.class);

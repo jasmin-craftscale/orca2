@@ -33,7 +33,7 @@ import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.platform.scope.ScopeSeam;
 
 /**
- * <strong>Phase 2 review addendum · the {@code @Transactional} wiring, proven.</strong>
+ * Proves the container-managed {@code @Transactional} wiring.
  *
  * <p>Every other suite constructs the domain services with {@code new}, which
  * is exactly the blind spot the corpus warns about: annotations are inert

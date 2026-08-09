@@ -49,11 +49,11 @@ import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.platform.web.ApiException;
 
 /**
- * <strong>WP4 · settings, workspace, audit.</strong>
+ * Proves settings, workspace and audit behavior.
  *
- * <p>The plan's done-when, verbatim: a secret-shaped key is refused with the
- * typed error, settings history appends, and the audit trail records a config
- * mutation end to end.
+ * <p>A secret-shaped key must be refused with the typed error, settings history
+ * must append rather than overwrite, and the audit trail must record a
+ * configuration mutation end to end.
  */
 class SettingsWorkspaceAuditPropertiesIT {
 

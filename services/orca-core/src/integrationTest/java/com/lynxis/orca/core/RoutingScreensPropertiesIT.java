@@ -40,8 +40,7 @@ import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.platform.web.ApiException;
 
 /**
- * <strong>Phase 3 WP2 · screens & routing: what the schema refuses, and what the
- * views publish.</strong>
+ * Proves what the screens-and-routing schema refuses and what its views publish.
  *
  * <p>The load-bearing constraints, each watched to refuse a duplicate: one
  * active screen per node per site (routing must resolve to ONE screen), and the

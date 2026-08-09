@@ -41,10 +41,10 @@ import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.platform.web.ApiException;
 
 /**
- * <strong>WP3 · the device registry.</strong>
+ * Proves the device registry.
  *
- * <p>The plan's done-when: a device with a full port layout round-trips through
- * the API, the catalogs seed stably (proven beside the entitlement seed in
+ * <p>A device with a full port layout must round-trip through the API, the
+ * catalogs must seed stably (proven beside the entitlement seed in
  * {@link CatalogSeedPropertiesIT}), and {@code topology_device} still serves
  * what runtime and edge already read.
  */

@@ -43,12 +43,12 @@ import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.platform.web.ApiException;
 
 /**
- * <strong>WP2 · teams and templates.</strong>
+ * Proves teams and shift/break templates.
  *
- * <p>The plan's done-when: template CRUD end to end, and the overnight/duration
- * semantics proven — 1.x stored a duration in a TIME column and carried a flag
- * nothing kept consistent; here duration is computed and the flag is CHECKed to
- * the times.
+ * <p>The suite exercises template CRUD end to end and proves overnight/duration
+ * semantics. The legacy 1.x schema stored a duration in a TIME column and carried
+ * a flag nothing kept consistent; here duration is computed and a database CHECK
+ * keeps the flag consistent with the times.
  */
 class TeamsTemplatesPropertiesIT {
 

@@ -40,13 +40,13 @@ import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.platform.web.ApiException;
 
 /**
- * <strong>WP1 · identity: what the schema refuses, and what the API round-trips.</strong>
+ * Proves what the identity schema refuses and what the API round-trips.
  *
- * <p>Sheet rules 2–3 as executable facts: every uniqueness rule is a database
- * constraint proven by a deliberate duplicate, not a SELECT-then-INSERT
- * convention (which is exactly the 1.x defect this phase does not port). Plus
- * the plan's done-when: a role's resolved entitlements round-trip through the
- * API, and the two-dimension scope design denies by default.
+ * <p>Every uniqueness rule is a database constraint proven by a deliberate
+ * duplicate, not a SELECT-then-INSERT convention; the latter is a defect in the
+ * legacy 1.x system that this implementation does not reproduce. The suite also
+ * proves that a role's resolved entitlements round-trip through the API and that
+ * the two-dimension scope design denies by default.
  */
 class IdentityPropertiesIT {
 
@@ -180,7 +180,7 @@ class IdentityPropertiesIT {
 	}
 
 	// ------------------------------------------------------------------------
-	// The API round trip — the plan's done-when.
+	// The required API round trip.
 	// ------------------------------------------------------------------------
 
 	@Test
