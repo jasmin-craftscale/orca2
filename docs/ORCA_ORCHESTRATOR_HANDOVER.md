@@ -156,43 +156,36 @@ These are not preferences. Each was learned by getting it wrong.
 
 ---
 
-## 9 · Where things stand right now
+## 9 · Where things stand right now (updated 9 August 2026 — through Phase 3)
 
-**Phase 0 is built.** Eight work packages committed on `phase-0-foundations`, plus uncommitted work on top. What exists:
+**Four phases are built and independently verified**, all on `phase-0-foundations` (kept as the trunk by product-owner ruling — do not create a `main`). Each was built by a focused agent session and then re-run and re-driven by the orchestrator — **the discipline is verify-by-executing, never trust the report**; continue it.
 
-| | |
-|---|---|
-| Gradle modules | **12** registered — five primitives, six services, `build-checks`. Root is an aggregator with no `src/` |
-| Bootable applications | **6** |
-| Build-check rules | **6** — platform purity, module walls, scope seam, error envelope, retention class, **and a system-context rule the brief did not ask for** |
-| Migrations | **13 files** — 4 bootstrap (`deploy/bootstrap/`), 3 platform-primitive, 6 service baselines, each service against its own schema |
-| Contracts | **7 authored** — one per service, plus the shared envelope `_shared.yaml` in `platform/web` |
-| Bootstrap · compose · CI | all present |
+| Phase | Delivered | Report |
+|---|---|---|
+| **0 · Foundations** | 12 Gradle modules, 6 bootable services, 5 primitives, the build checks | `docs/phase-0-report.md` |
+| **1 · The gate path** | plate → durable buffer → **exactly one visit** (1,000×) → TOS call → confirmed barrier → outbox fact; then a hardening pass | `docs/phase-1-report.md`, `docs/phase-1-hardening-report.md` |
+| **2 · World as configured** | orca-core config world: identity + entitlement catalog, teams, device registry, settings — translated from 1.x, not copied | `docs/phase-2-report.md` |
+| **3 · Clerk workflow** | the `MANUAL` branch made real: work item created in the engine transaction, completion advances the process atomically, SLA a real engine timer | `docs/phase-3-report.md` |
 
-**After the eight packages, three more commits landed:** the `NON_NULL` envelope-serialisation fix (`5bd278e` — *"one shape on paper, two on the wire"*), the **ADR-011 narrowing** (`c4730b1`, a product-owner decision: Keycloak authenticates people only; services present a per-installation shared credential on `/internal/**`), the **§9 report** (`3b0bc3d` — now at `docs/phase-0-report.md`, read it before the code), and a review pass (`a11b8ec`) that closed a real loophole in the envelope rule (`ResponseEntity<Object>` passed the check) and removed dead springdoc.
+**Build checks are now ten** (platform purity, module walls, scope seam, error envelope, retention class, system context, engine confinement, scope-leading index, contract interface, internal surface) plus `ImportedSetGuard`. `./gradlew check integrationTest` is full verification; plain `test` skips the property suites. The stack and demo tools run in containers (`docker compose run --rm bootstrap`), so a Windows host needs only Docker + a JDK; `docs/deployment.md` is the run guide, `docs/phase-1-demo.md` the truck-through-the-gate walkthrough (the standing regression canary for every later phase).
 
-### Verification — executed 7 August 2026, independently of the build session
+**Decisions locked since this handover was first written** (all in the register / architecture): ADR-001 Java 25 / Boot 4; ADR-011 Keycloak authenticates people, services carry a per-installation shared credential on `/internal/**`; NEW-1b the cloud tier is per-customer and the programme is **on-site first** (portal/sync/fleet stay skeletons); **licensing (register item 20) = a concurrent-instance limit enforced by the database lease, not machine-binding, with hardware identity as heartbeat telemetry** (architecture §B6/§C6). Spike 1 was folded into Phase 1 WP0 and passed.
 
-The brief's rule was verify before trusting. Done, by the orchestrator session, against a moving-free tree:
+### What comes next
 
-1. **`./gradlew build`** — green.
-2. **`./gradlew integrationTest --rerun-tasks`** — green: 31 property tests against real SQL Server via Testcontainers, including kill-between-writes on the outbox, the 16-way lease race with fence monotonicity, default-deny scope, and the 32-way idempotency race.
-3. **All six build-check rules proven to fire** — one deliberate violation each, in throwaway copies, each failing the build with a message naming the violating class: platform purity (caught `VisitResponse`, the exact camelCase compound the pre-`ac0eb0d` matcher missed), module walls (caught all three dependency edges into another module's `persistence`), scope seam (Spring Data interface), error envelope (`ResponseEntity<String>` — confirming the `a11b8ec` loophole is closed), retention class, and system context (a naked `@Scheduled` method, with a green control run after removal).
-4. **The primitives' tests were read for property-versus-path**: six of eight suites are genuinely property-style; the four strongest live in `src/integrationTest/`, so plain `./gradlew test` does not run them — use `check` plus `integrationTest`.
+**The current goal is the full on-site backend** (product-owner direction). Remaining phases, none blocked on anything external, prepped the same proven way (extract the 1.x reference sheet → write `phase-N-plan.md` → a focused build session → orchestrator verification):
 
-**Still open, deliberately:**
+- **Phase 4 — partner event API & integration breadth** (the inbound external-event → workflow path, `event_dispatch`, the frozen partner endpoints, connector breadth). The recommended next build; more CRUD-shaped than Phase 3's engine internals.
+- **Phase 5 — read models & notifications** · **Phase 6 — retention/purge jobs** · **Phase 7 — core remainder** (custom entities + DDL executor, the licensing-verification module). Then the on-site backend is complete.
+- **The deployment phase** (installer, secrets provisioning, release images, licensing) is its own plan later — blocked on the vendor answer and a hosted repo. `docs/deployment.md` Part 2 is its backlog.
 
-- **Six services on their committed ports** was verified only on a +10000 offset — this machine runs the ORCA 1.x devcontainer on exactly 8081–8086. The CI local-stack job (bootstrap twice, prove credential isolation) is the standing cover; a literal-ports boot needs a machine without the 1.x stack.
-- **`ImportedSetGuard` has no vacuity tripwire for the system-context rule** — it registers emptiness for runtime's module packages but not for "no `@Scheduled` exists yet". The rule is proven to fire, but a guard entry mirroring `whatIsStillEmptyIsStated` would make its empty set visible. Small, worth adding.
-- **Gradle materialises phantom `:platform` and `:services` container projects** from the nested include paths — two empty jars a naive publish task would ship. Cosmetic until someone wires publishing.
+**Standing items that are the product owner's, and should not slip behind the build:**
 
-### What comes after Phase 0
+- **Host the repository.** Everything is on one laptop and CI has never run — the cheapest risk with the biggest downside.
+- **The vendor call (register NEW-4).** Does the .NET device host validate the `Authorization` token on the barrier command? It blocks the first real device host; the brief is `docs/device-host-outbound-from-1x.md` §3.
+- **The frontend is unstaffed** — two React apps, the kiosk, both builders. Nothing can be demoed to a customer without it.
+- **The builder-developer** owns the BPMN service-task boundary-timer question (`docs/BPMN_EXECUTION_PROFILE.md` §8) and should see the profile.
 
-**Phase 1 is one vertical slice, not four services in parallel:** a plate read producing a visit, a call to the customer's system, and a confirmed barrier — across `orca-edge`, `orca-runtime` and `orca-core`. Its acceptance test is the one that matters most: **two simultaneous plate reads for the same truck produce exactly one visit, a thousand times.** Building breadth per service before that path works proves nothing about whether the primitives compose.
+### For a fresh orchestrator session
 
-**The recommended sequencing with four developers:**
-
-- **Spike 1 starts immediately, regardless of Phase 0.** It is the only open item where a bad answer changes the architecture, it needs one person, and it runs in a throwaway project with no repo conflict. Every week it is not run is a week the runtime design is unconfirmed.
-- **The build session is over and Phase 0 is verified** — the repository is the team's to work in. The high-value non-code work remains Spike 1, NEW-1a, NEW-1b and the volume measurement.
-- **With Phase 0 verified:** two developers on the vertical slice, two continuing on the open questions.
-- **Core and runtime need two developers each** when service build-out starts. Between them they are 76% of the tables and 62% of the endpoints.
+Everything durable is in three places: this document (the map), the phase reports and reference sheets in `~/Documents/Projects/orca/docs/` (the detail), and git history. The orchestrator's own working memory (the `orca-rewrite-initiative` ledger) loads automatically and is current through Phase 3. Onboard via §7, skim the four phase reports, then continue: prep Phase 4, or take up whichever standing item the product owner directs.
