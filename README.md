@@ -127,7 +127,8 @@ cd ..
 # 4 · one truck through the gate
 cd deploy
 docker compose run --rm demo-seed                      # one site, lane, camera, barrier
-docker compose run --rm send-plate --plate T-DEMO-01   # speaks the real camera framing
+cd ..
+./gradlew sendPlate -Pplate=T-DEMO-01                  # speaks the real camera framing at edge
 ```
 
 The visit completes, the barrier command is confirmed at the stub, and a

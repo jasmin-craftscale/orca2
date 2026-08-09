@@ -71,11 +71,17 @@ perform, so it lives here and runs once. No application ever holds admin credent
 
 ```bash
 cd deploy
-docker compose run --rm demo-seed                    # one demo site/lane/camera/barrier — a
-                                                     # deliberate act, never a profile or migration
-docker compose run --rm send-plate --plate T-DEMO-01 # speaks the real camera wire format at the
-                                                     # host's edge listener (append --port for offsets)
+docker compose run --rm demo-seed        # one demo site/lane/camera/barrier — a deliberate
+                                         # act, never a profile or migration
+cd ..
+./gradlew sendPlate -Pplate=T-DEMO-01    # speaks the real camera wire format at edge's listener
 ```
+
+`sendPlate` is a Gradle task, not a container: edge runs on the host during local
+dev, so the plate sender must reach the host — and Gradle is already present on
+every OS. Override with `-Pport=`, `-Plane=`, `-PeventGuid=`, `-Prepeat=2` (the last
+two demonstrate the dedup key). `deploy/demo/send-plate.py` is the same framing as a
+standalone script if you prefer Python.
 
 Full walkthrough, inspection queries and the four deliberate demonstrations
 (dedup, the admission race, the unrouted branch, the expired command):

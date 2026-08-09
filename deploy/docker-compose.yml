@@ -123,7 +123,10 @@ services:
   #   docker compose run --rm bootstrap          # once, against a fresh database
   #   docker compose run --rm verify-isolation   # prove the 36 confinement checks
   #   docker compose run --rm demo-seed          # after core+runtime have migrated
-  #   docker compose run --rm send-plate --plate T-DEMO-01
+  #
+  # These three reach the sqlserver CONTAINER over the compose network. Sending a
+  # demo plate is different — it targets orca-edge, which runs on the HOST during
+  # local dev — so it is a Gradle task (`./gradlew sendPlate`), not a container.
   #
   # The sqlcmd images reuse the SQL Server image already pulled for the stack.
   # ---------------------------------------------------------------------------
@@ -186,18 +189,6 @@ services:
       # so they stay host-form regardless of where the seed itself runs.
       ORCA_TOS_STUB_PORT: ${ORCA_TOS_STUB_PORT:-9200}
       ORCA_DEVICE_HOST_STUB_PORT: ${ORCA_DEVICE_HOST_STUB_PORT:-9300}
-    volumes:
-      - ./:/deploy:ro
-
-  # Speaks the camera's framing at edge's listener, which runs on the HOST —
-  # hence host.docker.internal (mapped to the host gateway for Linux parity).
-  # Override anything, including --host and --port, by appending arguments.
-  send-plate:
-    image: python:3.12-alpine
-    profiles: ["tools"]
-    entrypoint: ["python", "/deploy/demo/send-plate.py", "--host", "host.docker.internal"]
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - ./:/deploy:ro
 

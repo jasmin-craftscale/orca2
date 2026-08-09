@@ -173,3 +173,66 @@ tasks.register<JacocoReport>("jacocoRootReport") {
 		html.required = true
 	}
 }
+
+// ---------------------------------------------------------------------------
+// sendPlate — the demo camera, cross-platform. Speaks the DERIVED-FROM-1X
+// STX/ETX ZapPacket framing (docs/lpr-wire-format-from-1x.md) at orca-edge's
+// listener, which runs on THIS host during local dev. A Gradle task rather than
+// a container because it must reach a host process, and rather than a Python
+// script because Gradle is already present on every developer's machine —
+// including Windows, with nothing else installed.
+//
+//   ./gradlew sendPlate                       # T-DEMO-01 on LANE-DEMO-01
+//   ./gradlew sendPlate -Pplate=T-RACE -Pport=9100
+//   ./gradlew sendPlate -Pplate=T-D -PeventGuid=evt-fixed -Prepeat=2   # dedup
+// ---------------------------------------------------------------------------
+tasks.register("sendPlate") {
+	group = "orca demo"
+	description = "Send a plate read to orca-edge's LPR listener (the camera's wire format)."
+	doLast {
+		val host = (project.findProperty("host") as String?) ?: "localhost"
+		val port = ((project.findProperty("port") as String?) ?: "9100").toInt()
+		val lane = (project.findProperty("lane") as String?) ?: "LANE-DEMO-01"
+		val plate = (project.findProperty("plate") as String?) ?: "T-DEMO-01"
+		val camera = (project.findProperty("camera") as String?) ?: "DEV-DEMO-CAMERA"
+		val confidence = (project.findProperty("confidence") as String?) ?: "0.94"
+		val repeat = ((project.findProperty("repeat") as String?) ?: "1").toInt()
+		val eventGuid = (project.findProperty("eventGuid") as String?)
+			?: "evt-${java.util.UUID.randomUUID()}"
+
+		// Two plate hypotheses; the listener must take the HIGHER-confidence second
+		// one. A reader that took the first would pass every single-plate test and
+		// put the wrong truck through the gate.
+		val body = ("""<ZapPacket Type="MSG" Id="pkt-$eventGuid" Version="4.4" """ +
+			"""SenderId="$camera" SenderName="$camera"><Event>""" +
+			"""<EventId>1</EventId><EventGuid>$eventGuid</EventGuid>""" +
+			"""<Online>true</Online><TimeStamp>2026-08-07T09:00:00</TimeStamp>""" +
+			"""<LaneId>$lane</LaneId><LaneName>$lane</LaneName>""" +
+			"""<LP><AutoLPR>WRONG-1</AutoLPR><Confidence>0.41</Confidence></LP>""" +
+			"""<LP><AutoLPR>$plate</AutoLPR><Confidence>$confidence</Confidence>""" +
+			"""<CharConfidence>0.93</CharConfidence>""" +
+			"""<LPRImage TIN="1" CameraId="$camera"><Path>/var/lpr/demo.jpg</Path></LPRImage>""" +
+			"""</LP></Event></ZapPacket>""").toByteArray(Charsets.UTF_8)
+		val frame = byteArrayOf(0x02) + body + byteArrayOf(0x03)
+
+		println("→ lane $lane, plate $plate, EventGuid $eventGuid")
+		java.net.Socket().use { sock ->
+			sock.connect(java.net.InetSocketAddress(host, port), 10_000)
+			sock.soTimeout = 10_000
+			repeat(repeat) { sock.getOutputStream().write(frame) }
+			sock.getOutputStream().flush()
+			val buf = java.io.ByteArrayOutputStream()
+			val input = sock.getInputStream()
+			var started = false
+			while (true) {
+				val b = input.read()
+				if (b == -1) break
+				if (b == 0x02) { started = true; buf.reset() }
+				else if (b == 0x03 && started) break
+				else if (started) buf.write(b)
+			}
+			val ack = buf.toString("UTF-8")
+			if (ack.isNotEmpty()) println("← $ack") else println("← (no acknowledgement)")
+		}
+	}
+}
