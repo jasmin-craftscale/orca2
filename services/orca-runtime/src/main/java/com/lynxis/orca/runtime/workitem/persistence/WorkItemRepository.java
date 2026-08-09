@@ -20,10 +20,10 @@ import lombok.RequiredArgsConstructor;
  * else.
  *
  * <p><strong>Every state transition here is a conditional UPDATE guarded by
- * rows-affected</strong> — the same primitive as the lease and the idempotency
- * claim (§C2 says this outright: <em>"only the conditional UPDATE prevents a
- * double claim. Pre-checks exist for the interface but are racy and must never be
- * the guard"</em>). A method returning {@code 0} is telling the caller it lost;
+ * rows-affected</strong>, the same primitive used by the lease and idempotency
+ * claim. Only that update prevents a double claim; pre-checks improve the
+ * interface but are racy and must never be the guard. A method returning
+ * {@code 0} is telling the caller it lost;
  * translating that into a typed conflict is the service's job, and translating it
  * into a silent no-op is the 1.x defect this phase exists not to port.
  */
@@ -75,8 +75,8 @@ public class WorkItemRepository {
 	}
 
 	/**
-	 * The queue, oldest first. Priority ordering joins in WP2 at the grid read;
-	 * FIFO by {@code queued_at} is the tiebreak it will keep.
+	 * The queue, oldest first. The grid read layers routing priority over this;
+	 * FIFO by {@code queued_at} remains the tiebreak.
 	 *
 	 * <p><strong>{@code status == null} means the OPEN QUEUE, in the SQL itself.</strong>
 	 * The predicate has to live here rather than in the caller's post-filter: this
@@ -140,7 +140,8 @@ public class WorkItemRepository {
 	 * The claim. {@code QUEUED} → {@code IN_PROGRESS}, one winner.
 	 *
 	 * <p>A pre-assigned item is claimable by its assignee only; an unassigned item
-	 * by anyone (eligibility joins in WP2). The predicate carries both, and the
+	 * by anyone who passes the service's eligibility check. The predicate carries
+	 * both assignment cases, and the
 	 * conditional UPDATE is the only guard.
 	 *
 	 * @return whether this caller won
@@ -156,8 +157,8 @@ public class WorkItemRepository {
 	}
 
 	/**
-	 * The supervisor steal. Stays {@code IN_PROGRESS}, reassigns, resets the clock
-	 * (sheet §1). Guarded on the previous holder too, so the audit row's
+	 * The supervisor steal. It stays {@code IN_PROGRESS}, reassigns the item and
+	 * resets the clock. Guarded on the previous holder too, so the audit row's
 	 * {@code previous_assignee} is the person it actually happened to — if they
 	 * completed or parked between the read and this update, rows-affected is 0 and
 	 * the caller is told, not fooled.
@@ -173,9 +174,9 @@ public class WorkItemRepository {
 
 	/**
 	 * Park is re-queue: {@code IN_PROGRESS} → {@code QUEUED}, assignee and clock
-	 * cleared. The 1.x shape kept deliberately — there is no distinct PARKED
-	 * status (§C2's lifecycle diagram says the same); the design choice is stated
-	 * in the phase report rather than inherited silently.
+	 * cleared. The 1.x shape is kept deliberately: there is no distinct PARKED
+	 * status, so parked work returns to the visible queue rather than acquiring a
+	 * second waiting state.
 	 */
 	public boolean park(String externalId, String actor) {
 		return seam.update(ScopedUpdate.table("work_item")
@@ -197,8 +198,8 @@ public class WorkItemRepository {
 
 	/**
 	 * The item's half of complete-and-advance. {@code completion_duration_sec} is
-	 * computed by the caller from the row's own {@code started_at} — never taken
-	 * from the request (sheet §1) — and the guard on the assignee is what makes
+	 * computed by the caller from the row's own {@code started_at}, never taken
+	 * from the request, and the guard on the assignee is what makes
 	 * that read safe: a takeover between the read and this update changes the
 	 * assignee, so this returns 0 and the completion is refused whole.
 	 */
@@ -224,7 +225,7 @@ public class WorkItemRepository {
 	}
 
 	/**
-	 * WP3's breach record. {@code sla_breached_at IS NULL} in the predicate is what
+	 * Records an SLA breach. {@code sla_breached_at IS NULL} in the predicate is what
 	 * makes "fires once across a restart" a database fact rather than a hope: a
 	 * timer job retried after a crash records nothing the second time.
 	 *

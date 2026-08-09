@@ -9,17 +9,17 @@ import com.lynxis.orca.platform.scope.ScopedSelect;
 import lombok.RequiredArgsConstructor;
 
 /**
- * The routing world, through core's published views (§B4 mechanism 2 — the same
- * way admission reads {@code topology_lane}): screens, rules, memberships and
- * the operator directory. Runtime can reach nothing core has not deliberately
- * published, and every read leads with a scope predicate.
+ * Reads screens, rules, memberships and the operator directory through core's
+ * published views, the same way admission reads {@code topology_lane}. Runtime
+ * can reach nothing core has not deliberately published, and every read leads
+ * with a scope predicate.
  */
 @RequiredArgsConstructor
 public class RoutingReadRepository {
 
 	private static final String SCOPE = "site_external_id";
 
-	/** Installation-realm reads (the operator directory) — phase-2 §5.1's second dimension. */
+	/** The {@code config_realm} dimension used for installation-wide operator-directory reads. */
 	private static final String REALM = "config_realm";
 
 	private final ScopeSeam seam;
@@ -98,8 +98,8 @@ public class RoutingReadRepository {
 
 	/**
 	 * A setting's current value from core's published registry view — the value
-	 * where one is set, else the seeded default, else empty. WP3's SLA fallback
-	 * reads {@code MAX_PROCESSING_TIME_SEC} through this.
+	 * where one is set, else the seeded default, else empty. The SLA fallback reads
+	 * {@code MAX_PROCESSING_TIME_SEC} through this method.
 	 */
 	public Optional<String> settingValue(String settingKey) {
 		return seam.select(ScopedSelect.from("core.topology_setting")
@@ -111,8 +111,8 @@ public class RoutingReadRepository {
 	}
 
 	/**
-	 * Resolves an identity-provider subject to the platform operator — the read
-	 * that retires the "subject as actor" slice shape WP1 stated openly.
+	 * Resolves an identity-provider subject to the platform operator, replacing the
+	 * first slice's temporary "subject as actor" representation.
 	 */
 	public Optional<String> operatorBySubject(String subject) {
 		return seam.select(ScopedSelect.from("core.topology_operator")

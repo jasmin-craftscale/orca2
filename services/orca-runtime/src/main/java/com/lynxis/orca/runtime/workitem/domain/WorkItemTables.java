@@ -11,9 +11,9 @@ import com.lynxis.orca.platform.scope.table.RetentionClass;
  * can read them.
  *
  * <p>Both are {@link Growth#TRAFFIC_GROWING}: one item per exception per truck,
- * and several audit rows per item, forever, at every lane. The 1.x measurement
- * item on the open-questions register lists {@code work_items} among the tables
- * whose growth was never measured — 2.0 declares the class on day one instead.
+ * and several audit rows per item, forever, at every lane. Growth of the legacy
+ * 1.x {@code work_items} table was never measured; this implementation declares
+ * the retention class from its first migration instead.
  */
 public final class WorkItemTables {
 
@@ -23,12 +23,12 @@ public final class WorkItemTables {
 	/**
 	 * One unit of human work, parked on one engine task.
 	 *
-	 * <p>⚠️ The retention class name is <strong>PROVISIONAL</strong>, like every
-	 * class named so far — the check enforces that a class is <em>named</em>
-	 * (§B10), and naming one is not the same as closing the list (§C2 invariant 4).
+	 * <p>⚠️ The retention class name is <strong>PROVISIONAL</strong>.
+	 * {@code RetentionClassRule} fails the build unless a class is <em>named</em>;
+	 * it cannot validate membership in the unreconciled closed catalog.
 	 *
 	 * @param status  {@code QUEUED} · {@code IN_PROGRESS} · {@code COMPLETED} ·
-	 *                {@code FAILED} — exactly the four with a writer (sheet §2).
+	 *                {@code FAILED} — exactly the four with a writer.
 	 *                The dead 1.x escalation statuses are deliberately absent
 	 * @param taskId  the engine's handle for the wait state this item parks on.
 	 *                Completion presents it back to the engine, which is what makes
@@ -63,12 +63,12 @@ public final class WorkItemTables {
 		public static final String IN_PROGRESS = "IN_PROGRESS";
 		public static final String COMPLETED = "COMPLETED";
 
-		/** Lane reset is the writer — it fails the visit and its open items together (§C2). */
+		/** Lane reset is the writer; it fails the visit and its open items together. */
 		public static final String FAILED = "FAILED";
 	}
 
 	/**
-	 * One action on one item — the trail (sheet §3).
+	 * One auditable action on one work item.
 	 *
 	 * <p>Retention class {@code audit}, PROVISIONAL, deliberately the same name
 	 * core's {@code audit_event} and the settings history use: these are all

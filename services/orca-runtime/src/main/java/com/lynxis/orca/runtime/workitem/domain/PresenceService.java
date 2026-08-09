@@ -15,12 +15,12 @@ import com.lynxis.orca.runtime.workitem.persistence.PresenceRepository;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Operator presence (sheet §6): the open {@code user_activity} row is the
- * current status, transitions close-and-open in one transaction, and the Push
+ * Operator presence: the open {@code user_activity} row is the current status,
+ * transitions close-and-open in one transaction, and the Push
  * path asks one question — <em>who is assignable right now?</em>
  *
- * <p>Assignable means {@code IDLE} or {@code WORKING}, exactly as the sheet
- * names them; {@code DND}, {@code BREAK}, {@code OFFLINE} and {@code ACTIVE}
+ * <p>Assignable means exactly {@code IDLE} or {@code WORKING}; {@code DND},
+ * {@code BREAK}, {@code OFFLINE} and {@code ACTIVE}
  * are not. An operator with no open row at all is {@code OFFLINE} — the state a
  * fresh installation's operators are in before their first transition.
  */
@@ -74,7 +74,7 @@ public class PresenceService {
 		});
 	}
 
-	/** History, newest first — the durations read (§C2's /operators/activity). */
+	/** Presence history, newest first, for the {@code /operators/activity} duration view. */
 	public List<UserActivity> historyOf(String userExternalId, int limit) {
 		return repository.historyOf(userExternalId, limit);
 	}

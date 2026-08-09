@@ -17,8 +17,8 @@ import com.lynxis.orca.runtime.workitem.persistence.WorkItemRepository;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * The work-item lifecycle — §C2's state diagram, with the three inversions of
- * {@code docs/work-items-schema-from-1x.md} §0 built in rather than aspired to:
+ * The work-item lifecycle, with the legacy inversions described by
+ * {@code docs/work-items-schema-from-1x.md} built in rather than merely documented:
  *
  * <ol>
  *   <li><strong>Creation happens in the engine's transaction.</strong>
@@ -73,7 +73,7 @@ public class WorkItemService implements WorkItemIntake {
 	@Override
 	public void manualStepReached(ManualStep step) {
 		transactions.executeWithoutResult(status -> {
-			// The screen identity this node fronts, resolved at creation (WP2). An
+			// The screen identity this node fronts, resolved at creation. An
 			// unconfigured node still creates an item — a screen-less item is
 			// visible and claimable by anyone, which beats invisible human work.
 			String screenExternalId = routing
@@ -89,9 +89,9 @@ public class WorkItemService implements WorkItemIntake {
 			log.info("work item {} queued for visit {} at node '{}' (task {}, screen {})", externalId,
 					step.visitExternalId(), step.nodeReference(), step.taskId(), screenExternalId);
 
-			// WP4: the Push half of the routing evaluation, in the same
-			// transaction. Push = PRE-ASSIGN to an assignable eligible operator —
-			// the item stays QUEUED and the assignee still takes it (sheet §1);
+			// The Push half of routing runs in the same transaction. Push means
+			// PRE-ASSIGN to an assignable eligible operator: the item stays QUEUED
+			// and the assignee still explicitly takes it;
 			// Prompt teams broadcast, which is the notify hub's, later. No
 			// assignable operator anywhere = the item stays unassigned and
 			// visible, never parked on someone who cannot act.
@@ -155,7 +155,7 @@ public class WorkItemService implements WorkItemIntake {
 	/**
 	 * The guarded claim. The loser is told what the item is now, never silently
 	 * no-op'd — and an operator outside the eligible teams is refused <em>before</em>
-	 * the guard (WP2: the claim respects eligibility). The eligibility check is
+	 * the guard, so every claim respects configured routing. The eligibility check is
 	 * authorization, not the race guard: only the conditional UPDATE prevents a
 	 * double claim.
 	 */
@@ -225,7 +225,7 @@ public class WorkItemService implements WorkItemIntake {
 	 * engine is not waiting on is refused and nothing moves.
 	 *
 	 * <p>{@code completion_duration_sec} is computed here from the row's own
-	 * {@code started_at} — the request cannot supply it (sheet §1). The read is
+	 * {@code started_at}; the request cannot supply it. The read is
 	 * safe because the guarded update re-checks holder and status: a takeover in
 	 * between makes rows-affected 0 and the whole completion a conflict.
 	 */
@@ -241,7 +241,7 @@ public class WorkItemService implements WorkItemIntake {
 
 			// The engine, in the SAME transaction. Not after the commit: between
 			// the two there is a state where the console believes the item is done
-			// and the engine does not — the exact 1.x shape §0 inverts. If the
+			// and the engine does not — the exact legacy 1.x failure being reversed. If the
 			// engine is not waiting on this task, ProcessNotWaitingException
 			// unwinds this transaction and the item update above with it.
 			manualSteps.completeManualStep(before.taskId());
@@ -255,7 +255,7 @@ public class WorkItemService implements WorkItemIntake {
 		});
 	}
 
-	// --- WP3: the timer — thresholds out, breaches in ------------------------
+	// --- the timer: thresholds out, breaches in -----------------------------
 
 	/**
 	 * {@inheritDoc}
@@ -264,7 +264,8 @@ public class WorkItemService implements WorkItemIntake {
 	 * {@code MAX_PROCESSING_TIME_SEC} global setting is the fallback; neither
 	 * configured means no SLA. The {@code below_expected}/{@code expected}
 	 * thresholds are deliberately not timers — they are grid display data, as in
-	 * 1.x; only the breach is an engine fact (the narrow version, register #5).
+	 * 1.x. Only the breach is an engine fact; escalation is deliberately limited
+	 * to detection, recording and visibility.
 	 */
 	@Override
 	public java.util.Optional<Duration> slaBreachAfter(String processDefinitionKey,
@@ -334,7 +335,7 @@ public class WorkItemService implements WorkItemIntake {
 		});
 	}
 
-	// --- eligibility (WP2) ---------------------------------------------------
+	// --- eligibility ---------------------------------------------------------
 
 	/**
 	 * Who may claim: the pre-assigned operator; anyone, when the item has no
@@ -368,10 +369,10 @@ public class WorkItemService implements WorkItemIntake {
 	}
 
 	/**
-	 * The grid read, with the sheet's ordering (§5): rules with a set priority
-	 * before unset, lower number more urgent, oldest-queued as the tiebreak —
-	 * and, deliberately, ONE ordering for every consumer: the Push selection in
-	 * the presence work package reads the same sorted queue, closing 1.x's
+	 * The grid read: rules with a set priority come before unset ones, lower
+	 * numbers are more urgent, and oldest-queued is the tiebreak —
+	 * and, deliberately, ONE ordering for every consumer. Push selection reads the
+	 * same sorted queue, closing 1.x's
 	 * split-brain between the grid's SQL and the push path's map iteration.
 	 *
 	 * <p>Sorted here rather than in SQL: the priority lives on the routing rules
@@ -472,8 +473,8 @@ public class WorkItemService implements WorkItemIntake {
 	}
 
 	/**
-	 * The operator is outside the item's eligible teams (WP2). Distinguished from
-	 * a conflict: nothing raced — this claim was never theirs to make.
+	 * The operator is outside the item's eligible teams. Distinguished from a
+	 * conflict: nothing raced — this claim was never theirs to make.
 	 */
 	public static class WorkItemIneligibleException extends RuntimeException {
 

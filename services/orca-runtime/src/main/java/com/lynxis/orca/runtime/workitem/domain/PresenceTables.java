@@ -19,9 +19,8 @@ public final class PresenceTables {
 	 * per operator" as a database fact.
 	 *
 	 * <p>{@link Growth#TRAFFIC_GROWING}: one row per transition per operator per
-	 * shift, forever — the unbounded growth the sheet flags on 1.x's table,
-	 * bounded here by the retention class (PROVISIONAL, like every class until
-	 * the list closes).
+	 * shift, forever. The legacy 1.x table grew without a retention policy; this
+	 * one declares a retention class, still PROVISIONAL until the catalog closes.
 	 */
 	@PersistentTable(name = "user_activity", growth = Growth.TRAFFIC_GROWING)
 	@RetentionClass("presence") // PROVISIONAL
