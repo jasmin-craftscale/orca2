@@ -49,7 +49,7 @@ You will be asked to verify claims against this codebase. It is the evidence bas
 
 | Limitation | Consequence |
 |---|---|
-| Work in progress is held **in the memory of a running process** | A restart abandons every in-flight visit. A second server cannot see the work, so more than one server is impossible |
+| The **continuation** of a visit is held in a running process — a bare goroutine per step, with no lock, lease or claim anywhere | A restart abandons every in-flight visit: the step position survives in the database, but nothing scans for it and no timer survives at all. The message that triggered the work is acknowledged *before* it is executed, so it is never redelivered. A second server does not fix it — the two share a database and a consumer group, so it can resume the work, but with no lock it will just as happily start a **duplicate** execution ⚠️ *Corrected 9 Aug 2026 — the previous wording, "a second server cannot see the work", is not what the code does; see `docs/partner-event-api-from-1x.md` for the sweep that found it* |
 | Tenant scoping is **roughly 816 hand-written conditions** | Forgetting one is a cross-tenant leak. There is no single place to fix it |
 | Creating a work item and advancing the process are **two cross-service HTTP calls** | Either can half-apply; the console and the engine can disagree about what happened |
 | A **Kafka VM per site** carries only point-to-point messages | A server to provision, patch and monitor at every site, for delivery a database table can provide |
