@@ -34,15 +34,12 @@ This file is a map. It does not restate the architecture — follow the link.
 
 | Question | Document |
 |---|---|
+| **New here? Start with these three, in order** | `docs/LOCAL_DEVELOPMENT.md` (set up and run) → `docs/DEVELOPER_ONBOARDING.md` (how to work) → `docs/BUILD_ROADMAP.md` (**what exists, what is being built, what does NOT exist yet**) |
 | What is the target design, and what does it guarantee? | `docs/ORCA_ARCHITECTURE.md` — **read §B10 first; it is the acceptance criteria** |
 | What is deliberately unsettled? | `docs/ORCA_OPEN_QUESTIONS_REGISTER.md` |
 | What are the five primitives, and what pattern is each? | `docs/PLATFORM_PRIMITIVES.md` |
 | Where does anything live in this repository? | `docs/REPOSITORY_GUIDE.md` |
-| What did Phase 0 build, decide, and fail to settle? | `docs/phase-0-report.md` |
-| What did Phase 1 build, and what is still guessed? | `docs/phase-1-report.md` — **§3, §5 and §7** |
-| What did the hardening after it change? | `docs/phase-1-hardening-report.md` — **§5 is what it found and did not fix** |
-| What did Phase 2 build, decide, and leave as named gaps? | `docs/phase-2-report.md` — **§5.1 (the realm dimension), §6 (three PROPOSED security designs), §7** |
-| What did Phase 3 build, and what did the engine teach it? | `docs/phase-3-report.md` — **§3 (the three inversions and their proofs), §5.1 (a parked visit holds its lane), §7 (wait-state timers, for the builder-developer)** |
+| What was built in each phase, what was NOT, and every decision the plan did not dictate | `docs/phase-*-report.md`, newest first. Each one's "what was not built", "decisions the plan did not dictate" and "found wrong" sections are where the value is |
 | What does 1.x's work-item world actually contain? | `docs/work-items-schema-from-1x.md` — DERIVED-FROM-1X; **§0's three inversions are the acceptance criteria Phase 3 built** |
 | How do I run the slice end to end? | `docs/phase-1-demo.md` |
 | What does the camera actually put on the wire? | `docs/lpr-wire-format-from-1x.md` — DERIVED-FROM-1X, not a vendor spec |

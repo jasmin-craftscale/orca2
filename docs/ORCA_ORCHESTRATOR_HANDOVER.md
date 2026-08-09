@@ -33,7 +33,7 @@ Two properties shape every decision:
 | Path | What it is |
 |---|---|
 | `~/Documents/Projects/lynxis/Lynxis-Gate` | **The existing system**, in production today — 25 Go microservices, 4 React applications, SQL Server. Also holds the full document corpus for the rewrite. **Read-only for analysis. Never modify production code here** |
-| `~/Documents/Projects/orca` | **The new build.** Spring Boot 4.0.7 / Java 25, trunk branch `phase-0-foundations` (kept by PO ruling — there is no `main`). **Four phases built and verified**: foundations, the gate path, the configuration world, the clerk workflow. See §9 |
+| `~/Documents/Projects/orca` | **The new build.** Spring Boot 4.0.7 / Java 25, branch model `feature/*` → `develop` → `main` (product-owner ruling, 10 Aug 2026 — this **supersedes** the earlier ruling that kept `phase-0-foundations` as the trunk with no `main`). **Four phases built and verified**: foundations, the gate path, the configuration world, the clerk workflow. See §9 |
 
 ---
 
@@ -173,7 +173,7 @@ These are not preferences. Each was learned by getting it wrong.
 
 ## 9 · Where things stand right now (updated 9 August 2026 — through Phase 3)
 
-**Four phases are built and independently verified**, all on `phase-0-foundations` (kept as the trunk by product-owner ruling — do not create a `main`). Each was built by a focused agent session and then re-run and re-driven by the orchestrator — **the discipline is verify-by-executing, never trust the report**; continue it.
+**Four phases are built and independently verified**, all on `phase-0-foundations`, which is now the ancestor of `main` and `develop` (the no-`main` ruling was superseded on 10 Aug 2026). Each was built by a focused agent session and then re-run and re-driven by the orchestrator — **the discipline is verify-by-executing, never trust the report**; continue it.
 
 | Phase | Delivered | Report |
 |---|---|---|

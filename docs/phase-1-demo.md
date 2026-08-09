@@ -143,8 +143,14 @@ TOS stub, routes `200` to `APPROVED`, and commands the barrier through edge's
 A helper, so the queries below are one line each:
 
 ```bash
-q() { docker exec -i orca-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -No -d orca -h -1 -W -Q "$1"; }
+q() { docker exec -i orca-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -No -I -d orca -h -1 -W -Q "$1"; }
 ```
+
+⚠️ **The `-I` is required, not optional.** Several tables carry filtered indexes,
+and SQL Server refuses to write to those unless `QUOTED_IDENTIFIER` is on. Without
+it a write fails with an error naming SET options and no table at all — which is a
+genuinely confusing twenty minutes. Reads work either way, which is why the flag
+was missing here for so long.
 
 **The capture, buffered and acknowledged by runtime:**
 
