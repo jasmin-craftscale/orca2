@@ -67,8 +67,9 @@ public class UserAccountRepository {
 	/**
 	 * The active user a token's subject maps to — the read
 	 * {@code ux_user_account_keycloak_subject} exists for. Every {@code /me/**}
-	 * request and every audit attribution goes through here; before this method
-	 * both streamed the whole directory (review finding, Phase 2 addendum).
+	 * request and every audit attribution goes through here. Before this indexed
+	 * lookup was added, both paths streamed the whole directory; a review exposed
+	 * that unbounded read.
 	 */
 	public Optional<UserAccount> activeByKeycloakSubject(String keycloakSubject) {
 		return seam.select(ScopedSelect.from(TABLE)

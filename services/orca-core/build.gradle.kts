@@ -1,4 +1,4 @@
-// orca-core — the world as configured (§C1).
+// orca-core — owns and serves the installation's configured world.
 //
 // Owns schema `core`, its own migrations, its own contract and its own database
 // login. Publisher of the read-only views the other services consume, which is
@@ -11,7 +11,7 @@ plugins {
 }
 
 
-// --- Contract-first (ADR-014) -----------------------------------------------
+// --- Contract-first ---------------------------------------------------------
 //
 // The OpenAPI document is the source of truth; this generates the API interface
 // and its DTOs from it. The controller is hand-written and implements the
@@ -90,8 +90,8 @@ dependencies {
 	// --- The primitives this service uses, and why ---------------------
 	implementation(project(":platform:web")) // the envelope, the error codes and the system context
 	implementation(project(":platform:scope")) // the query seam; every service serves scoped reads
-	implementation(project(":platform:outbox")) // this service publishes facts (§C: it has an outbox pair)
-	implementation(project(":platform:lease")) // one `service_lease` per service schema (§C2)
+	implementation(project(":platform:outbox")) // this service publishes facts through its own outbox
+	implementation(project(":platform:lease")) // one `service_lease` table per service schema
 
 	// --- Spring Boot ----------------------------------------------------
 	implementation(libs.spring.boot.starter.webmvc)
@@ -107,9 +107,9 @@ dependencies {
 	// springdoc was here and was REMOVED by review. Its UI cannot run with
 	// api-docs disabled (SwaggerConfig is @ConditionalOnBean(SpringDocConfiguration),
 	// which springdoc.api-docs.enabled=false switches off), and enabling api-docs
-	// would introspect the code — a second source of truth beside the contract,
-	// which §4b forbids. The brief's own fallback applies: serve the file
-	// statically and drop springdoc. The bundled, fully resolved contract is
+	// would introspect the code — a second source of truth beside the authored
+	// contract. The safe fallback is to serve that file statically and drop
+	// springdoc. The bundled, fully resolved contract is
 	// served at /openapi/orca-core.yaml by Spring's static-resource handling.
 
 	// --- Tests ----------------------------------------------------------

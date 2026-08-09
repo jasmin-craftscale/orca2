@@ -12,8 +12,8 @@ import java.time.ZoneOffset;
  *
  * <p>The same helper edge carries, for the same reason — {@code rs.getTimestamp}
  * reads a database-written UTC value as JVM-zone wall-clock and is wrong by the
- * machine's offset the moment the appliance is not at UTC. Found by H3's own
- * property test; see {@code orca-edge}'s copy for the full account. Core's
+ * machine's offset the moment the appliance is not at UTC. Edge's buffer-age
+ * property test exposed this; see {@code orca-edge}'s copy for the full account. Core's
  * {@code created_at}/{@code retired_at} columns are all {@code SYSUTCDATETIME()}
  * defaults, so every read here goes through this.
  */

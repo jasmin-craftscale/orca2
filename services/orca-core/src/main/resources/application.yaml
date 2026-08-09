@@ -1,4 +1,4 @@
-# orca-core — the world as configured (§C1)
+# orca-core — owns and serves the installation's configured world
 #
 # Six bootable applications run on one developer machine, so each takes its own
 # port and its own database login. Neither problem is visible until someone tries
@@ -13,8 +13,8 @@ spring:
     name: orca-core
 
   # --- Datasource -----------------------------------------------------------
-  # The username is THIS SERVICE'S OWN LOGIN. That is ADR-004: schema ownership
-  # is enforced by credentials, not by convention. A service pointed at a shared
+  # The username is THIS SERVICE'S OWN LOGIN: schema ownership is enforced by
+  # credentials, not convention. A service pointed at a shared
   # administrative login has no enforcement at all, and no build check can see it.
   datasource:
     url: ${ORCA_DB_URL:jdbc:sqlserver://localhost:1433;databaseName=orca;encrypt=true;trustServerCertificate=true}
@@ -54,13 +54,13 @@ spring:
       # centralise schema definition away from the services that own it.
       - classpath:db/platform/outbox
       - classpath:db/platform/lease
-    # An expand-only discipline across an upgrade pair (§B7) means a migration is
-    # never edited after it ships. Checksum drift is a mistake, not a workflow.
+    # Migrations are expand-only across an upgrade pair and are never edited after
+    # they ship. Checksum drift is a mistake, not a workflow.
     validate-on-migrate: true
 
   # --- Identity -------------------------------------------------------------
   # Tokens are validated BY SIGNATURE, LOCALLY, against the realm's published
-  # keys. Nothing calls out to Keycloak per request (§B6) — which is also what
+  # keys. Nothing calls out to Keycloak per request, which is also what
   # lets a site keep working when the wide-area link drops.
   security:
     oauth2:
@@ -70,7 +70,7 @@ spring:
 
 # --- Actuator ---------------------------------------------------------------
 # Health, and nothing this service does not need. `/actuator/health` is the
-# orchestrator's probe (§C1).
+# process orchestrator's probe.
 management:
   endpoints:
     web:
@@ -84,16 +84,16 @@ management:
 
 orca:
   service: orca-core
-  # --- Scope (Phase 2) --------------------------------------------------------
+  # --- Scope ----------------------------------------------------------------
   # The installation's own site, from configuration and never from a request —
-  # the same pattern edge and runtime already follow (phase-1 decision 7). Core's
+  # the same pattern edge and runtime follow. Core's
   # request boundary permits this site plus the INSTALLATION realm; see
   # CoreScopes. A multi-site installation is hosted-tier shape, deferred with
-  # cloud scope (register NEW-1b).
+  # the deferred hosted/cloud scope.
   installation:
     site-external-id: ${ORCA_SITE_EXTERNAL_ID:SITE-DEMO}
 
-  # --- Service-to-service authentication (ADR-011) ----------------------------
+  # --- Service-to-service authentication ------------------------------------
   # Keycloak authenticates PEOPLE. A service calling another service presents this
   # per-installation shared credential on /internal/** instead of minting a token,
   # so no identity provider sits on the gate path. The committed value is the
@@ -102,8 +102,8 @@ orca:
   internal:
     shared-credential: ${ORCA_INTERNAL_CREDENTIAL:local-dev-internal-credential-not-for-deployment}
 
-  # ⚠️ LOCAL DEVELOPMENT VALUES. §C2 states no lease duration and no renewal
-  # interval, and requires instead that a service REFUSE TO START when either is
+  # ⚠️ LOCAL DEVELOPMENT VALUES. No universal lease duration or renewal
+  # interval has been chosen; a service must REFUSE TO START when either is
   # unset or when the duration is not longer than the renewal interval — see
   # LeaseConfigurationValidator, which is that specification. These two numbers are
   # therefore a local profile's answer and NOT a recommendation for a site: a
@@ -112,8 +112,8 @@ orca:
     duration: 30s
     renewal-interval: 10s
 
-  # No consumers are registered yet, because no service consumes another's facts in
-  # Phase 0. This is deliberately not defaulted: the registry decides whose
+  # No consumers are registered because no service currently consumes core's facts.
+  # This is deliberately not defaulted: the registry decides whose
   # acknowledgement retention waits for, and a guess in the permissive direction
   # deletes data a peer never received.
   outbox:

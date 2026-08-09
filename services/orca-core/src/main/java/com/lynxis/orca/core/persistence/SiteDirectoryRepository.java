@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
  * that <em>defines</em> sites, the site dimension and the row's identity are the
  * same thing, so {@code scopedBy("external_id", "site_external_id")} is the
  * honest declaration — a caller sees exactly the sites its scope permits, and
- * listing "all sites" is not expressible, which is correct (§B6).
+ * listing "all sites" is not expressible. The seam offers no unscoped read.
  */
 @RequiredArgsConstructor
 public class SiteDirectoryRepository {
