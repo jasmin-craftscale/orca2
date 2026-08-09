@@ -2,7 +2,7 @@
 
 **A plan for one focused session. Self-contained: you need nothing but this file and the repository.**
 
-The SQL half of this work is finished, validated and merged. This is the rest. Read §1 to know what you are joining, §3 for the standard you are judged against, and §5 before you touch a single Java file — it names four traps that the SQL half did not have and that will silently produce a broken sweep if you meet them unprepared.
+The SQL half of this work is finished, validated and merged. This is the rest. Read §1 to know what you are joining, §3 for the standard you are judged against, and §5 before you touch a single Java file — it names five traps that the SQL half did not have and that will silently produce a broken sweep if you meet them unprepared.
 
 ---
 
@@ -26,11 +26,11 @@ Two calibration files were rewritten before that work started and are still your
 Every comment in the remaining non-SQL files explains itself. Specifically:
 
 1. **Work package B** — `platform/` and `build-checks/` (91 files). The densest reasoning in the repository.
-2. **Work package C** — `services/` Java (354 files), the Gradle build files, the per-service configuration, and the process definitions.
+2. **Work package C** — `services/` Java (199 files), the Gradle build files, the per-service configuration, and the process definitions.
 3. **Work package D** — the build-check *failure messages*, which are strings rather than comments and need their own commit and their own justification. §7.
 4. A report: `docs/comment-clarity-java-report.md`.
 
-**This is a lot of files.** Package B is the valuable half and package C is mostly light. If you run out of capacity, **finish B completely, land it, and report C as not started** — a half-swept `services/` tree is worse than an unswept one, because nobody can tell which files were considered.
+**This is a lot of files — 313 in total.** Package B is the valuable half and package C is mostly light. If you run out of capacity, **finish B completely, land it, and report C as not started** — a half-swept `services/` tree is worse than an unswept one, because nobody can tell which files were considered.
 
 ## 3 · The standard
 
@@ -63,15 +63,15 @@ Every comment in the remaining non-SQL files explains itself. Specifically:
 
 **Do not invent.** If you cannot determine what a comment meant, read `docs/ORCA_ARCHITECTURE.md` for the section it cites. If it is still unclear, leave the comment, list it in the report, and move on. A gap reported is worth more than a gap filled with something plausible.
 
-## 5 · ⚠️ Four traps Java has that SQL did not
+## 5 · ⚠️ Five traps Java has that SQL did not
 
 ### 5.1 · The checker had a blind spot for Java, and it has just been fixed
 
-`deploy/tools/assert-comments-only.py` strips comments from both versions of a file and asserts the remainder is identical. Until now it stripped `//` with a regex — which truncates `String u = "http://a";` at `http:`, making a real change to that string **invisible**. There are 93 such lines in this repository.
+`deploy/tools/assert-comments-only.py` strips comments from both versions of a file and asserts the remainder is identical. Until now it stripped `//` with a regex — which truncates `String u = "http://a";` at `http:`, making a real change to that string **invisible**. There are 39 such lines in this repository.
 
 **It is now string-aware**: it walks the text tracking string literals, character literals and Java text blocks, and only treats `//` and `/*` as comments outside them. Regression-tested against five cases including text blocks containing SQL.
 
-**You must still prove it before you trust it (§7.0).** Do not skip that.
+**You must still prove it before you trust it (§7.1).** Do not skip that.
 
 ### 5.2 · Nothing compiles Javadoc, so nothing will tell you when you break it
 
@@ -79,11 +79,26 @@ There is **no javadoc task and no doclint** anywhere in the build. A malformed `
 
 So: when you edit a Javadoc block, keep its tags valid by inspection. `{@link X}` must name a type that exists and is imported or fully qualified. `{@code ...}` needs no import. If in doubt, prefer plain prose in backticks over a `{@link}` you have not verified.
 
-### 5.3 · Text blocks hold SQL, and that SQL is code
+### 5.3 · ⚠️ `build/` holds generated copies of everything — never count or edit them
+
+`services/*/build/generated/openapi/` holds **155 generated Java files**, and
+`build/resources/` holds copies of every migration, `application.yaml` and BPMN
+file. They are regenerated on every build.
+
+**Never edit them** — your change is erased on the next build and the checker will
+report a file you did not touch. **Never count them either**: an earlier draft of
+this plan said `services/` had 325 Java files when the true figure is 170, because
+the count included generated output. The same mistake was made twice more before
+it was caught.
+
+Every `find` you run must carry `-not -path '*/build/*'`. If a file count looks
+surprisingly large, that is the first thing to check.
+
+### 5.4 · Text blocks hold SQL, and that SQL is code
 
 Repository classes hold their statements in Java text blocks (`"""`). The SQL inside them is **code, not comment** — a `--` line inside a text block is part of a statement being sent to the database. Never edit inside a text block. The checker now understands this; you must too.
 
-### 5.4 · Some comments describe an enforced rule, and the enforcement is the point
+### 5.5 · Some comments describe an enforced rule, and the enforcement is the point
 
 The failure from the SQL half, restated because it is the one that matters: when a comment says a rule is *checked*, the rewrite must still say it is *checked*, and should name the check. Before: *"Leads with the scope column — ScopeIndexRule insists."* A rewrite explaining only *why* the rule is sensible has lost the fact that the build stops you.
 
@@ -105,7 +120,7 @@ For `build-checks` specifically: each rule class explains a failure that actuall
 
 ### WP-C · `services/` Java, build files, configuration, process definitions
 
-**386 files**: 325 under `services/*/src/main/java`, 29 integration-test classes, 14 `*.gradle.kts`, 12 `application.yaml`, 6 `*.bpmn20.xml`.
+**222 files**: 170 under `services/*/src/main/java`, 29 integration-test classes, 14 `*.gradle.kts`, 6 `application.yaml`, 3 `*.bpmn20.xml`.
 
 Highest volume, lowest density — many need a single phrase replaced. Spend the care where it is worth spending:
 
@@ -139,7 +154,20 @@ But they are **strings, not comments**, so changing them fails the comments-only
 
 ## 7 · Verification — run these, do not reason about them
 
-### 7.0 · Prove the checker before you believe its PASS
+### 7.0 · Record your starting commit, first
+
+Everything below compares against the tree as you found it. **Before your first
+edit**, capture it:
+
+```bash
+BASE=$(git rev-parse HEAD) && echo "$BASE"
+```
+
+Write that hash into your report. Every `--base` below means that hash. Do not use
+a moving reference like `HEAD~1` — you will make several commits, and the base must
+stay fixed at where you began.
+
+### 7.1 · Prove the checker before you believe its PASS
 
 Change one Java token in a file you have edited — a field name, a constant, a number. Run the checker. Confirm it reports `CHANGED`, names the file, quotes the differing line, and **exits non-zero**. Revert.
 
@@ -147,12 +175,12 @@ Then do the same with a change *after* a `//` inside a string literal, on one of
 
 A checker nobody has watched fail may not be wired in. This repository has shipped that defect before.
 
-### 7.1 – 7.6
+### 7.2 · The verification table
 
 | # | Check | Expected |
 |---|---|---|
-| 1 | `python3 deploy/tools/assert-comments-only.py --base <commit before your first>` | `PASS`, with the file count you expect. Run after every few files, not once at the end |
-| 2 | Banned-token scan over comment lines only (§7.7 gives the command) | No output |
+| 1 | `python3 deploy/tools/assert-comments-only.py --base $BASE` | `PASS`, with the file count you expect. Run after every few files, not once at the end |
+| 2 | Banned-token scan over comment lines only (§7.3 gives the command) | No output |
 | 3 | `./gradlew check` | `BUILD SUCCESSFUL`, 60 unit tests, all ten build checks green |
 | 4 | `./gradlew check integrationTest --rerun-tasks` | `BUILD SUCCESSFUL`, **222 integration tests, 60 unit, 0 failures, 0 errors, 0 skipped** |
 | 5 | All six services start | Each answers `/actuator/health` with `UP`. **Core first** — runtime and edge refuse to start until core's views exist |
@@ -178,10 +206,10 @@ Then, from the repository root, each in its own terminal, **core first**:
 
 If ports 8081–8086 are taken, `docs/phase-1-demo.md` §3 has the offset incantation. If `sendPlate` gets no acknowledgement, edge has not yet won the lane lease — it polls every five seconds; wait and retry before assuming a defect.
 
-### 7.7 · The banned-token scan
+### 7.3 · The banned-token scan
 
 ```bash
-git diff --name-only <base>..HEAD | grep -E '\.(java|kts|yaml|xml)$' | while read -r f; do
+git diff --name-only $BASE..HEAD | grep -E '\.(java|kts|yaml|xml)$' | while read -r f; do
   grep -nE '^\s*(\*|//|<!--)|^\s*#' "$f" \
     | grep -inE '§|ADR-[0-9]|WP[0-9]|phase [0-9]|register (NEW|item|#)|DERIVED-FROM-1X' \
     && echo "  ^^^ $f"
@@ -202,7 +230,7 @@ Expect no output. If a hit is inside a **string literal** rather than a comment,
 `docs/comment-clarity-java-report.md`:
 
 1. **What was rewritten** — counts per package and file type, and comment-line totals before and after. Script these; they are checkable and they will be checked.
-2. **The proof nothing changed** — the checker's output, how you ran it, and the two deliberate failures you watched in §7.0.
+2. **The proof nothing changed** — the checker's output, how you ran it, and the two deliberate failures you watched in §7.1.
 3. **Every verification item from §7 with its real result**, including anything that failed first and what you did.
 4. **Decisions this plan did not dictate**, with reasoning.
 5. **Comments you could not translate** — by file and line.
