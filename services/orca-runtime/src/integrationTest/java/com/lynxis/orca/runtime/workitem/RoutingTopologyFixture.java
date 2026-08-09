@@ -19,6 +19,7 @@ public final class RoutingTopologyFixture {
 	}
 
 	public static void publish(Consumer<String> admin, String grantee) {
+		admin.accept("IF SCHEMA_ID(N'core') IS NULL EXEC('CREATE SCHEMA [core]')");
 		for (String table : new String[] { "topology_screen", "topology_team_routing",
 				"topology_team_member", "topology_operator", "topology_setting" }) {
 			admin.accept("IF OBJECT_ID(N'core." + table + "', 'U') IS NOT NULL DROP TABLE core." + table);

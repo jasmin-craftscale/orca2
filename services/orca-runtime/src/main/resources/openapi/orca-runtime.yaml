@@ -51,6 +51,11 @@ tags:
     description: |
       Lane operations. Reset aborts the running visit, fails its open work
       items and terminates its process instance — one transaction (§C2).
+  - name: presence
+    description: |
+      Operator presence (§C2). The open activity row is the current status —
+      there is no status column on any user. IDLE and WORKING are assignable;
+      the Push routing path selects from them.
 
 paths:
   /api/v1/health:
@@ -392,6 +397,99 @@ paths:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 
+  /api/v1/me/presence:
+    get:
+      tags: [presence]
+      operationId: getMyPresence
+      summary: The calling operator's current status
+      responses:
+        "200":
+          description: The current status — OFFLINE when no transition was ever recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresenceEnvelope"
+        "401":
+          description: No credential, or no resolvable operator behind it
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    put:
+      tags: [presence]
+      operationId: setMyPresence
+      summary: Move to a new status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPresenceRequest"
+      responses:
+        "200":
+          description: The new open activity row
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresenceEnvelope"
+        "401":
+          description: No credential, or no resolvable operator behind it
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/operators/idle:
+    get:
+      tags: [presence]
+      operationId: listAssignableOperators
+      summary: Operators assignable right now — IDLE or WORKING, longest in state first
+      responses:
+        "200":
+          description: The assignable operators
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresenceListEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/operators/activity:
+    get:
+      tags: [presence]
+      operationId: listOperatorActivity
+      summary: Presence history for one operator, newest first
+      parameters:
+        - name: userExternalId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 50
+            maximum: 500
+      responses:
+        "200":
+          description: The transitions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresenceListEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
   /api/v1/lanes/{laneExternalId}/reset:
     post:
       tags: [lanes]
@@ -517,6 +615,50 @@ components:
         correctedEventData:
           type: string
           description: The operator's corrected data, stored verbatim on the item.
+
+    PresenceStatus:
+      type: string
+      enum: [IDLE, WORKING, DND, BREAK, OFFLINE, ACTIVE]
+
+    PresenceActivity:
+      type: object
+      properties:
+        userExternalId:
+          type: string
+        status:
+          $ref: "#/components/schemas/PresenceStatus"
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+          description: Absent on the open row — the current status.
+
+    SetPresenceRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/PresenceStatus"
+
+    PresenceEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/PresenceActivity"
+
+    PresenceListEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/PresenceActivity"
 
     LaneResetResult:
       type: object

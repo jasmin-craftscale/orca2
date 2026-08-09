@@ -323,7 +323,8 @@ class FlowableAdoptionIT {
 		// being constructible. Recorded in the phase-3 report.
 		jdbc.update("""
 				IF OBJECT_ID(N'work_item_audit', 'U') IS NOT NULL DROP TABLE work_item_audit;
-				IF OBJECT_ID(N'work_item', 'U') IS NOT NULL DROP TABLE work_item;""");
+				IF OBJECT_ID(N'work_item', 'U') IS NOT NULL DROP TABLE work_item;
+				IF OBJECT_ID(N'user_activity', 'U') IS NOT NULL DROP TABLE user_activity;""");
 		jdbc.update("DELETE FROM flyway_schema_history WHERE TRY_CAST(version AS INT) >= 110");
 	}
 

@@ -46,10 +46,35 @@ public class WorkItemConfiguration {
 	 * thing — the same reasoning admission's wiring records.
 	 */
 	@Bean
+	public com.lynxis.orca.runtime.workitem.persistence.PresenceRepository presenceRepository(
+			ScopeSeam seam) {
+		return new com.lynxis.orca.runtime.workitem.persistence.PresenceRepository(seam);
+	}
+
+	@Bean
+	public com.lynxis.orca.runtime.workitem.domain.PresenceService presenceService(
+			com.lynxis.orca.runtime.workitem.persistence.PresenceRepository repository,
+			PlatformTransactionManager transactionManager,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.runtime.workitem.domain.PresenceService(repository,
+				new TransactionTemplate(transactionManager), siteExternalId);
+	}
+
+	@Bean
+	public com.lynxis.orca.runtime.workitem.api.PresenceController presenceController(
+			com.lynxis.orca.runtime.workitem.domain.PresenceService presence,
+			OperatorIdentity operatorIdentity,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.runtime.workitem.api.PresenceController(presence, operatorIdentity,
+				siteExternalId);
+	}
+
+	@Bean
 	public WorkItemService workItemService(WorkItemRepository repository, RoutingReadRepository routing,
+			com.lynxis.orca.runtime.workitem.domain.PresenceService presence,
 			ManualStepPort manualSteps, PlatformTransactionManager transactionManager,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
-		return new WorkItemService(repository, routing, manualSteps,
+		return new WorkItemService(repository, routing, presence, manualSteps,
 				new TransactionTemplate(transactionManager), siteExternalId);
 	}
 

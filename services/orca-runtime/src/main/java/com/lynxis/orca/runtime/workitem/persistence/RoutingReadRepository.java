@@ -70,6 +70,15 @@ public class RoutingReadRepository {
 				RoutingReadRepository::teamRule);
 	}
 
+	/** The active members of one team — the Push selection's candidate pool. */
+	public List<String> membersOf(String teamExternalId) {
+		return seam.select(ScopedSelect.from("core.topology_team_member")
+						.columns("user_external_id")
+						.scopedBy(SCOPE)
+						.where("team_external_id = ?", teamExternalId),
+				(rs, row) -> rs.getString("user_external_id"));
+	}
+
 	/** Whether the operator belongs to any of these teams. */
 	public boolean isMemberOfAny(String userExternalId, List<String> teamExternalIds) {
 		if (teamExternalIds.isEmpty()) {

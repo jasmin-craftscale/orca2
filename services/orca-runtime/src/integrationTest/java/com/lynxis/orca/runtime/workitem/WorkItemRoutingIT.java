@@ -71,11 +71,15 @@ class WorkItemRoutingIT {
 		}
 
 		ScopeSeam seam = new JdbcScopeSeam(jdbc);
+		TransactionTemplate transactions = new TransactionTemplate(new JdbcTransactionManager(dataSource));
 		workItems = new WorkItemService(new WorkItemRepository(seam), new RoutingReadRepository(seam),
+				new com.lynxis.orca.runtime.workitem.domain.PresenceService(
+						new com.lynxis.orca.runtime.workitem.persistence.PresenceRepository(seam),
+						transactions, SITE),
 				taskId -> {
 					// No engine in this suite; completion is WorkItemLifecycleIT's.
 				},
-				new TransactionTemplate(new JdbcTransactionManager(dataSource)), SITE);
+				transactions, SITE);
 
 		jdbc.update("INSERT INTO execution (external_id, site_external_id, lane_id, status) "
 				+ "VALUES (?, ?, 999, 'MANUAL')", "vis-routing-" + UUID.randomUUID(), SITE);

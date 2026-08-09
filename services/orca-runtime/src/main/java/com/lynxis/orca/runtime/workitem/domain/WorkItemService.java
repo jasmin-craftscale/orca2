@@ -45,14 +45,17 @@ public class WorkItemService implements WorkItemIntake {
 
 	private final WorkItemRepository repository;
 	private final RoutingReadRepository routing;
+	private final PresenceService presence;
 	private final ManualStepPort manualSteps;
 	private final TransactionTemplate transactions;
 	private final String siteExternalId;
 
 	public WorkItemService(WorkItemRepository repository, RoutingReadRepository routing,
-			ManualStepPort manualSteps, TransactionTemplate transactions, String siteExternalId) {
+			PresenceService presence, ManualStepPort manualSteps, TransactionTemplate transactions,
+			String siteExternalId) {
 		this.repository = repository;
 		this.routing = routing;
+		this.presence = presence;
 		this.manualSteps = manualSteps;
 		this.transactions = transactions;
 		this.siteExternalId = siteExternalId;
@@ -79,12 +82,56 @@ public class WorkItemService implements WorkItemIntake {
 					.orElse(null);
 
 			String externalId = "wi-" + UUID.randomUUID();
-			repository.insert(externalId, siteExternalId, step.executionId(), step.laneId(),
-					step.visitExternalId(), step.laneExternalId(), step.processInstanceId(), step.taskId(),
-					step.processDefinitionKey(), step.nodeReference(), screenExternalId, step.eventData());
+			long workItemId = repository.insert(externalId, siteExternalId, step.executionId(),
+					step.laneId(), step.visitExternalId(), step.laneExternalId(),
+					step.processInstanceId(), step.taskId(), step.processDefinitionKey(),
+					step.nodeReference(), screenExternalId, step.eventData());
 			log.info("work item {} queued for visit {} at node '{}' (task {}, screen {})", externalId,
 					step.visitExternalId(), step.nodeReference(), step.taskId(), screenExternalId);
+
+			// WP4: the Push half of the routing evaluation, in the same
+			// transaction. Push = PRE-ASSIGN to an assignable eligible operator —
+			// the item stays QUEUED and the assignee still takes it (sheet §1);
+			// Prompt teams broadcast, which is the notify hub's, later. No
+			// assignable operator anywhere = the item stays unassigned and
+			// visible, never parked on someone who cannot act.
+			if (screenExternalId != null) {
+				pushAssign(workItemId, externalId, screenExternalId, step.laneExternalId());
+			}
 		});
+	}
+
+	/**
+	 * PUSH rules in deterministic order — priority set before unset, lower first,
+	 * team external id as the total-order tiebreak; the first team with an
+	 * assignable member wins. The same ordering family as the grid's, which is
+	 * the point: 1.x's push path iterated a Go map and disagreed with its own
+	 * grid ordering per run.
+	 */
+	private void pushAssign(long workItemId, String externalId, String screenExternalId,
+			String laneExternalId) {
+		List<RoutingReadRepository.RouteRule> pushRules =
+				routing.rulesFor(screenExternalId, laneExternalId).stream()
+						.filter(rule -> "PUSH".equals(rule.handlingMethod()))
+						.sorted(java.util.Comparator
+								.comparing((RoutingReadRepository.RouteRule rule) ->
+										rule.priority() == null ? 1 : 0)
+								.thenComparing(rule -> rule.priority() == null
+										? Integer.MAX_VALUE : rule.priority())
+								.thenComparing(RoutingReadRepository.RouteRule::teamExternalId))
+						.toList();
+		for (RoutingReadRepository.RouteRule rule : pushRules) {
+			java.util.Optional<String> operator = presence.selectAssignable(
+					new java.util.HashSet<>(routing.membersOf(rule.teamExternalId())));
+			if (operator.isPresent()) {
+				repository.assign(externalId, operator.get());
+				repository.audit(workItemId, siteExternalId, WorkItemAudit.ASSIGN, "system:router",
+						null, null, 0);
+				log.info("work item {} pushed to {} of team {}", externalId, operator.get(),
+						rule.teamExternalId());
+				return;
+			}
+		}
 	}
 
 	@Override
