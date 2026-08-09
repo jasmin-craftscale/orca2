@@ -8,17 +8,17 @@ import lombok.Setter;
 /**
  * The credential a service presents when it calls another service.
  *
- * <p>Keycloak authenticates <em>people</em> (§B6, ADR-011). A caller acting for an
- * operator, a driver or a customer's own system presents an OIDC token; a service
- * calling another service presents this instead, and no identity provider is on
- * the request path.
+ * <p>Keycloak authenticates <em>people</em>. A caller acting for an operator, a
+ * driver or a customer's own system presents an OIDC token; a service calling
+ * another service presents this credential instead, and no identity provider is
+ * on the request path.
  *
  * <p><strong>The reason is availability, not simplicity.</strong> Token validation
  * is local signature verification and survives an outage. Token <em>issuing</em>
  * always requires Keycloak to be reachable, and no caching strategy fixes it — so
  * a design in which runtime must mint a token to tell edge to raise a barrier puts
- * the identity provider on the gate path. §A1 says the gate must keep working when
- * other things do not.
+ * the identity provider on the gate path. The gate must keep working while that
+ * provider or another remote dependency is unavailable.
  */
 @Getter
 @Setter
@@ -51,8 +51,8 @@ public class InternalCallProperties {
 	/**
 	 * Path pattern for the service-to-service surface.
 	 *
-	 * <p>{@code /internal/**} is not invented here — §C1 to §C6 already route every
-	 * service-to-service endpoint under it: {@code /internal/commands/v1},
+	 * <p>{@code /internal/**} is the established home of every service-to-service
+	 * endpoint: {@code /internal/commands/v1},
 	 * {@code /internal/feed/v1}, {@code /internal/apply/v1},
 	 * {@code /internal/events/v1}, {@code /internal/tickets/validate}.
 	 */

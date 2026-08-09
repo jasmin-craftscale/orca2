@@ -5,7 +5,7 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
- * The one response shape, for every service, on every route (§B8, §D3).
+ * The one response shape, for every service, on every route.
  *
  * <p>Defined here and <em>implemented</em> here. The OpenAPI schema for it lives
  * beside this class in {@code src/main/resources/openapi/_shared.yaml}, and every

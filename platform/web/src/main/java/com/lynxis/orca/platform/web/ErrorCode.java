@@ -2,7 +2,7 @@ package com.lynxis.orca.platform.web;
 
 /**
  * A machine-readable error code a caller can branch on <em>without reading the
- * message</em> (§B8, §D3).
+ * message</em>.
  *
  * <p>That is the whole point, and it is why this is not a string typed at each
  * throw site: a partner's integration branches on the code, so improving the
@@ -16,9 +16,9 @@ package com.lynxis.orca.platform.web;
  * which is exactly what {@code platform/} must not do.
  *
  * <p><strong>What is deliberately not here:</strong> the partner event API's
- * validation taxonomy. Open register item U2 records that it is free to design
- * and should be taken narrowly, and it belongs to the service that serves that
- * API rather than to this envelope.
+ * validation taxonomy. That taxonomy remains open for a narrow design by the
+ * service that serves the partner API; defining it in this shared envelope would
+ * prematurely impose one service's business failures on every other service.
  */
 public interface ErrorCode {
 

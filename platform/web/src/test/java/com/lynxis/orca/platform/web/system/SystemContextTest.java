@@ -10,7 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * P5 property 2, the runtime half — <strong>no path runs with no identity.</strong>
+ * Proves at runtime that no unattended path runs with no identity.
  *
  * <p>The other half is a build check: {@code SystemContextRule} in
  * {@code build-checks} fails the build when a scheduled entry point does not enter

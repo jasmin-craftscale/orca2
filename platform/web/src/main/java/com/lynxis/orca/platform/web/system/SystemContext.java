@@ -7,10 +7,9 @@ import java.util.concurrent.Callable;
  * The explicit identity for every entry point that runs without a user.
  *
  * <p>A relay, a scheduled job, a reconciler — none of them is invoked by a person,
- * and §B6 and §D3 both say the same thing about them: <strong>no path runs with
- * no identity at all.</strong> Work that runs anonymously cannot be authorised
- * and cannot be attributed, and the first time anyone notices is when they are
- * trying to explain a write nobody can account for.
+ * yet <strong>no path may run with no identity at all.</strong> Work that runs
+ * anonymously cannot be authorised or attributed, and the first time anyone
+ * notices is when they are trying to explain a write nobody can account for.
  *
  * <p>Usage is a wrapper rather than a "set it and remember to unset it" pair,
  * because the {@code finally} is the part that gets forgotten and the failure is

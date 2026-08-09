@@ -43,7 +43,7 @@ public enum PlatformErrorCode implements ErrorCode {
 	/** The caller's payload is larger than this service accepts. */
 	PAYLOAD_TOO_LARGE("PAYLOAD_TOO_LARGE", 413),
 
-	/** A dependency did not answer inside its deadline. Every external call has one (§B8). */
+	/** A dependency did not answer inside its deadline. Every external call has a deadline. */
 	DEADLINE_EXCEEDED("DEADLINE_EXCEEDED", 504),
 
 	/** A dependency is down or its circuit is open. */

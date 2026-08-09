@@ -17,7 +17,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * P5 property 1 — <strong>no error path serialises an exception or a schema name.</strong>
+ * Proves that no error path serialises an exception or a schema name.
  *
  * <p>This does not test that the handler "returns a 500 for an exception"; that is
  * exercising the path. It feeds each handler an exception whose message contains

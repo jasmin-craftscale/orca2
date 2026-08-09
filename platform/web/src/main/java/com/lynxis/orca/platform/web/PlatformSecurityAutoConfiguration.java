@@ -26,23 +26,22 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * The default HTTP security shape, once, for all six services.
  *
- * <p><strong>This is a decision the architecture did not dictate, and it is here
- * rather than in six services for one reason:</strong> §B6 states a single
- * platform-wide property — "every service validates tokens by signature locally"
- * — and six copies of a filter chain is six chances for one of them to be subtly
- * different. That is the defect class this phase exists to remove.
+ * <p><strong>Centralising the filter chain here is an implementation decision,
+ * not a product requirement.</strong> Every service must validate tokens locally
+ * by signature, and six copies of the filter chain would create six chances for
+ * that platform-wide security property to differ subtly.
  *
  * <p>What it decides, and nothing more:
  *
  * <ul>
  *   <li>Every route requires an authenticated caller, <em>except</em>
- *       {@code /actuator/health}, which is the orchestrator's probe (§C1–C6) and
- *       is called by something that holds no token.</li>
+ *       {@code /actuator/health}, which is the unauthenticated liveness probe used
+ *       by the process orchestrator.</li>
  *   <li>Tokens are validated as JWTs against the configured issuer's published
  *       keys — locally, by signature, with no call-out per request.</li>
  *   <li>No session. A service that keeps a session has state an instance can lose,
- *       and §A5 says coordination lives in the database rather than in a running
- *       program.</li>
+ *       while coordination state belongs in the database so another instance can
+ *       recover it.</li>
  *   <li>CSRF is off because there is no cookie-borne credential to forge: these
  *       are bearer-token APIs.</li>
  *   <li>Authentication and authorization failures are answered in the ENVELOPE,
@@ -51,10 +50,11 @@ import tools.jackson.databind.json.JsonMapper;
  * </ul>
  *
  * <p>What it deliberately does NOT decide: any authorization rule. No role
- * mapping, no scope-to-entitlement translation, no per-route policy. Those belong
- * to the security design, and open register items NEW-1a and U3 are exactly that
- * conversation. A service that needs a different chain defines its own
- * {@link SecurityFilterChain} bean and this one steps aside.
+ * mapping, no scope-to-entitlement translation, no per-route policy. Those
+ * security decisions remain open and require their named product and security
+ * owners; this class must not settle them incidentally. A service that needs a
+ * different chain defines its own {@link SecurityFilterChain} bean and this one
+ * steps aside.
  */
 @AutoConfiguration
 @ConditionalOnClass(SecurityFilterChain.class)
@@ -88,8 +88,8 @@ public class PlatformSecurityAutoConfiguration {
 		return http
 				.csrf(csrf -> csrf.disable())
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-				// The service-to-service surface (§B6, ADR-011). The filter
-				// authenticates /internal/** against the per-installation shared
+				// The filter authenticates the service-to-service surface at
+				// /internal/** against the per-installation shared
 				// credential and grants ROLE_ORCA_SERVICE; the matcher below then
 				// requires exactly that authority there — so a USER token, however
 				// valid, cannot call an internal endpoint, and the service
