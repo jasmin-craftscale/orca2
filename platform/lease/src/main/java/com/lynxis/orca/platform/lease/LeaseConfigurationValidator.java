@@ -7,11 +7,11 @@ import lombok.RequiredArgsConstructor;
 /**
  * Refuses to start a service whose lease configuration is unset or incoherent.
  *
- * <p>This class <em>is</em> the specification. §C2 states no duration, no renewal
- * interval and no clock-skew allowance, and says instead that a service refuses to
- * start when either is unset or when expiry is not greater than the renewal
- * interval. So that is what happens here, and no number is invented to make it
- * pass.
+ * <p>This class <em>is</em> the specification. No universal lease duration, renewal
+ * interval or clock-skew allowance has been chosen. Each installation must supply
+ * the first two, and a service refuses to start when either is unset or when the
+ * duration is not greater than the renewal interval. No number is invented merely
+ * to make startup pass.
  *
  * <p>Why refuse rather than warn: a renewal interval at or above the lease
  * duration means the holder's renewal always arrives after the lease has already

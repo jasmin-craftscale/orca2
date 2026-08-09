@@ -48,8 +48,8 @@ public interface IdempotencyStore {
 	 *
 	 * <p>For the case where the attempt did not reach the outside world at all. Once
 	 * an actuating call has been made, {@code release} is the wrong tool — the
-	 * physical outcome is unknown, and unknown is resolved by looking, not by
-	 * retrying (§B10).
+	 * physical outcome is unknown. An unknown physical outcome must be resolved by
+	 * observing the device, not by repeating an action that may already have happened.
 	 */
 	void release(String key, String operation, String holderId);
 }

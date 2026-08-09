@@ -1,5 +1,3 @@
-// P4 · Idempotency record.
-//
 // The same key applied twice has the effect of once, and the second caller gets
 // the recorded outcome rather than a bare "duplicate" it cannot use.
 

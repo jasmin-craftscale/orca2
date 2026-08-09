@@ -1,5 +1,5 @@
 /**
- * P2 · Lease with a fence token — anything only one instance may do at a time.
+ * Lease with a fence token — anything only one instance may do at a time.
  *
  * <p>Acquisition is a conditional update guarded by rows-affected, never a
  * read-then-write. The fence token increases every time the lease changes hands,

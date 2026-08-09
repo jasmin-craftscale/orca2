@@ -1,5 +1,5 @@
 /**
- * P4 · Idempotency record — the same key applied twice has the effect of once.
+ * Idempotency record — the same key applied twice has the effect of once.
  *
  * <p>The second call returns the <em>recorded outcome</em>, never a bare duplicate:
  * a caller that retried because it never saw the first answer needs the answer, not

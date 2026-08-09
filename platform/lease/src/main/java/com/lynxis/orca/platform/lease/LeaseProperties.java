@@ -10,12 +10,12 @@ import lombok.Setter;
 /**
  * How long a lease is held, and how often its holder renews it.
  *
- * <p><strong>Neither has a default, deliberately.</strong> §C2 is explicit that the
- * architecture states no number here: the duration, the renewal interval and the
- * clock-skew allowance are profile configuration that must be set explicitly, and
- * <em>a service refuses to start when either is unset or when the duration is not
- * longer than the renewal interval</em>. That startup validation is the
- * specification — see {@link LeaseConfigurationValidator}.
+ * <p><strong>Neither has a default, deliberately.</strong> No universal duration,
+ * renewal interval or clock-skew allowance has been chosen. The first two are
+ * installation configuration that must be set explicitly, and <em>a service
+ * refuses to start when either is unset or when the duration is not longer than
+ * the renewal interval</em>. {@link LeaseConfigurationValidator} enforces that
+ * startup rule.
  *
  * <p>A default here would satisfy the validator and defeat the point: an
  * installation would run on a number nobody chose, and the first sign of it being

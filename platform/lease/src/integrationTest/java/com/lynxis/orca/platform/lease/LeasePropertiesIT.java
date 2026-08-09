@@ -28,7 +28,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.lynxis.orca.platform.outbox.testing.PlatformDatabase;
 
 /**
- * The three properties P2 claims.
+ * Proves the lease primitive's three guarantees.
  *
  * <p>The third one is the one that matters. Acquiring a lease is easy and every
  * naive implementation gets it right; <em>refusing the zombie's write</em> is what

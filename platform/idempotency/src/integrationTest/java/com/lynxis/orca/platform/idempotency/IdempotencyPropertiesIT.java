@@ -23,7 +23,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import com.lynxis.orca.platform.outbox.testing.PlatformDatabase;
 
 /**
- * The three properties P4 claims.
+ * Proves the three guarantees of the recorded-key store.
  *
  * <p>The second one is the one the gate depends on. A device host that
  * <em>did</em> raise the barrier but answered slowly must not have its step

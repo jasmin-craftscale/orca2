@@ -22,10 +22,9 @@ public sealed interface IdempotencyOutcome {
 	 * Someone else is executing it right now.
 	 *
 	 * <p><strong>This is not a terminal state and it is not an answer.</strong> The
-	 * caller keeps waiting for the real outcome. Treating it as a failure is the
-	 * exact hazard §B9 describes: a device host that <em>did</em> raise the barrier
-	 * but answered slowly would have its step failed, and the gate would be told a
-	 * physical action did not happen when it did.
+	 * caller keeps waiting for the real outcome. Treating it as a failure would
+	 * misreport a slow device host: it may have raised the barrier before answering,
+	 * yet the gate would record that the physical action did not happen.
 	 */
 	record InProgress(String key, String operation, String holderId) implements IdempotencyOutcome {
 	}

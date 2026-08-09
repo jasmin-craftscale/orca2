@@ -9,10 +9,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * §C2 states no lease duration, no renewal interval and no clock-skew allowance,
- * and says instead that <em>a service refuses to start when either is unset or when
- * expiry is not greater than the renewal interval</em>. That startup validation is
- * the specification, so this is the test of the specification.
+ * Proves the startup rule for deliberately unset lease timing defaults.
+ *
+ * <p>No universal lease duration, renewal interval or clock-skew allowance has
+ * been chosen. A service must therefore refuse to start when either configured
+ * interval is absent or when the duration is not greater than the renewal
+ * interval; otherwise it would run on an invented value or renew after expiry.
  */
 class LeaseConfigurationValidatorTest {
 

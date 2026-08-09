@@ -1,7 +1,6 @@
-// P2 · Lease with fence token.
-//
 // Anything only one instance may do at a time. Process-coordination state, not
-// tenant data: no site id, no audit quartet, no soft delete (§C2, service_lease).
+// tenant data: `service_lease` has no site id, audit quartet or soft delete. It
+// carries one bounded row per coordination point and is updated in place.
 
 plugins {
 	`java-library`
