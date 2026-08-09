@@ -40,6 +40,32 @@ public interface WorkItemIntake {
 	int failOpenItemsFor(long executionId, String actor);
 
 	/**
+	 * The SLA breach threshold for a manual step: the screen identity's
+	 * {@code max_sec} where set, else the {@code MAX_PROCESSING_TIME_SEC} global
+	 * setting, else empty — no SLA is configured for this step.
+	 *
+	 * <p>Resolved at the moment the engine <em>arms</em> the boundary timer (WP3),
+	 * which is the moment the wait state is entered — so a threshold changed later
+	 * applies to the next item, not to one already parked. That snapshot behaviour
+	 * is the timer's nature, stated rather than hidden.
+	 */
+	java.util.Optional<java.time.Duration> slaBreachAfter(String processDefinitionKey,
+			String nodeReference);
+
+	/**
+	 * The SLA boundary timer fired for this process instance: record the breach on
+	 * every open item of the instance whose own threshold has genuinely elapsed.
+	 *
+	 * <p>Re-deriving per item is what keeps this precise when a process one day
+	 * carries several manual steps — the timer that fired names only the instance,
+	 * and a sibling item that is not yet overdue must not be marked. Idempotent by
+	 * the {@code sla_breached_at IS NULL} predicate: a timer job retried after a
+	 * crash records nothing the second time — "fires once across a restart" is a
+	 * database fact, not a scheduler's promise.
+	 */
+	void recordDueSlaBreaches(String processInstanceId);
+
+	/**
 	 * One parked manual step, as the execution module saw it when the engine
 	 * stopped there.
 	 *

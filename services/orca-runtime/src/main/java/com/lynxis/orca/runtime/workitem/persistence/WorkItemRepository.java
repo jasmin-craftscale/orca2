@@ -102,6 +102,15 @@ public class WorkItemRepository {
 				(rs, row) -> map(rs));
 	}
 
+	public List<WorkItem> openItemsOfProcessInstance(String processInstanceId) {
+		return seam.select(ScopedSelect.from("work_item")
+						.columns(COLUMNS)
+						.scopedBy(SCOPE_COLUMN)
+						.where("process_instance_id = ? AND status IN ('QUEUED', 'IN_PROGRESS')",
+								processInstanceId),
+				(rs, row) -> map(rs));
+	}
+
 	public List<WorkItem> openItemsOf(long executionId) {
 		return seam.select(ScopedSelect.from("work_item")
 						.columns(COLUMNS)

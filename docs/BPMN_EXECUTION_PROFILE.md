@@ -255,7 +255,60 @@ commit. A submit the engine is not waiting on is refused whole
 
 **A boundary timer on this task fires.** Unlike §8's service-task case, the wait
 state genuinely parks: the timer job is committed and visible to the async
-executor while the task waits. §8b (Phase 3 WP3) gives the SLA construct.
+executor while the task waits. §8b gives the SLA construct.
+
+---
+
+## 8b · The SLA timer — a non-interrupting boundary timer on the wait state
+
+**Added in Phase 3, executed by `WorkItemSlaIT`: the timer fires, survives a
+restart firing exactly once, and never fires falsely.** A manual step with a
+time target compiles to:
+
+```xml
+<boundaryEvent id="manualInputSla" attachedToRef="manualInput" cancelActivity="false">
+  <timerEventDefinition>
+    <timeDuration>${workItemSla.breachDuration(execution, 'manualInput')}</timeDuration>
+  </timerEventDefinition>
+</boundaryEvent>
+<sequenceFlow id="slaToRecord" sourceRef="manualInputSla" targetRef="recordSlaBreach"/>
+<serviceTask id="recordSlaBreach" flowable:delegateExpression="${workItemSlaBreachDelegate}"
+             flowable:async="true"/>
+<sequenceFlow id="recordToNoted" sourceRef="recordSlaBreach" targetRef="slaBreachRecorded"/>
+<endEvent id="slaBreachRecorded" name="SLA breach recorded"/>
+```
+
+Rules the compiler must keep, and why:
+
+- **`cancelActivity="false"`, always.** A breach marks the item; it must not kill
+  the operator's work. An interrupting timer here would delete the task an
+  operator may be mid-way through.
+- **Two more stable bean names**: `workItemSla` (the duration source) and
+  `workItemSlaBreachDelegate` (the recording step). Like the two delegates, they
+  are link targets and do not move.
+- **The node reference travels as a string literal** — the compiler knows the
+  task id it is attaching the timer to. No engine introspection, no naming
+  convention on boundary-event ids.
+- **The timer is armed even when no threshold is configured** — a BPMN boundary
+  event is static, and an expression returning null fails the task's entry.
+  `workItemSla` answers a ten-year sentinel for an unconfigured step; the job
+  costs one engine-table row and is deleted with the task. The alternative
+  (emit the timer only when a threshold exists at compile time) would freeze
+  threshold configuration into the published process.
+- **Thresholds are resolved at arming time** — the screen identity's `max_sec`,
+  else the `MAX_PROCESSING_TIME_SEC` setting. A threshold changed later applies
+  to the next item, not to one already parked. Snapshot behaviour, stated.
+- **The breach branch's end event concludes the branch, not the process.** The
+  instance keeps waiting at the task. This is why the platform closes visits on
+  `PROCESS_COMPLETED` (with the end-event id stashed from `ACTIVITY_COMPLETED`
+  in the same command) rather than on any end event — Phase 1's
+  any-end-event-closes rule broke the day the process gained a non-interrupting
+  branch, and `VisitCompletionListener` records the measurement.
+
+**For the builder developer's open §8 question:** this settles the wait-state
+half from the running side — timers on wait states are real, restart-safe
+protection. The service-task half (triggerable device commands) remains open,
+and remains yours with the product owner.
 
 ---
 

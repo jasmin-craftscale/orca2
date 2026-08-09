@@ -168,6 +168,27 @@ public class ExecutionConfiguration {
 		return new LaneResetController(laneReset, operatorIdentity, siteExternalId);
 	}
 
+	// --- Phase 3 WP3 · the SLA timer -----------------------------------------
+
+	/**
+	 * Bean name = the compiler's link target for the SLA timer's duration
+	 * expression. Do not rename.
+	 */
+	@Bean
+	public com.lynxis.orca.runtime.execution.domain.WorkItemSla workItemSla(WorkItemIntake workItemIntake,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.runtime.execution.domain.WorkItemSla(workItemIntake, siteExternalId);
+	}
+
+	/** Bean name = the compiler's link target. Do not rename. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.domain.WorkItemSlaBreachDelegate workItemSlaBreachDelegate(
+			WorkItemIntake workItemIntake,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.runtime.execution.domain.WorkItemSlaBreachDelegate(workItemIntake,
+				siteExternalId);
+	}
+
 	/**
 	 * Bean name = the compiler's link target. Do not rename.
 	 *

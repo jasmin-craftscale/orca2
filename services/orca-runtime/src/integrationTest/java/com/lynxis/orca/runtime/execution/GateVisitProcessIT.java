@@ -97,6 +97,22 @@ class GateVisitProcessIT {
 		registry.add("spring.datasource.url", migrated::getUrl);
 		registry.add("spring.datasource.username", migrated::getUsername);
 		registry.add("spring.datasource.password", migrated::getPassword);
+		// Entering manualInput arms the SLA timer, whose duration bean reads
+		// core's published screen/setting views — absent here, so every timer
+		// arms at the no-threshold sentinel and the wait-state tests are
+		// undisturbed. WorkItemSlaIT is where thresholds are real.
+		com.lynxis.orca.runtime.workitem.RoutingTopologyFixture.publish(
+				GateVisitProcessIT::admin, "it_" + SCHEMA);
+	}
+
+	private static void admin(String sql) {
+		try (java.sql.Connection connection = PlatformDatabase.administrative().getConnection();
+				java.sql.Statement statement = connection.createStatement()) {
+			statement.execute(sql);
+		}
+		catch (java.sql.SQLException e) {
+			throw new IllegalStateException("Failed: " + sql, e);
+		}
 	}
 
 	@BeforeEach

@@ -208,28 +208,69 @@ public class WorkItemService implements WorkItemIntake {
 		});
 	}
 
-	// --- WP3: the timer's record --------------------------------------------
+	// --- WP3: the timer — thresholds out, breaches in ------------------------
 
 	/**
-	 * The SLA timer fired for the wait state this task id names.
+	 * {@inheritDoc}
+	 *
+	 * <p>The screen identity's {@code max_sec} wins; the
+	 * {@code MAX_PROCESSING_TIME_SEC} global setting is the fallback; neither
+	 * configured means no SLA. The {@code below_expected}/{@code expected}
+	 * thresholds are deliberately not timers — they are grid display data, as in
+	 * 1.x; only the breach is an engine fact (the narrow version, register #5).
+	 */
+	@Override
+	public java.util.Optional<Duration> slaBreachAfter(String processDefinitionKey,
+			String nodeReference) {
+		java.util.Optional<Integer> screenMax = routing.screenFor(processDefinitionKey, nodeReference)
+				.map(RoutingReadRepository.ScreenIdentity::maxSec);
+		if (screenMax.isPresent()) {
+			return screenMax.map(Duration::ofSeconds);
+		}
+		return routing.settingValue("MAX_PROCESSING_TIME_SEC")
+				.map(String::trim)
+				.filter(value -> value.chars().allMatch(Character::isDigit) && !value.isEmpty())
+				.map(Long::parseLong)
+				.filter(seconds -> seconds > 0)
+				.map(Duration::ofSeconds);
+	}
+
+	/**
+	 * {@inheritDoc}
 	 *
 	 * <p>Idempotent by predicate ({@code sla_breached_at IS NULL}), which is what
-	 * "fires once across a restart" rests on: a timer job that is retried after a
-	 * crash finds the record already written and writes nothing.
+	 * "fires once across a restart" rests on: a timer job retried after a crash
+	 * finds the record already written and writes nothing.
 	 */
-	public void recordSlaBreach(String taskId) {
+	@Override
+	public void recordDueSlaBreaches(String processInstanceId) {
 		transactions.executeWithoutResult(status -> {
-			if (!repository.recordBreach(taskId, Instant.now())) {
-				log.debug("SLA breach for task {} was already recorded; not recording twice", taskId);
-				return;
+			Instant now = Instant.now();
+			for (WorkItem item : repository.openItemsOfProcessInstance(processInstanceId)) {
+				if (item.slaBreachedAt() != null) {
+					continue;
+				}
+				// Re-derive this item's own threshold: the timer that fired names
+				// only the instance, and a sibling manual step not yet overdue must
+				// not be marked. A small tolerance absorbs the skew between the
+				// engine's clock arming the timer and the database's queued_at.
+				java.util.Optional<Duration> threshold =
+						slaBreachAfter(item.processDefinitionKey(), item.nodeReference());
+				if (threshold.isEmpty()
+						|| item.queuedAt().plus(threshold.get()).minusSeconds(5).isAfter(now)) {
+					continue;
+				}
+				if (!repository.recordBreach(item.taskId(), now)) {
+					log.debug("SLA breach for task {} was already recorded; not recording twice",
+							item.taskId());
+					continue;
+				}
+				repository.audit(item.workItemId(), siteExternalId, WorkItemAudit.SLA_BREACH,
+						"system:sla-timer", item.assignee(), null, elapsedSince(item.queuedAt()));
+				log.warn("work item {} breached its SLA (queued {}, threshold {}s, assignee {})",
+						item.externalId(), item.queuedAt(), threshold.get().toSeconds(),
+						item.assignee());
 			}
-			WorkItem item = repository.byTaskId(taskId).orElseThrow(() -> new IllegalStateException(
-					"recordBreach moved a row for task " + taskId + " but no work item reads back. "
-							+ "The scope predicate and the update disagree, which should be impossible."));
-			repository.audit(item.workItemId(), siteExternalId, WorkItemAudit.SLA_BREACH,
-					"system:sla-timer", item.assignee(), null, elapsedSince(item.queuedAt()));
-			log.warn("work item {} breached its SLA (queued {}, assignee {})", item.externalId(),
-					item.queuedAt(), item.assignee());
 		});
 	}
 

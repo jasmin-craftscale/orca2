@@ -144,7 +144,7 @@ class WorkItemLifecycleIT {
 			jdbc.execute("DELETE FROM " + table);
 		}
 		for (String table : List.of("topology_screen", "topology_team_routing",
-				"topology_team_member", "topology_operator")) {
+				"topology_team_member", "topology_operator", "topology_setting")) {
 			admin("DELETE FROM core." + table);
 		}
 	}

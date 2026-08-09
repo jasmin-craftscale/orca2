@@ -8,7 +8,8 @@ import org.flowable.engine.delegate.event.FlowableActivityEvent;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Notices that a process instance reached an end event, and closes its visit.
+ * Notices that a process instance reached an end event, and closes its visit —
+ * when, and only when, the end event actually ended the instance.
  *
  * <p><strong>Why an engine listener and not a third service task.</strong> The
  * compiled process is the visual builder's output, and every construct this
@@ -23,11 +24,23 @@ import lombok.RequiredArgsConstructor;
  * plus {@code flowable:executionListener} is a proprietary extension and the
  * profile admits exactly one ({@code delegateExpression}).
  *
- * <p>{@code ACTIVITY_COMPLETED} on an {@code endEvent} rather than
- * {@code PROCESS_COMPLETED}, because the end event's <em>id</em> is what
- * distinguishes "the truck may go" from "a human is needed" — and
- * {@code PROCESS_COMPLETED} would force that distinction to be inferred from
- * variables, which is guessing dressed as reading.
+ * <p><strong>Why two event types since Phase 3, where Phase 1 used one.</strong>
+ * Phase 1 closed the visit on {@code ACTIVITY_COMPLETED} of any {@code endEvent} —
+ * which was correct while every end event ended the process, and became wrong the
+ * moment gate-visit gained a NON-INTERRUPTING branch: the SLA breach path
+ * concludes at its own end event <em>while the manual-input task still waits</em>,
+ * and closing the visit there would mark a truck resolved that is still standing
+ * at the gate. So the end event's id is <em>stashed</em> per instance on
+ * {@code ACTIVITY_COMPLETED}, and the visit closes on {@code PROCESS_COMPLETED} —
+ * the event the engine only fires when the instance genuinely ended, in the same
+ * command and the same transaction as the final end event. The id still comes
+ * from the end event, never from variables. ({@code PROCESS_COMPLETED} alone
+ * does not carry the end activity's id — measured, not assumed; the stash is what
+ * bridges the two events.)
+ *
+ * <p>The stash is bounded: an entry is written per end event and removed when the
+ * instance completes or is cancelled (lane reset). An instance that ends neither
+ * way does not exist.
  */
 @RequiredArgsConstructor
 public class VisitCompletionListener implements FlowableEventListener {
@@ -36,14 +49,36 @@ public class VisitCompletionListener implements FlowableEventListener {
 
 	private final VisitCompletion completion;
 
+	private final java.util.concurrent.ConcurrentMap<String, String> lastEndEventByInstance =
+			new java.util.concurrent.ConcurrentHashMap<>();
+
 	@Override
 	public void onEvent(FlowableEvent event) {
-		if (event.getType() != FlowableEngineEventType.ACTIVITY_COMPLETED
-				|| !(event instanceof FlowableActivityEvent activity)
-				|| !END_EVENT.equals(activity.getActivityType())) {
+		if (event.getType() == FlowableEngineEventType.ACTIVITY_COMPLETED
+				&& event instanceof FlowableActivityEvent activity
+				&& END_EVENT.equals(activity.getActivityType())) {
+			lastEndEventByInstance.put(activity.getProcessInstanceId(), activity.getActivityId());
 			return;
 		}
-		completion.reachedEndState(activity.getProcessInstanceId(), activity.getActivityId());
+		if (event.getType() == FlowableEngineEventType.PROCESS_COMPLETED
+				&& event instanceof org.flowable.common.engine.api.delegate.event.FlowableEngineEvent engineEvent) {
+			String processInstanceId = engineEvent.getProcessInstanceId();
+			String endEventId = lastEndEventByInstance.remove(processInstanceId);
+			if (endEventId == null) {
+				// An instance can complete without a visible end event only if it was
+				// started and finished outside this listener's lifetime; nothing to
+				// classify, and VisitCompletion's own lookup decides if a visit exists.
+				endEventId = "";
+			}
+			completion.reachedEndState(processInstanceId, endEventId);
+			return;
+		}
+		if (event.getType() == FlowableEngineEventType.PROCESS_CANCELLED
+				&& event instanceof org.flowable.common.engine.api.delegate.event.FlowableEngineEvent engineEvent) {
+			// Lane reset or an operator abort: the reset owns the visit's closing
+			// write; this only keeps the stash bounded.
+			lastEndEventByInstance.remove(engineEvent.getProcessInstanceId());
+		}
 	}
 
 	/**

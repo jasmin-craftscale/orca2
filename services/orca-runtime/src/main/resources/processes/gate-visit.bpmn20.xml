@@ -101,6 +101,42 @@
          identity tables. -->
     <userTask id="manualInput" name="manual handling"/>
 
+    <!-- The SLA — a REAL engine timer, which is the inversion this phase exists
+         for (1.x computed thresholds in the operator UI and nothing ever fired).
+
+         It can exist here and could not exist on the service tasks above:
+         phase-1 report §7.1 found a boundary timer on a service task is created
+         and deleted inside one transaction, so it never fires. A userTask
+         genuinely parks — the timer job is committed while the task waits, and
+         the async executor fires it on breach.
+
+         NON-interrupting (cancelActivity="false"): a breach marks the item, it
+         does not kill the operator's work. The duration comes from the platform
+         at arming time — the screen identity's max_sec, falling back to the
+         global setting — through the workItemSla bean; the node reference
+         travels as a literal because the compiler knows what it attached the
+         timer to. A step with no configured threshold arms the ten-year
+         sentinel (see WorkItemSla — a BPMN boundary event is static, and an
+         expression returning null would fail the task's entry). -->
+    <boundaryEvent id="manualInputSla" attachedToRef="manualInput" cancelActivity="false">
+      <timerEventDefinition>
+        <timeDuration>${workItemSla.breachDuration(execution, 'manualInput')}</timeDuration>
+      </timerEventDefinition>
+    </boundaryEvent>
+
+    <sequenceFlow id="slaToRecord" sourceRef="manualInputSla" targetRef="recordSlaBreach"/>
+
+    <serviceTask id="recordSlaBreach" name="record the SLA breach"
+                 flowable:delegateExpression="${workItemSlaBreachDelegate}"
+                 flowable:async="true"/>
+
+    <sequenceFlow id="recordToNoted" sourceRef="recordSlaBreach" targetRef="slaBreachRecorded"/>
+
+    <!-- Concludes the BREACH BRANCH only — the instance keeps running, parked at
+         manualInput. The platform closes visits on PROCESS_COMPLETED, not on any
+         end event, precisely so this branch cannot close one. -->
+    <endEvent id="slaBreachRecorded" name="SLA breach recorded"/>
+
     <sequenceFlow id="manualInputResolved" sourceRef="manualInput"
                   targetRef="manualHandlingResolved"/>
 

@@ -88,6 +88,20 @@ public class RoutingReadRepository {
 	}
 
 	/**
+	 * A setting's current value from core's published registry view — the value
+	 * where one is set, else the seeded default, else empty. WP3's SLA fallback
+	 * reads {@code MAX_PROCESSING_TIME_SEC} through this.
+	 */
+	public Optional<String> settingValue(String settingKey) {
+		return seam.select(ScopedSelect.from("core.topology_setting")
+						.columns("setting_value")
+						.scopedBy(REALM, REALM)
+						.where("setting_key = ?", settingKey),
+				(rs, row) -> rs.getString("setting_value"))
+				.stream().filter(java.util.Objects::nonNull).findFirst();
+	}
+
+	/**
 	 * Resolves an identity-provider subject to the platform operator — the read
 	 * that retires the "subject as actor" slice shape WP1 stated openly.
 	 */

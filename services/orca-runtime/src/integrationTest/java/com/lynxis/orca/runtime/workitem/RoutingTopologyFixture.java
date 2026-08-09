@@ -20,7 +20,7 @@ public final class RoutingTopologyFixture {
 
 	public static void publish(Consumer<String> admin, String grantee) {
 		for (String table : new String[] { "topology_screen", "topology_team_routing",
-				"topology_team_member", "topology_operator" }) {
+				"topology_team_member", "topology_operator", "topology_setting" }) {
 			admin.accept("IF OBJECT_ID(N'core." + table + "', 'U') IS NOT NULL DROP TABLE core." + table);
 			admin.accept("IF OBJECT_ID(N'core." + table + "', 'V') IS NOT NULL DROP VIEW core." + table);
 		}
@@ -44,8 +44,12 @@ public final class RoutingTopologyFixture {
 				CREATE TABLE core.topology_operator (
 					config_realm VARCHAR(16), user_external_id VARCHAR(64),
 					keycloak_subject VARCHAR(64), display_name NVARCHAR(200))""");
+		admin.accept("""
+				CREATE TABLE core.topology_setting (
+					config_realm VARCHAR(16), setting_key VARCHAR(200),
+					setting_value NVARCHAR(2000) NULL)""");
 		for (String table : new String[] { "topology_screen", "topology_team_routing",
-				"topology_team_member", "topology_operator" }) {
+				"topology_team_member", "topology_operator", "topology_setting" }) {
 			admin.accept("GRANT SELECT ON core." + table + " TO [" + grantee + "]");
 		}
 	}
