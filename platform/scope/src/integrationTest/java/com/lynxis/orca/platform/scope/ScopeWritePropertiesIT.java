@@ -16,13 +16,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import com.lynxis.orca.platform.outbox.testing.PlatformDatabase;
 
 /**
- * <strong>WP2 · the seam's write half.</strong>
+ * Proves the scope seam's write half.
  *
- * <p>Phase 0's seam could only read, and the build check forbids a service from
- * touching JDBC — so until now a service physically could not insert a row. That
- * was correct while there was no business logic. The moment there is, the same
- * question arrives from the other side: <em>can a caller write a row into a scope
- * it does not hold?</em>
+ * <p>The seam originally supported reads only, while {@code ScopeSeamRule} failed
+ * the build if a service touched JDBC directly. Once services began writing
+ * business data, the seam had to answer the same question from the other side:
+ * <em>can a caller write a row into a scope it does not hold?</em>
  *
  * <p>It is the worse half of the problem. A read that escapes its scope shows the
  * caller data they should not see, which at least surfaces somewhere. A write that
@@ -53,8 +52,9 @@ class ScopeWritePropertiesIT {
 					site_id VARCHAR(20) NOT NULL,
 					status VARCHAR(20) NOT NULL)
 				""".formatted(SCHEMA));
-		// H5's counter. Added rather than included above because the table survives
-		// between runs, and a CREATE guarded by IF OBJECT_ID would skip a new column.
+		// The atomic-increment test's counter. Added rather than included above
+		// because the table survives between runs, and a CREATE guarded by
+		// IF OBJECT_ID would skip a new column.
 		new JdbcTemplate(dataSource).execute("""
 				IF COL_LENGTH('%s.work_item', 'attempts') IS NULL
 				ALTER TABLE work_item ADD attempts INT NOT NULL CONSTRAINT df_wi_attempts DEFAULT 0
@@ -102,8 +102,8 @@ class ScopeWritePropertiesIT {
 	@DisplayName("entering a system identity is not the same as holding a scope — there is no implicit one")
 	void systemWorkGetsNoImplicitScope() {
 		// The rule the seam's Javadoc states, made executable. Background work is
-		// required to enter a system context (§B6) — and that grants an IDENTITY, not
-		// an ENTITLEMENT. Wiring the two together would be the one silent bypass
+		// required to enter a system context for attribution — and that grants an
+		// IDENTITY, not an ENTITLEMENT. Wiring the two together would be the one silent bypass
 		// nobody would ever notice, because system work has no user to notice on its
 		// behalf. Here, "background work" is simply a thread that set no scope.
 		assertThat(ScopeContext.current().isDeny())
@@ -283,13 +283,13 @@ class ScopeWritePropertiesIT {
 	}
 
 	// ------------------------------------------------------------------------
-	// WP6 · the two things the seam had to learn for admission.
+	// The two capabilities admission required from the seam.
 	// ------------------------------------------------------------------------
 
 	@Test
 	@DisplayName("a nullable column can be written as NULL — a seam that cannot express it forces raw JDBC")
 	void aNullableColumnCanBeWrittenAsNull() {
-		// Latent from WP2 until WP7's first insert with a genuinely absent value: the
+		// Latent until the first admission insert with a genuinely absent value: the
 		// builder copied its values with Map.copyOf, which rejects a null with a bare
 		// NullPointerException out of ImmutableCollections. A nullable column is
 		// entirely ordinary — a device that did not identify itself, a command with no
@@ -407,7 +407,7 @@ class ScopeWritePropertiesIT {
 	}
 
 	// ------------------------------------------------------------------------
-	// H5 — the allow-listed atomic increment, and the update it stops losing.
+	// The allow-listed atomic increment, and the update it stops losing.
 	// ------------------------------------------------------------------------
 
 	@Test
@@ -429,9 +429,9 @@ class ScopeWritePropertiesIT {
 						recorded.""")
 				.isEqualTo((long) threads * each);
 
-		// --- what WP5 had to do, in the same conditions --------------------
-		// EventBufferRepository read every row and wrote it back, because the seam
-		// could not express the arithmetic. This is that, and it is here so the
+		// --- the former workaround, in the same conditions ------------------
+		// EventBufferRepository previously read every row and wrote it back because
+		// the seam could not express the arithmetic. This is that, and it is here so the
 		// assertion above is a comparison rather than an assertion about nothing.
 		jdbc.update("UPDATE work_item SET attempts = 0");
 		long readWriteBack = countUp(threads, each, () -> {
@@ -495,7 +495,7 @@ class ScopeWritePropertiesIT {
 	@Test
 	@DisplayName("a SET to null lands as NULL — the pump's error message is allowed to be absent")
 	void aNullValueCanBeSet() {
-		// Found in review, fixed incidentally by H5: the previous assignments map went
+		// Found while adding atomic increment: the previous assignments map went
 		// through Map.copyOf, which rejects null VALUES — so set(column, null) threw
 		// NullPointerException at execution. A real caller hits this: the pump records
 		// a failure with exception.getMessage(), and a message can be null. This test

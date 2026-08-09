@@ -17,8 +17,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import com.lynxis.orca.platform.outbox.testing.PlatformDatabase;
 
 /**
- * P3 property 2 — <strong>a query through the seam with no scope set returns zero
- * rows, never all rows.</strong>
+ * Proves that a query through the seam with no scope set returns zero rows, never
+ * all rows.
  *
  * <p>Property 1 — "a repository method building a query outside the seam fails the
  * build" — cannot be a test, because a test that compiles has already failed to
@@ -116,7 +116,7 @@ class ScopeSeamPropertiesIT {
 	@DisplayName("orderByDescending is the bounded 'latest N' read — direction is the seam's keyword, never caller text")
 	void descendingOrderIsBoundedAndScoped() {
 		ScopeContext.runIn(Scope.of("site_id", Set.of("site-1")), () -> {
-			// Newest-first with a limit: the read Phase 2's audit trail needs.
+			// Newest-first with a limit: the bounded read used by the audit trail.
 			// Without a direction the caller would fetch a growing table whole
 			// and reverse in memory — an unbounded read dressed as a bounded one.
 			List<Integer> newestFirst = seam.select(

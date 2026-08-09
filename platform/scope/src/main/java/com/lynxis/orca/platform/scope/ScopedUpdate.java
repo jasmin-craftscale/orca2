@@ -25,9 +25,9 @@ import java.util.Map;
  * any SQL is built, because a caller with no scope for this table is not asking
  * about rows at all.
  *
- * <p>Retirement (§D3 — records are retired rather than removed) is an update, and
- * that is deliberate: it means the one operation that makes a row disappear from
- * every published view acquires the scope predicate like any other write.
+ * <p>Ordinary records are retired rather than removed. Retirement is an update,
+ * deliberately, so the operation that makes a row disappear from every published
+ * view acquires the scope predicate like any other write.
  *
  * <h2>Two assignment forms, and exactly two</h2>
  *

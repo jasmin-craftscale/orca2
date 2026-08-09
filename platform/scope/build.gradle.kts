@@ -1,9 +1,7 @@
-// P3 · The scope seam.
-//
 // One place where a query acquires its scope predicate, and no way around it.
-// The requirement (§B6, ADR-005) is settled; the mechanism is not. This module
-// is the seam and its default-deny behaviour — it deliberately does NOT
-// implement database row-level security, which belongs to the security design.
+// That requirement is settled; the enforcement mechanism is not. This module is
+// the seam and its default-deny behaviour — it deliberately does NOT implement
+// database row-level security, which remains a security-design decision.
 
 plugins {
 	`java-library`

@@ -3,10 +3,11 @@ package com.lynxis.orca.platform.scope.table;
 /**
  * How a table grows.
  *
- * <p>There is no default anywhere for this. §B10 requires that every table growing
- * with traffic carries a retention class, and the only way a build check can tell
- * which tables those are is if somebody said so. A default would answer the
- * question on the author's behalf, in whichever direction was convenient.
+ * <p>There is no default anywhere for this. {@code RetentionClassRule} fails the
+ * build when a traffic-growing table does not name a retention class, and it can
+ * identify those tables only when every author declares the growth mode. A default
+ * would answer the question on the author's behalf in whichever direction was
+ * convenient.
  */
 public enum Growth {
 

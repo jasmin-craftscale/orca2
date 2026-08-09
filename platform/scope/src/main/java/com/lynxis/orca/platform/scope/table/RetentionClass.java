@@ -10,19 +10,17 @@ import java.lang.annotation.Target;
  * The retention class a traffic-growing table's rows belong to.
  *
  * <p><strong>The value is a String and not an enum, and that is a gap rather than
- * a design choice.</strong> §B10 says the class list "is closed and enumerated",
- * and §C2 invariant 4 says it is closed by a database {@code CHECK} over an
- * 18-value list. That list lives in the ORCA Data Dictionary, which is not in this
- * repository — and the open-questions register records, as a High documentation
- * item, that <em>the list appears in two documents, both declared closed, and they
- * are not identical</em>.
+ * a design choice.</strong> The catalog is supposed to be a closed 18-value set
+ * enforced by a database {@code CHECK}. It lives in the ORCA Data Dictionary,
+ * which is not in this repository, and its two published copies both claim to be
+ * complete but are not identical.
  *
  * <p>Writing an enum here would mean choosing between two lists that disagree and
  * publishing the choice as settled. So this carries the mechanism and not the
- * list: the build check enforces that a traffic-growing table <em>names</em> a
- * class, which is exactly what §B10 says the build-time check does. Membership of
- * the closed list is enforced by the database constraint, and that constraint
- * cannot be written until the two documents are reconciled.
+ * list: {@code RetentionClassRule} fails the build unless a traffic-growing table
+ * <em>names</em> a class. Membership of the closed list belongs in the database
+ * constraint, and that constraint cannot be written until the two source documents
+ * are reconciled.
  */
 @Documented
 @Target(ElementType.TYPE)

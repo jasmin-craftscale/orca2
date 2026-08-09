@@ -7,9 +7,9 @@ import org.springframework.jdbc.core.RowMapper;
 /**
  * The one place a query acquires its scope predicate.
  *
- * <p>§B6, and ADR-005: "Scope is enforced in one place, applied by construction,
- * with a build-time check that fails when a query bypasses it. No query carries its
- * own scoping condition."
+ * <p>Scope is enforced here, applied by construction, and protected by a build-time
+ * check that fails when a service query bypasses it. No query carries its own
+ * scoping condition.
  *
  * <p>Two halves make that true, and both are needed:
  *
@@ -25,10 +25,10 @@ import org.springframework.jdbc.core.RowMapper;
  *       a suggestion.</li>
  * </ul>
  *
- * <p><strong>What this is not.</strong> It is not database row-level security, and
- * Phase 0 deliberately does not implement it. That choice belongs to the security
- * design and has a named owner. See {@code README.md} in this module for the trap
- * waiting for whoever implements it.
+ * <p><strong>What this is not.</strong> It is not database row-level security.
+ * Choosing such a mechanism remains a security-design decision with a named owner;
+ * this interface must not settle it incidentally. See {@code README.md} in this
+ * module for the connection-pool trap waiting for whoever implements it.
  *
  * <h2>How a scope comes to be established</h2>
  *
@@ -40,14 +40,14 @@ import org.springframework.jdbc.core.RowMapper;
  *   <li><strong>A request path</strong> derives it at the request boundary, from
  *       the caller's claims and the installation's configuration, and runs the
  *       work inside {@link ScopeContext#callIn}. What that derivation <em>is</em>
- *       — which claim, which entitlement, which of §B6's three different problems
- *       it is solving — belongs to the security design and to open register item
- *       NEW-1a. This module takes no position on it, which is why {@link Scope} is
+ *       — which claim or entitlement it uses, and whether it restricts a site, a
+ *       customer or a requester such as a driver — remains a security-design
+ *       question. This module takes no position, which is why {@link Scope} is
  *       opaque about what a dimension means.</li>
  *   <li><strong>Background work</strong> — a relay, a scheduled job, a reconciler —
  *       sets the installation's own scope explicitly, inside the system context it
- *       is already required to enter (§B6, §D3). <strong>There is no implicit
- *       scope for system work.</strong> Entering {@code SystemContext} grants an
+ *       must enter for identity and attribution. <strong>There is no implicit scope
+ *       for system work.</strong> Entering {@code SystemContext} grants an
  *       identity, not an entitlement, and the two are deliberately not wired
  *       together: a background job that acquired scope merely by being a
  *       background job would be the silent bypass this seam exists to remove, and

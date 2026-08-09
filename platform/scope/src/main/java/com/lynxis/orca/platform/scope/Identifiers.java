@@ -34,13 +34,12 @@ final class Identifiers {
 	/**
 	 * A table name, which may carry <strong>one</strong> schema qualifier.
 	 *
-	 * <p>Added in WP1/WP5, because ADR-009 and ADR-005 were in direct conflict
-	 * without it. ADR-009 makes a published view — {@code core.topology_lane} — the
-	 * only cross-schema read; ADR-005 puts every read through this seam. The seam
-	 * could not name a qualified table, so the two rules together forbade the one
-	 * read the architecture requires, and the only ways out were to write raw JDBC
-	 * (which {@code ScopeSeamRule} fails, correctly) or to mirror another service's
-	 * view into every consumer's schema.
+	 * <p>A published view such as {@code core.topology_lane} is the only permitted
+	 * cross-schema read, while every service read must pass through the scope seam.
+	 * Before this method accepted one qualifier, the seam could not name such a
+	 * view. The only alternatives were raw JDBC, which {@code ScopeSeamRule}
+	 * correctly fails at build time, or mirroring every published view into each
+	 * consumer's schema.
 	 *
 	 * <p>Exactly one dot, and both halves are the same narrow shape. Not a
 	 * concession to escaping: {@code core.lane; DROP} still has nowhere to hide,

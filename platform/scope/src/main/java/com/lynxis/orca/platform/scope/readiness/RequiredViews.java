@@ -11,9 +11,9 @@ import lombok.Setter;
  * The published views this service requires before it will serve.
  *
  * <p>{@code orca-core} publishes read-only views onto its world model, and other
- * services read them in their own transaction (§C1, ADR-009). That creates a
- * deployment ordering: core must have migrated before a service that reads its
- * views starts.
+ * services read those views in their own transactions instead of reading core's
+ * tables. That creates a deployment ordering: core must have migrated before a
+ * service that depends on one of its views starts.
  *
  * <p><strong>The ordering is a deployment concern, not a build one.</strong> It
  * is handled where it belongs — deployment order, plus this check. A shared
@@ -25,11 +25,11 @@ import lombok.Setter;
  * resolves against the caller's own default schema, which is the one schema the
  * view is certainly not in.
  *
- * <p><strong>Empty in Phase 0.</strong> orca-core publishes no views yet, because
- * Phase 0 builds no world model. The check exists now rather than later because a
- * service that starts and then fails on its first query is far harder to diagnose
- * than one that refuses to start and says why — and because wiring it after the
- * consumers exist means wiring it into six services instead of one.
+ * <p>The list defaulted to empty when this guard was introduced, before core
+ * published any world-model views. The guard was added early because a service
+ * that starts and then fails on its first query is far harder to diagnose than one
+ * that refuses to start and names the missing view, and because adding the common
+ * hook after consumers exist would require wiring it into every service separately.
  */
 @Getter
 @Setter

@@ -25,11 +25,10 @@ import java.util.Map;
  * worse than a read that returns too much, because the read at least shows up
  * somewhere.
  *
- * <p><strong>There is no delete.</strong> §D3: records are retired rather than
- * removed, except where a retention policy deletes them deliberately — and
- * retention is the outbox's and the purge job's business, not a caller's. A
- * retirement is an {@link ScopedUpdate}, which means it acquires the scope
- * predicate like any other write.
+ * <p><strong>There is no delete.</strong> Ordinary records are retired rather than
+ * removed; only a retention policy deletes them deliberately, and retention is the
+ * outbox's and the purge job's business, not a caller's. A retirement is an
+ * {@link ScopedUpdate}, so it acquires the scope predicate like any other write.
  */
 public final class ScopedInsert {
 
@@ -84,8 +83,9 @@ public final class ScopedInsert {
 	 * {@code NULL} pushes every such write back to raw JDBC, which the build check
 	 * correctly forbids.
 	 *
-	 * <p>It was latent from WP2 until WP7's first insert with a genuinely absent
-	 * value found it. Recorded in the phase report rather than fixed quietly.
+	 * <p>The defect remained latent until the first production-shaped insert supplied
+	 * a genuinely absent value. The history is recorded here because changing back
+	 * to {@code Map.copyOf} would silently restore the pressure to bypass the seam.
 	 */
 	Map<String, Object> columns() {
 		return java.util.Collections.unmodifiableMap(new LinkedHashMap<>(columns));

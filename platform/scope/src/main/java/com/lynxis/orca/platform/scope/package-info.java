@@ -1,6 +1,6 @@
 /**
- * P3 · The scope seam — one place where a query acquires its scope predicate,
- * and no way around it (§B6, ADR-005).
+ * The scope seam — one place where a query acquires its scope predicate, and no
+ * way around it.
  *
  * <p>The requirement is settled; the mechanism is not. This package is the seam,
  * its default-deny behaviour, and nothing more. It deliberately does not implement

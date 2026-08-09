@@ -13,7 +13,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 
 /**
- * P5 property 3 — <strong>two distinct failures return two distinct codes.</strong>
+ * Proves that two distinct failures return two distinct codes.
  *
  * <p>The point is not that codes exist. It is that a caller can branch on them
  * <em>without reading the message</em>: if two failures a partner must handle
