@@ -159,6 +159,7 @@ AI-assisted PRs accordingly.
 |---|---|
 | **Set it up and run it — start here** | **`docs/LOCAL_DEVELOPMENT.md`** |
 | **Joining the project, as a developer or an AI** | **`docs/DEVELOPER_ONBOARDING.md`** |
+| **What is built, what is next, what does not exist yet** | **`docs/BUILD_ROADMAP.md`** |
 | The rules that fail the build | `AGENTS.md` |
 | The target design and its guarantees | `docs/ORCA_ARCHITECTURE.md` |
 | What's deliberately undecided | `docs/ORCA_OPEN_QUESTIONS_REGISTER.md` |

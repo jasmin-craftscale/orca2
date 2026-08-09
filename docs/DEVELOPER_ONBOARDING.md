@@ -6,6 +6,12 @@ Written for a developer joining ORCA 2.0 and for the AI assistant working alongs
 them. If you are setting a machine up, `docs/LOCAL_DEVELOPMENT.md` comes first —
 this document assumes the platform already runs for you.
 
+**Then read `docs/BUILD_ROADMAP.md`.** This document tells you *how to work here*;
+that one tells you *what is already built, what is being built now, and what does
+not exist yet*. You need both before you start, and the second is the one that
+stops you building something that already exists or depending on something that
+does not.
+
 ---
 
 ## 1 · What ORCA does

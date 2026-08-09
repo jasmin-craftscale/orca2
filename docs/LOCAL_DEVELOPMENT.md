@@ -213,17 +213,21 @@ Then paste this, once, at the start of a fresh session:
 ```
 You are joining the ORCA 2.0 build as a developer's assistant.
 
-Read docs/DEVELOPER_ONBOARDING.md in full before doing anything else. It is
-self-contained: what this system is, the rules that fail the build, how the old
-system may and may not be used, and how to verify your work.
+Read these two documents in full before doing anything else, in this order:
+
+  1. docs/DEVELOPER_ONBOARDING.md — what this system is, the rules that fail the
+     build, how the old system may and may not be used, how to verify your work.
+  2. docs/BUILD_ROADMAP.md — what is already built, what is being built now, what
+     is deliberately not started, and where your stream fits in that.
 
 The system being replaced is cloned as a sibling of this repository at
 ../Lynxis-Gate. It is READ-ONLY — never modify anything there. Before you search
 it, read ../Lynxis-Gate/CLAUDE.md, or you will misread what you find.
 
 When you have read both, tell me in your own words: what ORCA does, the two
-properties that shape every decision in it, and the rules you must never break.
-Then wait for my task — do not start work.
+properties that shape every decision in it, the rules you must never break, and
+which parts of the system do NOT exist yet. Then wait for my task — do not start
+work.
 ```
 
 **The comprehension check at the end is deliberate.** If the answer is vague, the
