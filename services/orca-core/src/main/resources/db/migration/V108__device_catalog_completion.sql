@@ -1,13 +1,13 @@
--- Fills the three device catalogs that an earlier migration deliberately left
--- incomplete, and corrects three codes it had to guess at.
+-- Fills the three device catalogs that V106__device_registry.sql deliberately
+-- left incomplete, and corrects three codes it had to guess at.
 --
 -- WHY THERE WAS A GAP AT ALL
 -- The catalogs were translated from the Go system in production today. The
 -- extraction available at the time described some of the rows only in prose —
 -- "and so on" where a list should have been — and this project does not invent
 -- catalog rows to fill a hole, because a guessed value in a catalog other tables
--- point at becomes permanent very quickly. So the earlier migration seeded what
--- was known and left the rest visibly missing, with the fix recorded as owed
+-- point at becomes permanent very quickly. So V106__device_registry.sql seeded
+-- what was known and left the rest visibly missing, with the fix recorded as owed
 -- work: extract the rows properly by script, then seed the remainder in a later
 -- migration. This is that later migration.
 --
@@ -20,12 +20,12 @@
 -- GENERATED, NOT HAND-TRANSCRIBED. deploy/tools/gen-device-catalog-completion-seed.py
 -- parses that document, asserts the expected counts before it will emit a single
 -- line, and computes each external identifier by hashing the row's table and code
--- inside the same namespace the earlier migration used. Regenerating produces
+-- inside the same namespace V106__device_registry.sql used. Regenerating produces
 -- byte-identical output. Edit a row here by hand and that chain of custody is
 -- broken; regenerate instead.
 --
 -- WHY THREE ROWS ARE UPDATED RATHER THAN INSERTED
--- The earlier migration had to guess three camera codes. The real ones are
+-- V106__device_registry.sql had to guess three camera codes. The real ones are
 -- AXIS_PTZ_CAMERA, PELCO_PTZ_CAMERA and MILESIGHT_PTZ_CAMERA. Because the code is
 -- the contract and the identifier is derived FROM the code, correcting a code
 -- also means correcting the identifier — each row is given the identifier that
@@ -52,9 +52,9 @@ UPDATE device_type SET code = 'PELCO_PTZ_CAMERA', external_id = '826f1091-32ae-5
 UPDATE device_type SET code = 'MILESIGHT_PTZ_CAMERA', external_id = 'd2501f59-5006-5db3-8653-427878ee2729', name = N'Milesight PTZ Camera' WHERE code = 'MILESIGHT_CAMERA';
 
 -- The rows whose codes were already right get their display names put into the
--- exact casing the source system uses. The earlier migration wrote these in a
--- provisional lower case. Names are for display only and nothing matches on them,
--- so this is a correction rather than a breaking change.
+-- exact casing the source system uses. V106__device_registry.sql wrote these in
+-- a provisional lower case. Names are for display only and nothing matches on
+-- them, so this is a correction rather than a breaking change.
 UPDATE device_type SET name = N'AXIS Camera' WHERE code = 'AXIS_CAMERA';
 UPDATE device_type SET name = N'Barcode Scanner' WHERE code = 'BARCODE_SCANNER';
 UPDATE device_type SET name = N'RFID' WHERE code = 'RFID';
@@ -82,8 +82,8 @@ INSERT INTO device_io_port_name (external_id, port_type, code, name) VALUES ('1f
 INSERT INTO device_io_port_name (external_id, port_type, code, name) VALUES ('d988cc03-9d86-5634-8a84-6ffa831f05b8', 'AUDIO', 'REAR_SPEAKER', N'Rear Speaker');
 
 -- All 19 kinds of thing that can be wired to a port. The table was created empty
--- by the earlier migration because the values were not extractable then; these
--- are the whole list.
+-- by V106__device_registry.sql because the values were not extractable then;
+-- these are the whole list.
 INSERT INTO io_device_kind (external_id, port_type, code, name) VALUES ('a51bc591-fac8-5e8b-9e10-01af7d2e9b8c', 'INPUT', 'CALL_BUTTON', N'Call Button');
 INSERT INTO io_device_kind (external_id, port_type, code, name) VALUES ('63499b8c-c9ce-53d5-9e0c-f0ded12804b0', 'INPUT', 'HOOK_SWITCH', N'Hook Switch');
 INSERT INTO io_device_kind (external_id, port_type, code, name) VALUES ('1a186b4b-4405-55ac-ade5-4b960f715fa9', 'INPUT', 'LOOP', N'Loop');

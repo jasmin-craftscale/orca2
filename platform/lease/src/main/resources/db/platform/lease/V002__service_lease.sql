@@ -14,9 +14,15 @@
 -- It guarantees that its writes are REFUSED, using the fence token below.
 --
 -- WHERE THIS FILE ACTUALLY RUNS
--- Once per service, in that service's own schema. Every service has its own copy,
--- because each service's database login can reach only its own schema — a single
--- shared lease table would not be writable by the services that have to write it.
+-- Once per service, in that service's own schema. All six carry their own copy —
+-- orca-core, orca-runtime, orca-edge, orca-portal, orca-sync and orca-fleet —
+-- because each service's database login can reach only its own schema, so a
+-- single shared lease table would not be writable by the services that have to
+-- write it.
+--
+-- ⚠️ Editing this file — including its comments — invalidates the recorded
+-- checksum in all six schemas at once, not one. Flyway checksums the whole file,
+-- so the mismatch appears once per schema it was applied into.
 --
 -- Those near-identical copies are a known and accepted cost of giving each
 -- service its own schema in one database, not an oversight. That trade was made
@@ -76,10 +82,10 @@ CREATE TABLE service_lease (
 --     identity plus the three timestamps above ARE the record of who has it and
 --     since when; a second audit set would say the same thing again, differently.
 --
---   No soft delete. A lease is released by expiring, or by the next acquisition
---     taking it with a higher token. A "deleted" flag would be one more thing to
---     check before acting — on the one table whose entire purpose is to make
---     check-then-act impossible.
+--   No soft delete — no `deleted_at`. A lease is released by expiring, or by the
+--     next acquisition taking it with a higher token. A deletion flag would be
+--     one more thing to check before acting, on the one table whose entire
+--     purpose is to make check-then-act impossible.
 --
 --   No external identifier, no partitioning, no retention class. None applies to
 --     a table with one row per thing being coordinated.

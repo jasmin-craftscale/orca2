@@ -3,7 +3,7 @@
 -- a general place to hang extra configuration on anything in the world model.
 --
 -- WHAT THIS IS FOR
--- An earlier migration created a bare `device` table with just enough on it to
+-- V101__world_model.sql created a bare `device` table with just enough on it to
 -- get one truck through one lane. This turns it into the registry the console
 -- actually administers: the manufacturer and model of each unit, its network
 -- address and stream settings, which physical port on it is the loop detector and
@@ -25,12 +25,13 @@
 -- count and examples were known but whose exact values were not. The missing rows
 -- are NOT invented. Seeding a plausible guess into a catalog other tables point
 -- at is how a wrong value becomes permanent, and this project would rather ship a
--- visible hole. (A later migration fills all three from a proper extraction.)
+-- visible hole. (V108__device_catalog_completion.sql fills all three from a
+-- proper extraction.)
 --
 -- WHAT HAPPENS TO `device`
 -- It gains the full translated column set, plus two structural changes:
 --
---   * The free-text `device_type` column an earlier migration called provisional
+--   * The free-text `device_type` column V101__world_model.sql called provisional
 --     is replaced by a foreign key into the type catalog, and then dropped. The
 --     old system carried the same fact three times over — a code, a display name
 --     and a message-topic string — which is three chances to disagree.
@@ -124,7 +125,7 @@ CREATE TABLE device_io_port_name (
 --
 -- Created to shape, deliberately UNSEEDED — the source of the day could give a
 -- count but not the values, and this schema does not invent catalog rows. See the
--- header; a later migration seeds all 19.
+-- header; V108__device_catalog_completion.sql seeds all 19.
 CREATE TABLE io_device_kind (
 	io_device_kind_id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_io_device_kind PRIMARY KEY,
 	external_id       VARCHAR(64)   NOT NULL CONSTRAINT uq_io_device_kind_external_id UNIQUE,
@@ -200,7 +201,7 @@ INSERT INTO device_io_port_name (external_id, port_type, code, name) VALUES ('93
 GO
 
 -- --------------------------------------------------------------------------
--- device — the table an earlier migration created minimally, brought up to the
+-- device — the table V101__world_model.sql created minimally, brought up to the
 -- full registry.
 --
 -- ⚠️ THE ORDER AND THE `GO` SEPARATORS ARE REQUIRED, NOT STYLE. Columns are added
@@ -280,8 +281,9 @@ ALTER TABLE device DROP COLUMN device_type;
 GO
 
 -- The read path: site first, then lane. Reads arrive asking for a lane's devices
--- with the site already fixed by the caller's scope. A build check reads this file
--- and fails when a table carrying `site_external_id` has no index leading with it.
+-- with the site already fixed by the caller's scope. The build check
+-- `ScopeIndexRule` reads this file and fails when a table carrying
+-- `site_external_id` has no index leading with it.
 CREATE INDEX ix_device_scope ON device (site_external_id, lane_id);
 GO
 

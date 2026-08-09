@@ -23,10 +23,11 @@
 --     switches the seed on and off never changes the checksum and never causes a
 --     re-run. The rows would land only if local development happened to be active
 --     the very first time that database was migrated.
---   * A seeder written in Java cannot exist. A build check forbids service code
---     from touching a data source, a JDBC template or a raw connection — every
---     write goes through the shared scoping code — and fighting that check in
---     order to insert demo data would be exactly the wrong way round.
+--   * A seeder written in Java cannot exist. The build check `ScopeSeamRule`
+--     forbids service code from touching a `DataSource`, a `JdbcTemplate` or a
+--     raw `Connection` — every write goes through the shared scoping code — and
+--     fighting that check in order to insert demo data would be exactly the wrong
+--     way round.
 --
 -- WHY THE TABLE NAMES ARE SCHEMA-QUALIFIED HERE
 -- Because this is not a migration. Migrations deliberately write unqualified
@@ -72,8 +73,8 @@ GO
 --
 -- The address is passed in as a variable by deploy/demo/seed.sh rather than
 -- written here, because the port it contains is already written down once in the
--- deployment's environment file. Two copies of a port number is one copy that
--- eventually disagrees with the other.
+-- deployment's environment file, as `ORCA_DEVICE_HOST_STUB_PORT`. Two copies of a
+-- port number is one copy that eventually disagrees with the other.
 --
 -- ⚠️ It is a LOCALHOST address, not a container name. The hardware-facing service
 -- normally runs on the developer's own machine while the stub runs inside the
@@ -126,9 +127,11 @@ GO
 -- exception, becomes a work item in a queue, an operator completes it, and the
 -- parked process carries on and lifts the barrier.
 --
--- ⚠️ THE OPERATOR IS SEEDED WITH NO IDENTITY-PROVIDER SUBJECT, AND THAT IS
--- DELIBERATE. The local identity provider has no human accounts in it, only
--- convenience clients for development, so there is no subject to write here yet.
+-- ⚠️ THE OPERATOR IS SEEDED WITH NO IDENTITY-PROVIDER SUBJECT. `keycloak_subject`
+-- is left NULL, deliberately: the local identity provider has no human accounts
+-- in it, only convenience clients for development, so there is no subject to
+-- write here yet.
+--
 -- The walkthrough links whatever token it obtains to this row with a single,
 -- visible UPDATE — which is also the shortest demonstration of the operator
 -- directory doing exactly the job it exists for. The exact step is written out in

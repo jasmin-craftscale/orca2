@@ -19,8 +19,9 @@
 -- THE SITUATION IT EXISTS FOR
 --
 -- The workflow engine can build its own tables on startup, and early on it was
--- configured to. On a database where that happened, 45 engine tables exist and
--- the migration tool knows nothing about them. Those same 45 tables are now
+-- configured to: `flowable.database-schema-update: true`, which is now `false`.
+-- On a database where that happened, 45 engine tables exist and the migration
+-- tool knows nothing about them. Those same 45 tables are now
 -- defined as migrations of ours, so the next startup tries to create the first of
 -- them and fails:
 --

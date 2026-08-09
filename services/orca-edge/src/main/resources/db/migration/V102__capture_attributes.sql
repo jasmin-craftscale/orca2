@@ -3,17 +3,19 @@
 --
 -- WHY A SECOND COLUMN RATHER THAN A REPLACEMENT FOR THE ONE THAT IS THERE
 -- The existing `payload` column holds the bytes exactly as the camera sent them —
--- for the plate-reading cameras, a framed XML message between its start and end
--- delimiters. That stays. A durable buffer that stored a paraphrase of its input
--- would be worth less than one that did not: when a plate read is disputed, the
--- question is what the camera said, not what this service understood.
+-- for the plate-reading cameras, the vendor's `ZapPacket`: a framed XML message
+-- between its start-of-text and end-of-text delimiters. That stays.
+--
+-- A durable buffer that stored a paraphrase of its input would be worth less
+-- than one that did not: when a plate read is disputed, the question is what the
+-- camera said, not what this service understood.
 --
 -- But this service is the hardware boundary, and a boundary that passed the
 -- vendor's dialect through would put vendor-specific XML elements inside the
 -- service that runs the gate — which is the opposite of a boundary. So the
 -- vendor's format is decoded exactly once, here, and what crosses onward is this
--- small map of attributes. The gate never learns what the camera's message format
--- is called.
+-- small map of attributes. Nothing in orca-runtime knows what a `ZapPacket` is,
+-- and nothing there should.
 --
 -- WHY IT IS DECODED ON ARRIVAL RATHER THAN ON DELIVERY
 -- Because delivery retries, sometimes days later. If decoding happened at

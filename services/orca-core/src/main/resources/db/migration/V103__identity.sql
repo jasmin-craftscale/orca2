@@ -57,8 +57,8 @@
 --     value cannot drift or name a site that does not exist. Its index LEADS with
 --     it, because every scoped read leads with that condition — a table without
 --     such an index can only be scanned, and a scan taken under a lock locks
---     every row at the site. A build check reads this file and fails when a table
---     declaring the column has no index leading with it.
+--     every row at the site. The build check `ScopeIndexRule` reads this file
+--     and fails when a table declaring the column has no index leading with it.
 --   * `config_realm` — a constant 'INSTALLATION', for rows that belong to the
 --     installation as a whole: users, roles, the catalog, the grants. Reading
 --     installation-wide data then becomes a declared act with a named dimension
@@ -66,9 +66,9 @@
 --     sees nothing. A row also cannot quietly claim a site it does not have.
 --
 -- HOW BIG THESE GET
--- Growth is declared in Java beside each table, where a build check can read it.
--- All bounded: rows appear when an administrator configures something, never when
--- a truck arrives.
+-- Growth is declared in Java beside each table, in `IdentityTables`, where the
+-- build check `RetentionClassRule` can read it. All bounded: rows appear when an
+-- administrator configures something, never when a truck arrives.
 
 -- --------------------------------------------------------------------------
 -- role
@@ -85,8 +85,8 @@ CREATE TABLE role (
 	created_at    DATETIME2(3)   NOT NULL CONSTRAINT df_role_created_at DEFAULT SYSUTCDATETIME()
 );
 
--- Two active roles may not share a name. The old system enforced nothing here, so
--- duplicate role names were possible and the console showed two identical rows.
+-- Two active roles may not share a name. The old system had no unique constraint
+-- on the role name at all, so duplicates were possible there.
 --
 -- Filtered to unretired rows so that a retired role's name becomes free again.
 -- That is the deliberate difference between the two identifiers: an external id
@@ -186,8 +186,9 @@ CREATE INDEX ix_role_site_role ON role_site (role_id);
 --
 -- This is reference data owned by the product, not by the customer: an
 -- administrator picks from it, and never adds to it. The rows themselves are
--- inserted by the next migration, with identifiers that are computed rather than
--- random, so that two clean installations end up with byte-identical catalogs.
+-- inserted by V104__entitlement_catalog_seed.sql, with identifiers that are
+-- computed rather than random, so that two clean installations end up with
+-- byte-identical catalogs.
 --
 -- The four tables name their columns consistently. The old system did not — the
 -- key and the identifier at each level used different prefixes from each other.

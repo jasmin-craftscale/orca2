@@ -9,11 +9,11 @@
 --
 -- ⚠️ WHY `command_id` IS UNIQUE, WHEN SOMETHING ELSE ALREADY PREVENTS DUPLICATES
 -- Commands carry a key so that the same command delivered twice has the effect of
--- one, and there is a shared component that records those keys and gives a replay
--- the first attempt's answer. This constraint is not that mechanism; it is the
--- line behind it. If two deliveries race closely enough that both get past the
--- claim, the database is what decides, rather than the interleaving of two
--- threads.
+-- one, and `IdempotencyStore` — a shared platform component — records those keys
+-- and gives a replay the first attempt's answer. This constraint is not that
+-- mechanism; it is the line behind it. If two deliveries race closely enough that
+-- both get past the claim, the database is what decides, rather than the
+-- interleaving of two threads.
 --
 -- That belt-and-braces is specific to what these commands do. For an instruction
 -- that raises a physical barrier over a lane a truck is sitting in, "almost

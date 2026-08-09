@@ -33,9 +33,11 @@
 -- `below_expected_sec`, `expected_sec` and `max_sec` say how long this work
 -- should take before it is shown as running late, and when it has breached
 -- entirely. All three are nullable, and null means "use the installation-wide
--- default" — which is why a settings registry seeded two matching keys earlier.
--- There is deliberately no installation-wide default for the first of the three:
--- what counts as unusually fast is only meaningful per screen.
+-- default" — which is why V107__settings_workspace_audit.sql seeded the settings
+-- registry with `EXPECTED_PROCESSING_TIME_SEC` and `MAX_PROCESSING_TIME_SEC`, and
+-- why V110__settings_view.sql publishes that registry as a view. There is
+-- deliberately no installation-wide default matching `below_expected_sec`: what
+-- counts as unusually fast is only meaningful per screen.
 --
 -- TEAM ROUTING, AND WHAT PRIORITY MEANS
 -- One row per team, screen and lane: "the day shift works unreadable plates on
@@ -82,8 +84,8 @@ CREATE TABLE screen (
 -- assumption the query makes.
 --
 -- It leads with the site column, so it is also the index every scoped read of
--- this table uses. A build check reads this file and fails when a table carrying
--- `site_external_id` has no index leading with it.
+-- this table uses. The build check `ScopeIndexRule` reads this file and fails
+-- when a table carrying `site_external_id` has no index leading with it.
 CREATE UNIQUE INDEX ux_screen_site_node
 	ON screen (site_external_id, process_definition_key, node_reference)
 	WHERE retired_at IS NULL;

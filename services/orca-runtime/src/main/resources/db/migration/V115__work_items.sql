@@ -36,9 +36,9 @@
 --   * An iteration counter, left over from an earlier attempt at service-level
 --     timing. Nothing ever incremented it. Timing here is a real engine timer,
 --     and what it produces is the `sla_breached_at` column below.
---   * Statuses for escalation and re-queueing. They were declared and never
---     written by anything. The four statuses below are exactly the four that have
---     a writer.
+--   * Three statuses — escalate to lane, escalate to customer, and re-queued.
+--     They were declared there and never written by anything. The four statuses
+--     below are exactly the four that have a writer.
 --   * A team reference that was never wired up as a foreign key and was always
 --     set to zero.
 --   * Copies of the customer, site and area on every row. All are reachable from
@@ -51,11 +51,12 @@
 --
 -- ONE THING STATED OPENLY RATHER THAN HIDDEN
 -- `event_data` and `corrected_event_data` hold their content inline. The design
--- calls for large bodies to be stored once per distinct content and referenced,
--- rather than copied into every record that mentions them — but that store does
--- not exist yet, and the size threshold at which it would take over has not been
--- set. Inline text is the honest shape until it does; what bounds it in the
--- meantime is the retention policy declared for this table in Java.
+-- calls for large bodies to be stored once per distinct content and referenced
+-- from a `payload_blob` table, rather than copied into every record that mentions
+-- them — but that store does not exist yet, and the size threshold at which it
+-- would take over has not been set. Inline text is the honest shape until it
+-- does; what bounds it in the meantime is the retention policy declared for this
+-- table in Java.
 
 -- --------------------------------------------------------------------------
 -- The visit gains a fourth and final state: FAILED.
@@ -156,11 +157,11 @@ CREATE TABLE work_item (
 -- fetches a single row.
 --
 -- It leads with the site column, as every index in this service does. A build
--- check insists on it, and the reason is measured rather than stylistic: the
--- shared code every read goes through puts the site condition first, and an index
--- that does not lead with it cannot be used for that condition, so the table gets
--- scanned instead. The lane-lock table in an earlier migration carries the full
--- account of what that cost.
+-- check — `ScopeIndexRule` — insists on it, and the reason is measured rather
+-- than stylistic: the shared code every read goes through puts the site condition
+-- first, and an index that does not lead with it cannot be used for that
+-- condition, so the table gets scanned instead. The comment on `lane_session` in
+-- V101__execution.sql carries the full account of what that cost.
 CREATE INDEX ix_work_item_scope_status
 	ON work_item (site_external_id, status, queued_at)
 	INCLUDE (external_id, execution_id, lane_id, lane_external_id, visit_external_id,

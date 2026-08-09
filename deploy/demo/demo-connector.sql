@@ -2,9 +2,10 @@
 -- what its answers are taken to mean.
 --
 -- ⚠️ WHY THIS IS A SEPARATE FILE FROM demo-site.sql, RUN AS A DIFFERENT LOGIN
--- These rows live in the gate service's schema, and the configuration service's
--- login has no permission to write there. That is the platform's data-ownership
--- boundary working exactly as designed, not an inconvenience to be worked around:
+-- These rows live in the `runtime` schema, and the `orca_core` login that seeds
+-- demo-site.sql has no permission to write there. That is the platform's
+-- data-ownership boundary working exactly as designed, not an inconvenience to be
+-- worked around:
 -- if a single script could write both schemas, the database would not be
 -- enforcing the confinement that deploy/bootstrap/verify-isolation.sh goes on to
 -- assert.
@@ -23,8 +24,8 @@ USE [orca];
 GO
 
 -- The customer's terminal operating system — the software that knows which
--- containers may be collected — as far as this demo is concerned: a canned-answer
--- stub under deploy/stubs/tos.
+-- containers may be collected — as far as this demo is concerned: a WireMock stub
+-- serving canned answers, configured under deploy/stubs/tos.
 --
 -- Its address is passed in by deploy/demo/seed.sh so that the deployment's
 -- environment file stays the one place the port is written down.
@@ -47,10 +48,10 @@ GO
 
 -- What each answer from that system means, as a word the process can branch on.
 --
--- ⚠️ ONE ROW, AND ONLY ONE, ON PURPOSE. The demo process sends APPROVED to the
--- barrier and everything else to a human. A site that wants 409 to mean something
--- other than "a person looks at it" ADDS A ROW HERE; it does not wait for a code
--- change. That is the whole reason this mapping is data.
+-- ⚠️ ONE ROW, AND ONLY ONE, ON PURPOSE. The demo process — `gate-visit` — sends
+-- APPROVED to the barrier and everything else to a human. A site that wants 409
+-- to mean something other than "a person looks at it" ADDS A ROW HERE; it does
+-- not wait for a code change. That is the whole reason this mapping is data.
 --
 -- A status with no row becomes the literal word `HTTP_<status>` — HTTP_503, say —
 -- which no branch matches, so the process takes its default path to a human. An

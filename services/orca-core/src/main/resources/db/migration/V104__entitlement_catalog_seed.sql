@@ -1,6 +1,6 @@
 -- The contents of the permission catalog: every application, module, sub-module
 -- and action item the gate console can gate a button on. The empty tables were
--- created by the previous migration; this fills them.
+-- created by V103__identity.sql; this fills them.
 --
 -- One branch only — the one rooted at GATE, which is the console operators and
 -- administrators use: 1 application, 3 modules, 30 sub-modules, 174 action items.
@@ -42,9 +42,10 @@
 --
 -- WHAT MIGHT SURPRISE YOU
 -- The rows carry no explicit scope column: `config_realm` is defaulted to
--- 'INSTALLATION' by the previous migration's column default. And the insert order
--- is load-bearing in a small way — the identity keys ascend in document order, so
--- ordering by key reproduces the menu order the console displays.
+-- 'INSTALLATION' by the column default V103__identity.sql gave it. And the
+-- insert order is load-bearing in a small way — the identity keys ascend in
+-- document order, so ordering by key reproduces the menu order the console
+-- displays.
 
 INSERT INTO entitlement_application (external_id, code, name) VALUES ('b8589e83-01a2-5c85-8b53-4468a5770a86', 'GATE', N'GATE');
 INSERT INTO entitlement_module (application_id, external_id, code, name)

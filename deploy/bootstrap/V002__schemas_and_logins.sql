@@ -34,11 +34,15 @@
 -- land in the right place, and the fourth bootstrap file checks it rather than
 -- assuming it.
 --
--- Each statement is wrapped in `EXEC` so that it is compiled only when it
--- actually runs. Without that, the database would try to compile a CREATE USER
--- naming a login that does not exist yet, and fail before the guard above it
--- could prevent it. The `GO` lines are batch separators for the same reason: each
--- step must be compiled after the previous one has taken effect.
+-- ⚠️ THE `EXEC` WRAPPERS ARE REQUIRED FOR THE `CREATE SCHEMA` STEP. SQL Server
+-- demands that CREATE SCHEMA be the first statement in its batch, so it cannot
+-- sit underneath an `IF` — written directly, it does not even parse, and the
+-- error is the unhelpful "Incorrect syntax near the keyword 'SCHEMA'". Wrapping
+-- it in `EXEC` defers it into a batch of its own at the moment it runs. The other
+-- three steps would work without the wrapper; they are written the same way.
+--
+-- The `GO` lines separate batches, which is what lets each step be compiled after
+-- the previous one has taken effect.
 
 SET NOCOUNT ON;
 GO

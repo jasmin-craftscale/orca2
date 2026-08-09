@@ -41,7 +41,7 @@ CREATE TABLE user_activity (
 	-- foreign key and there cannot be one: user accounts live in another service's
 	-- schema, which this service's database login has no access to. The value
 	-- arrives across the service boundary and is resolved through the view
-	-- orca-core publishes for it.
+	-- orca-core publishes for exactly this, `core.topology_operator`.
 	user_external_id VARCHAR(64)  NOT NULL,
 	status           VARCHAR(16)  NOT NULL
 		CONSTRAINT ck_user_activity_status

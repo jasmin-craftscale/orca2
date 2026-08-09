@@ -12,7 +12,7 @@
 -- Administrators write these rows through the console. The gate software reads
 -- them constantly: to know which lane a plate was read at, and which barrier to
 -- command. Other services do not read these tables directly — they read the
--- published views that the next migration creates.
+-- published views that V102__topology_views.sql creates.
 --
 -- WHY IT IS ONLY FOUR TABLES
 -- The design for orca-core names roughly seventy tables. This builds the four
@@ -36,8 +36,9 @@
 --     optional.
 --
 -- HOW BIG THESE GET
--- Each table's expected growth is declared in Java next to the entity, because
--- that is where a build check can read it and fail when a declaration is missing.
+-- Each table's expected growth is declared in Java next to the entity, on the
+-- `@PersistentTable` annotation, because that is where the build check
+-- `RetentionClassRule` can read it and fail when a declaration is missing.
 -- All four are bounded: a row appears when somebody configures something, never
 -- when a truck arrives.
 
@@ -124,8 +125,8 @@ CREATE TABLE device (
 	-- ⚠️ A PROVISIONAL VOCABULARY, deliberately left as a free VARCHAR rather
 	-- than constrained to a closed list.
 	--
-	-- The design settles what commands a device can be sent — raise the gate,
-	-- lower it, print, set an IO port, move a camera to a preset — but it never
+	-- The design settles what commands a device can be SENT — the five actions are
+	-- RAISE_GATE, LOWER_GATE, PRINT, SET_IO and PTZ_PRESET — but it never
 	-- enumerates device TYPES; it says only that a device has identity, addressing
 	-- and an IO port layout. Writing a CHECK over a closed list here would invent
 	-- a vocabulary nobody has agreed, and inventing one in a shipped migration is
@@ -133,8 +134,8 @@ CREATE TABLE device (
 	-- BARRIER — are provisional, and are named as provisional rather than dressed
 	-- up as a decision.
 	--
-	-- (This was later settled: a subsequent migration replaces this column with a
-	-- foreign key into a catalog of device types translated from the system in
+	-- (This was later settled: V106__device_registry.sql replaces this column with
+	-- a foreign key into a catalog of device types translated from the system in
 	-- production today, and BARRIER becomes that catalog's GATE_ARM.)
 	device_type  VARCHAR(32)   NOT NULL,
 	name         NVARCHAR(200) NOT NULL,

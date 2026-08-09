@@ -15,8 +15,8 @@
 --      DENY anywhere in this file.
 --   2. It would actively break the platform. A DENY OVERRIDES A GRANT. The
 --      configuration service publishes read-only views of its world model and
---      grants other services permission to read them — that is the only sanctioned
---      way one service sees another's data. A blanket DENY written here "for
+--      grants other services permission to read them — the only sanctioned way
+--      one service sees another's data. A blanket DENY written here "for
 --      tidiness" would silently defeat those grants when they arrive, and the
 --      resulting failure would look like a bug in the view rather than a
 --      permissions problem.

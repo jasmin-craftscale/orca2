@@ -15,9 +15,9 @@
 --
 -- This is the single hardest guarantee in the service, and every inbound path
 -- depends on it. It is not argued for — it is measured. The proof is an
--- executable test suite run against the real workflow engine and a real SQL
--- Server: a thousand iterations, two simultaneous events each time, and exactly a
--- thousand visits.
+-- executable test suite, `AdmissionPropertiesIT`, run against the real workflow
+-- engine and a real SQL Server: a thousand iterations, two simultaneous events
+-- each time, and exactly a thousand visits.
 --
 -- Three mechanisms hold it up, and each is explained where it appears below: a
 -- lock row per lane, a filtered unique index as the backstop behind it, and
@@ -25,11 +25,11 @@
 -- the three means reading that test suite before deciding the guarantee still
 -- holds.
 --
--- ⚠️ A SECOND COPY OF THESE TABLES EXISTS, ON PURPOSE. The proving suite applies
--- its own schema into a separate schema of its own, because it deliberately
--- disables the lane lock in order to watch the backstop fire — which is not a
--- mode the shipping code has, and should not be. Two shapes of the same tables is
--- a real cost, and it is written down rather than hidden.
+-- ⚠️ A SECOND COPY OF THESE TABLES EXISTS, ON PURPOSE. `AdmissionPropertiesIT`
+-- applies its own copy into a schema of its own, `it_admission`, because it
+-- deliberately disables the lane lock in order to watch the backstop fire — which
+-- is not a mode the shipping code has, and should not be. Two shapes of the same
+-- tables is a real cost, and it is written down rather than hidden.
 
 -- --------------------------------------------------------------------------
 -- lane_session — one row per lane, and the thing everything admitting a truck
@@ -44,9 +44,10 @@
 -- choice this table made.
 --
 -- The lane is identified by the numeric key orca-core uses for it, read from the
--- view orca-core publishes. That is deliberate: it is a key that is correlated
+-- view `core.topology_lane`. That is deliberate: it is a key that is correlated
 -- on, locked on and indexed on, so it wants to be a fixed narrow value rather
--- than the lane's display code, which is what the old system stored.
+-- than the lane's display code — `lane_code` — which is what the old system
+-- stored in its place.
 --
 -- ⚠️ THE PRIMARY KEY IS (site_external_id, lane_id), IN THAT ORDER, AND THE ORDER
 -- IS NOT COSMETIC. IT WAS MEASURED.
@@ -129,8 +130,8 @@ CREATE UNIQUE INDEX ux_execution_one_active_root_per_lane
 
 -- The read that decides "is a truck already here?", made on every arriving event
 -- while the lane lock is held. Site, lane and status are what the question asks
--- on; the four columns carried along in the index are the whole of the answer, so
--- the rows themselves never have to be fetched. On the path a truck is waiting
+-- on; the three columns carried along in the index are the whole of the answer,
+-- so the rows themselves never have to be fetched. On the path a truck is waiting
 -- on, and holding a lock, that matters.
 CREATE INDEX ix_execution_lane_status ON execution (site_external_id, lane_id, status)
 	INCLUDE (parent_execution_id, execution_id, external_id);
@@ -149,16 +150,17 @@ CREATE INDEX ix_execution_lane_status ON execution (site_external_id, lane_id, s
 -- record behind it.
 --
 -- `event_uuid` IS UNIQUE AS A SECOND LINE OF DEFENCE, NOT THE FIRST
--- A redelivered batch is already given a single effect by a shared component that
--- records what has been handled. This constraint is what holds if two deliveries
--- race closely enough that both get past that claim: the database decides, rather
--- than the interleaving of two threads.
+-- A redelivered batch is already given a single effect by `IdempotencyStore`, the
+-- shared component that records what has been handled. This constraint is what
+-- holds if two deliveries race closely enough that both get past that claim: the
+-- database decides, rather than the interleaving of two threads.
 --
 -- `attributes` IS THE DECODED EVENT, NOT THE RAW ONE
--- It is a small JSON map, produced by the service that talks to hardware. The
--- vendor's own message format stops at that service, deliberately: nothing in
--- this schema, and nothing in the process that runs the gate, knows what a
--- particular camera's wire format is called or how it is shaped.
+-- It is a small JSON map, produced by orca-edge, the service that talks to
+-- hardware. The vendor's own message format — for the plate cameras, a framed XML
+-- `ZapPacket` — stops at that service, deliberately: nothing in this schema, and
+-- nothing in the process that runs the gate, knows what one is or how it is
+-- shaped.
 CREATE TABLE execution_event (
 	execution_event_id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_execution_event PRIMARY KEY,
 	event_uuid         VARCHAR(64)   NOT NULL CONSTRAINT uq_execution_event_uuid UNIQUE,

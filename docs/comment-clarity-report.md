@@ -1,9 +1,9 @@
 # Comment clarity — the SQL
 
 **Every SQL comment in this repository now explains itself to a developer who has
-never read this project's documents and never will.** 33 files rewritten across
-three commits; not one byte of SQL changed, and that is proven mechanically
-rather than asserted.
+never read this project's documents and never will.** 33 files rewritten, then
+re-read end to end and corrected; not one byte of SQL changed, and that is proven
+mechanically rather than asserted.
 
 The standard, the ground rules and the verification table this work was done
 against are `docs/comment-clarity-plan.md`. This report records what was done,
@@ -19,13 +19,13 @@ calibration sample and was used as the reference rather than touched.**
 
 | Package | Files | Comment lines before → after |
 |---|---|---|
-| `services/orca-core/` migrations | 10 | 487 → 924 |
-| `services/orca-runtime/` migrations | 6 | 238 → 428 |
-| `services/orca-edge/` migrations | 4 | 93 → 172 |
+| `services/orca-core/` migrations | 10 | 525 → 995 |
+| `services/orca-runtime/` migrations | 6 | 238 → 431 |
+| `services/orca-edge/` migrations | 4 | 93 → 174 |
 | `services/orca-{fleet,portal,sync}/` baselines | 3 | 33 → 96 |
-| `platform/{outbox,lease,idempotency}/` | 3 | 116 → 216 |
-| `deploy/bootstrap/`, `deploy/demo/`, `deploy/adopt-flowable/` | 7 | 273 → 455 |
-| **Total** | **33** | **1,278 → 2,351** |
+| `platform/{outbox,lease,idempotency}/` | 3 | 116 → 239 |
+| `deploy/bootstrap/`, `deploy/demo/`, `deploy/adopt-flowable/` | 7 | 273 → 464 |
+| **Total** | **33** | **1,278 → 2,399** |
 
 Three commits, roughly ten files each:
 
@@ -35,6 +35,7 @@ Three commits, roughly ten files each:
 | `ef54df2` | orca-edge's three and orca-runtime's five |
 | `fba291c` | the three platform primitives and all seven files under `deploy/` |
 | `0a0ff46` | two file paths I had introduced incorrectly, corrected |
+| *(review)* | a full re-read: one invented explanation, two invented consequences and one miscount fixed; nineteen sibling-migration references named by filename; the real identifiers the first pass generalized away put back (§4.5, §4.7) |
 
 **The five Flowable migrations `V110`–`V114` in `orca-runtime` were not touched at
 all**, as instructed. They are extracted verbatim from the engine's own jars by a
@@ -112,8 +113,8 @@ Every row was run, not reasoned about. The numbering is the plan's §7.
 
 | # | Check | Result |
 |---|---|---|
-| 1 | `assert-comments-only.py`, after every few files and once across the sweep | **PASS.** 33 files; caught one real mistake mid-sweep (§2) |
-| 2 | `./gradlew check integrationTest --rerun-tasks` | **BUILD SUCCESSFUL in 6m 4s**, 68 tasks executed. **222 integration tests, 0 failures, 0 errors, 0 skipped**; 60 unit tests, 0 failures |
+| 1 | `assert-comments-only.py`, after every few files and once across the sweep | **PASS.** 33 files; caught one real mistake mid-sweep (§2). Re-run after the review pass: **PASS, 33 files** |
+| 2 | `./gradlew check integrationTest --rerun-tasks` | **BUILD SUCCESSFUL in 6m 4s**, 68 tasks executed. **222 integration tests, 0 failures, 0 errors, 0 skipped**; 60 unit tests, 0 failures. Re-run after the review pass: **BUILD SUCCESSFUL in 6m 54s**, same 222/0 and 60/0 |
 | 3 | Clean-database migration, then start the services | **PASS.** See below |
 | 4 | The rebuild procedure works against a database holding the old checksums | **PASS**, and the failure it repairs was observed first. See below |
 | 5 | Bootstrap is a no-op on an already-bootstrapped database; isolation passes | **PASS.** *"Database [orca] already exists — nothing to do"*, then *"verification passed: 7 schemas, 7 logins, each confined to its own"*; isolation reported **`PASS — 36 checks`** |
@@ -182,6 +183,36 @@ work_item_audit     TAKE · COMPLETE, both actor usr-demo-clerk
 
 The route was restored to 200 afterwards.
 
+### Everything re-run after the review pass
+
+The review touched migrations again, so the whole live sequence was repeated from
+a clean database: `down -v` → `up -d` → bootstrap → the three services → isolation
+→ demo seed → one truck.
+
+```
+bootstrap          verification passed: 7 schemas, 7 logins, each confined to its own
+verify-isolation   PASS — 36 checks
+core · runtime · edge   8081 · 8082 · 8083 all UP
+sendPlate T-REVIEW-01   runtime.execution  COMPLETED
+                        edge.command_log   RAISE_GATE  EXECUTED
+                        runtime.outbox     1  lane:LANE-DEMO-01  visit.completed
+```
+
+**One thing worth reporting from that run.** Starting core, runtime and edge in
+parallel, orca-edge lost the race and refused to start:
+
+```
+orca-edge will not start: 2 required published view(s) are absent —
+core.topology_lane, core.topology_device. orca-core publishes these; it must have
+migrated before this service starts. This is a deployment ordering problem, not a
+fault in this service.
+```
+
+That is the readiness guard working exactly as designed, and the message says so
+in plain words — but it means **the three services have a start ORDER**, and
+neither `docs/phase-1-demo.md` nor `deploy/README.md` says core must be up first.
+Reported, not fixed.
+
 **The `QUOTED_IDENTIFIER` trap documented in `deploy/demo/demo-site.sql` bit
 during this run, which is a small vindication of keeping the warning.** Updating
 `core.user_account` through `sqlcmd` without `-I` failed with *"UPDATE failed
@@ -246,7 +277,36 @@ replaced by the rule itself, stated where it applies. That is why several files
 grew: eleven numbered rules referenced 30-odd times each become the sentence they
 stand for, at the point it matters.
 
-### 4.4 · Two forward references added
+### 4.4 · Sibling migrations are named by filename, not as "an earlier migration"
+
+Nineteen comments referred to another migration in the same directory. They now
+name it — `V106__device_registry.sql` rather than "a later migration". Migration
+filenames are real, findable paths, which the standard explicitly allows and
+prefers; a Flyway version never changes once it has shipped, so there is no rot
+risk; and "an earlier migration" in a directory of eleven is a search task, not a
+reference.
+
+### 4.5 · Real identifiers restored where the first pass generalized them away
+
+The first pass replaced some grep-able names with prose — "a build check reads
+this file", "the view orca-core publishes", "a shared component that records what
+has been handled". That is knowledge loss dressed as clarity, and the standard
+lists real identifiers among the things to KEEP. A second pass put them back
+alongside the explanation rather than instead of it:
+
+`ScopeIndexRule`, `RetentionClassRule`, `ScopeSeamRule`, `IdentityTables`,
+`AuditTables`, `@PersistentTable`, `AdmissionPropertiesIT` and its `it_admission`
+schema, `IdempotencyStore`, `core.topology_lane`, `core.topology_operator`,
+`lane_session`, `payload_blob`, `ZapPacket`, `EXPECTED_PROCESSING_TIME_SEC` and
+`MAX_PROCESSING_TIME_SEC`, `ORCA_DEVICE_HOST_STUB_PORT`, `keycloak_subject`,
+`gate-visit`, `flowable.database-schema-update`, `deleted_at`, and the five
+command actions `RAISE_GATE`, `LOWER_GATE`, `PRINT`, `SET_IO`, `PTZ_PRESET`.
+
+The three platform migrations also regained the list of services they are applied
+into — four for the outbox, all six for the lease, three for the idempotency
+record — which the first pass had flattened to "several services".
+
+### 4.6 · Two forward references added
 
 `V101__world_model.sql` describes `device_type` as a provisional free-text column,
 which it no longer is — `V106` replaces it with a catalog reference and drops it.
@@ -259,7 +319,51 @@ debugging, and a comment describing a column that no longer exists — with no h
 that it was superseded — is worse than no comment. Both statements were verified
 against the migrations that make them true.
 
-### 4.5 · Work-package numbers replaced by what the work-package delivered
+### 4.7 · Three things a second pass found wrong in MY OWN work, and fixed
+
+A full re-read after the first four commits found three real defects. They are
+recorded because the same traps are available to anyone doing this kind of sweep.
+
+**1. An invented explanation, in `deploy/bootstrap/V002__schemas_and_logins.sql`.**
+The original said nothing about why each statement is wrapped in `EXEC`. I
+supplied a reason — that `CREATE USER` would otherwise fail to compile against a
+login that does not exist yet — and it is wrong. Checked against the running
+database with `SET PARSEONLY ON`:
+
+```
+IF 1 = 0 CREATE SCHEMA zzz_probe;                   →  Msg 156: Incorrect syntax near the keyword 'SCHEMA'
+IF 1 = 0 CREATE LOGIN [zzz] WITH PASSWORD = 'X';    →  parses fine
+IF 1 = 0 CREATE USER [zzz] FOR LOGIN [zzz_absent];  →  parses fine
+IF 1 = 0 ALTER USER [zzz] WITH DEFAULT_SCHEMA = …;  →  parses fine
+```
+
+Only `CREATE SCHEMA` genuinely needs the wrapper — it must be the first statement
+in its batch and cannot sit under an `IF`. The comment now says that and nothing
+more. **This is exactly what the plan's "do not invent explanations" rule is for,
+and I broke it; the check that caught it was reading my own sentence again and
+asking whether I actually knew it.**
+
+**2. Two invented consequences.** "the console showed two identical rows"
+(`V103__identity.sql`) and "showed up as a person listed twice in the console"
+(`V105__teams_templates.sql`) describe behaviour of the old system's user
+interface that I have not seen. Both now state only what is verifiable: that the
+old system had no unique constraint, so duplicates were possible there.
+
+**3. A miscount.** `V101__execution.sql` said "the four columns carried along in
+the index"; the index carries three.
+
+Three claims that WERE checked and held, for the record — the case-insensitive
+collation the `COLLATE` clauses exist to defeat, the `CREATE VIEW` batching rule,
+and the PUSH/PROMPT definitions:
+
+```
+DATABASEPROPERTYEX('orca','Collation')      →  SQL_Latin1_General_CP1_CI_AS
+'push' IN ('PUSH','PROMPT')                 →  ACCEPTED  (this is the trap)
+'push' COLLATE Latin1_General_100_BIN2 IN … →  REFUSED   (this is the fix)
+SELECT 1; CREATE VIEW …                     →  Msg 111: 'CREATE VIEW' must be the first statement in a query batch
+```
+
+### 4.8 · Work-package numbers replaced by what the work-package delivered
 
 Every migration's opening line was `orca-core · WP3 — …` or `orca-runtime · Phase
 3 WP1 — …`. Those are gone. What replaced them is a one-sentence statement of what
@@ -372,14 +476,26 @@ exactly the column an operator reads after an incident — so it is a reader-fac
 `DERIVED-FROM-1X`, in a database, and it is the same defect this work removed from
 the comments. It belongs to whichever session owns `deploy/stubs/`.
 
-### 6.8 · A comment edit in `platform/` invalidates checksums in six schemas
+### 6.8 · The three on-site services have an undocumented start order
 
-Not a defect, but it is not written down anywhere and it surprised this session.
-The three primitive migrations are applied into each consuming service's own
-schema, so editing one produces `Migration checksum mismatch for migration version
-001` in every schema it reached — six mismatches from one file. It is worth a line
-in `platform/AGENTS.md`, which currently describes those files only as being
-defined once.
+orca-edge refuses to start until orca-core has migrated, because it checks that
+the published views it reads actually exist. The refusal is correct and its
+message is excellent. But nothing in `docs/phase-1-demo.md` or `deploy/README.md`
+says core must come up first, and starting the three in parallel therefore fails
+about half the time. Hit during the review pass (§3).
+
+### 6.9 · A comment edit in `platform/` invalidates checksums in several schemas
+
+Not a defect, but it is written down nowhere and it surprised this session. The
+three primitive migrations are applied into each *consuming* service's own schema,
+so editing one produces a checksum mismatch in every schema it reached — four for
+the outbox, all six for the lease, three for the idempotency record. That is why
+the first service started after this work reported mismatches for versions 001 and
+002 alongside its own.
+
+Each of the three files now says so in its own header. It is also worth a line in
+`platform/AGENTS.md`, which currently describes those files only as being defined
+once.
 
 ---
 

@@ -26,6 +26,8 @@
 -- data-access code every read goes through has no unscoped read at all — so a
 -- view with no site dimension has to offer another one to be read under. That
 -- keeps reading installation-wide data a declared act rather than a hole.
+-- `topology_operator`, published alongside the routing views, is read the same
+-- way and for the same reason.
 
 IF DATABASE_PRINCIPAL_ID(N'orca_runtime') IS NULL
 	THROW 50110, 'orca_runtime does not exist in this database. Run deploy/bootstrap/run.sh before starting orca-core.', 1;

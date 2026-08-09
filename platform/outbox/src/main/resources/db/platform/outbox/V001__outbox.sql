@@ -19,9 +19,16 @@
 -- WHERE THIS FILE ACTUALLY RUNS
 -- It is written once, here, beside the code that implements the mechanism. It is
 -- then applied SEPARATELY into each owning service's own schema, by that
--- service's own migration run, using that service's own database credentials — so
--- several services each end up with their own pair of these tables, and no
--- service ever migrates another's schema.
+-- service's own migration run, using that service's own database credentials.
+-- Four services publish facts and so carry these two tables — orca-core,
+-- orca-runtime, orca-edge and orca-portal, each with its own pair — and no
+-- service ever migrates another's schema. (Which services apply this file is
+-- decided by each one's own list of migration locations, in its
+-- `application.yaml`.)
+--
+-- ⚠️ THAT ALSO MEANS EDITING THIS FILE — INCLUDING ITS COMMENTS — INVALIDATES THE
+-- RECORDED CHECKSUM IN FOUR SCHEMAS AT ONCE, not one. Flyway checksums the whole
+-- file, so the mismatch appears once per schema it was applied into.
 --
 -- That is deliberately not a shared migrations module. A shared module would move
 -- schema definition away from the services that own it, and it would not remove

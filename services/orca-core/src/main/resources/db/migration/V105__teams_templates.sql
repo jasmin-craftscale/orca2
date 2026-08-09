@@ -6,8 +6,8 @@
 -- the work has to reach somebody who is on duty and responsible for that lane. A
 -- team is that unit of responsibility — a named set of operators at one site. The
 -- shift and break templates say when its members are expected to be at their
--- desks. A later migration adds the routing rules that tie a team to particular
--- lanes and screens; this one builds the teams themselves.
+-- desks. V109__routing_screens.sql later adds the rules that tie a team to
+-- particular lanes and screens; this one builds the teams themselves.
 --
 -- Administrators write all of it. The gate software reads it when it has work to
 -- hand out.
@@ -158,8 +158,9 @@ CREATE TABLE team (
 
 -- One index doing two jobs: it makes a team's name unique within its site among
 -- active teams, and because it leads with the site column it is also the index
--- every scoped read of this table uses. A build check reads this file and fails
--- when a table carrying `site_external_id` has no index leading with it — without
+-- every scoped read of this table uses. The build check `ScopeIndexRule` reads
+-- this file and fails when a table carrying `site_external_id` has no index
+-- leading with it — without
 -- one the table can only be scanned, and a scan taken under a lock locks every
 -- row at the site.
 CREATE UNIQUE INDEX ux_team_site_name ON team (site_external_id, name) WHERE retired_at IS NULL;
@@ -178,8 +179,8 @@ CREATE TABLE team_member (
 );
 
 -- A person cannot be in the same team twice. The old system had an index on each
--- column separately and no unique constraint at all, so duplicate memberships
--- were possible and showed up as a person listed twice in the console.
+-- column separately and no unique constraint on the pair, so duplicate
+-- memberships were possible there.
 CREATE UNIQUE INDEX ux_team_member ON team_member (team_id, user_id) WHERE retired_at IS NULL;
 
 -- The read path: site first, then team. Reads arrive asking "who is in this team"

@@ -13,11 +13,11 @@
 -- the far end comes back. Every column and index below follows from it.
 --
 -- ⚠️ THE SITE AND LANE ARE EXTERNAL IDENTIFIERS, NOT THE OTHER SERVICE'S KEYS.
--- orca-core owns the world model — sites, lanes, devices — and publishes a
--- read-only view of it that carries both an internal numeric key and an external
--- string id for each row. This service stores the external one. Storing the
--- numeric key would mean holding a reference into another service's private
--- numbering, which it has no way to keep valid and no right to depend on.
+-- orca-core owns the world model — sites, lanes, devices — and publishes the
+-- read-only view `core.topology_lane`, which carries both an internal numeric key
+-- and an external string id for each row. This service stores the external one.
+-- Storing the numeric key would mean holding a reference into another service's
+-- private numbering, which it has no way to keep valid and no right to depend on.
 --
 -- The site itself comes from this installation's configuration, under the
 -- property `orca.installation.site-external-id`, rather than being worked out per

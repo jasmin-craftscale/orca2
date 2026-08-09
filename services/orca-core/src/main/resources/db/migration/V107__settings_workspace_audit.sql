@@ -22,7 +22,7 @@
 --
 -- `setting_history` is the only table in this migration that grows with use
 -- rather than with configuration. Its growth and how long it is kept are declared
--- in Java beside the entity, where a build check can read them.
+-- in Java beside the entity, in `AuditTables`, where a build check can read them.
 --
 -- 2 · WORKSPACE — what each operator has arranged for themselves
 -- `grid_definition` names the data grids the console shows. Only the grids whose
@@ -257,8 +257,9 @@ CREATE UNIQUE INDEX ux_site_language ON site_language (site_external_id, code) W
 -- This is the first table in this schema that grows with use rather than with
 -- configuration, which means it is also the first that must be bounded. How fast
 -- it grows and how long its rows are kept are declared in Java beside the entity,
--- where a build check can fail when a growing table has no retention declared.
--- The index it is read by is here, where a different build check reads it.
+-- in `AuditTables`, where the build check `RetentionClassRule` fails when a
+-- growing table names no retention class. The index it is read by is here, where
+-- `ScopeIndexRule` reads it.
 -- --------------------------------------------------------------------------
 CREATE TABLE audit_event (
 	audit_event_id     BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_audit_event PRIMARY KEY,

@@ -16,6 +16,16 @@
 -- guess. Replaying the recorded outcome tells it what actually happened, which is
 -- the whole point. This is why the `outcome` column exists and why the constraint
 -- at the bottom of the table refuses to let a finished record exist without one.
+--
+-- WHERE THIS FILE ACTUALLY RUNS
+-- Once per service that needs it, in that service's own schema — orca-runtime,
+-- orca-edge and orca-sync — applied by that service's own migration run with its
+-- own credentials. Each gets its own copy, because a service's database login can
+-- reach only its own schema.
+--
+-- ⚠️ Editing this file — including its comments — invalidates the recorded
+-- checksum in all three schemas at once, not one. Flyway checksums the whole
+-- file, so the mismatch appears once per schema it was applied into.
 
 CREATE TABLE idempotency_record (
 	-- The key the CALLER supplied. This platform never invents one — the caller
