@@ -13,8 +13,8 @@ import com.lynxis.orca.runtime.api.generated.model.ServiceHealth;
 /**
  * Hand-written, and it <strong>implements a generated interface</strong>.
  *
- * <p>That is what makes contract-first a constraint rather than documentation
- * (ADR-014). {@code HealthApi} is generated from
+ * <p>That is what makes contract-first a compiler-enforced constraint rather than
+ * documentation. {@code HealthApi} is generated from
  * {@code src/main/resources/openapi/orca-runtime.yaml} on every build, so changing
  * the route, the operation id or the response schema breaks this class until it
  * is brought back into line. Nobody has to notice; the compiler does.

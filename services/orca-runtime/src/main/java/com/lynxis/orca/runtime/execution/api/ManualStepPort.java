@@ -1,11 +1,11 @@
 package com.lynxis.orca.runtime.execution.api;
 
 /**
- * How the {@code workitem} module advances a parked process — §C2's second arrow
- * (<em>workitem "complete → advance" → execution</em>), as a seam.
+ * The seam through which {@code workitem} completes a manual step and advances a
+ * process parked inside {@code execution}.
  *
- * <p>The engine is confined to {@code execution} ({@code EngineConfinementRule},
- * ADR-006), so completing the engine task a work item parks on has to cross this
+ * <p>{@code EngineConfinementRule} confines Flowable to {@code execution}, so
+ * completing the engine task a work item parks on has to cross this
  * interface: no Flowable type appears in it, and the implementation lives with the
  * one module allowed to speak Flowable.
  *

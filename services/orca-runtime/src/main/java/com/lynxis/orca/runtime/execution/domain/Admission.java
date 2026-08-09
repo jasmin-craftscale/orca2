@@ -15,7 +15,7 @@ public sealed interface Admission {
 	/** The identifier of the visit this event belongs to, whichever way it got there. */
 	long executionId();
 
-	/** The visit's external identifier — what leaves this service (§B8). */
+	/** The visit's external identifier — the stable identifier that leaves this service. */
 	String visitExternalId();
 
 	/** This event started the visit. Exactly one of two simultaneous events for a lane gets this. */

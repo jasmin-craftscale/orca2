@@ -26,9 +26,9 @@ import com.lynxis.orca.runtime.execution.domain.InboundDeviceEvent;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Where a device event enters the gate brain (§B9's first step).
+ * Where a device event enters the gate's process-execution service.
  *
- * <p>Hand-written, implementing a generated interface — ADR-014. Change
+ * <p>Hand-written against a generated interface. Change
  * {@code /internal/events/v1} in {@code orca-runtime.yaml} and this class stops
  * compiling until it matches; nobody has to notice, the compiler does.
  *
@@ -36,11 +36,11 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <p>The scope seam applies whatever {@code ScopeContext} carries and never invents
  * one, so every entry point establishes it explicitly. This one takes <strong>the
- * installation's own site, from configuration</strong>, and not from the request —
- * deliberately, and for the same reason edge does (§C1: exactly one site is
- * primary, and it is the one the licence binds to). A site identifier carried on
+ * installation's own site, from configuration</strong>, and not from the request.
+ * Exactly one site is primary on an on-site installation, and that is the site the
+ * licence binds to. A site identifier carried on
  * the wire would be a value a peer could choose, and the credential on
- * {@code /internal/**} is a per-installation shared secret (ADR-011) that cannot
+ * {@code /internal/**} is a per-installation shared secret that cannot
  * prove <em>which</em> peer is calling — so trusting it to name a site would be
  * reading far more into it than it can carry.
  *
@@ -76,8 +76,8 @@ public class DeviceEventController implements InternalEventsApi {
 	/**
 	 * Admits the batch in the order it was sent.
 	 *
-	 * <p>Order matters and is not incidental: §D3 orders facts per key, edge drains
-	 * a lane oldest-first, and two events for one lane admitted out of order would
+	 * <p>Order matters and is not incidental: facts are ordered per key, edge drains
+	 * each lane oldest-first, and two events for one lane admitted out of order would
 	 * bind the wrong plate to the visit.
 	 */
 	private DeviceEventBatchResult admit(List<DeviceEvent> events) {

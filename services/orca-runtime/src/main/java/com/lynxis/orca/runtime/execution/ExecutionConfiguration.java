@@ -92,13 +92,13 @@ public class ExecutionConfiguration {
 		return new DeviceEventController(admission, siteExternalId);
 	}
 
-	// --- WP7 · out to the hardware, and the end of the visit ------------------
+	// --- out to the hardware, and the end of the visit -----------------------
 
 	/**
 	 * The device transport, replacing the deployment-fault fallback below.
 	 *
 	 * <p>It reaches edge's {@code /internal/commands/v1} with the per-installation
-	 * shared credential (ADR-011). No token is minted, because token <em>issuing</em>
+	 * shared credential. No token is minted, because token <em>issuing</em>
 	 * would put the identity provider on the gate path.
 	 */
 	@Bean
@@ -115,8 +115,7 @@ public class ExecutionConfiguration {
 	}
 
 	/**
-	 * Registers the engine listeners — visit completion (WP7) and work-item
-	 * creation (Phase 3 WP1).
+	 * Registers the visit-completion and work-item-creation engine listeners.
 	 *
 	 * <p>Through the engine's configuration rather than as {@code @Bean}s of a
 	 * Flowable type, so that the listeners are attached once, at startup, to the
@@ -133,7 +132,7 @@ public class ExecutionConfiguration {
 				new WorkItemCreationListener(workItemIntake, admissionRepository, siteExternalId)));
 	}
 
-	// --- Phase 3 WP1 · the manual-input wait state ---------------------------
+	// --- the manual-input wait state ----------------------------------------
 
 	/**
 	 * The engine's side of complete-and-advance, behind the module wall's seam.
@@ -149,7 +148,7 @@ public class ExecutionConfiguration {
 	}
 
 	/**
-	 * Lane reset — §C2's one-transaction abort, and the writer that makes
+	 * Lane reset — the one-transaction abort, and the writer that makes
 	 * {@code work_item.FAILED} real. Its own transaction template, for the same
 	 * reason admission's is its own.
 	 */
@@ -168,7 +167,7 @@ public class ExecutionConfiguration {
 		return new LaneResetController(laneReset, operatorIdentity, siteExternalId);
 	}
 
-	// --- Phase 3 WP3 · the SLA timer -----------------------------------------
+	// --- the SLA timer ------------------------------------------------------
 
 	/**
 	 * Bean name = the compiler's link target for the SLA timer's duration
@@ -223,7 +222,8 @@ public class ExecutionConfiguration {
 	 * customer system would, so the visit reaches "manual handling required" — the
 	 * one outcome that is visible to the people at the gate.
 	 *
-	 * <p>WP7 supplies the real one and this steps aside.
+	 * <p>When installation configuration supplies the real connector, this fallback
+	 * steps aside.
 	 */
 	static ConnectorPort unconfiguredConnectorPort() {
 		return call -> {

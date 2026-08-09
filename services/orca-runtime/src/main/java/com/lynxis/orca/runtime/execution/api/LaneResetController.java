@@ -20,7 +20,7 @@ import com.lynxis.orca.runtime.workitem.api.OperatorIdentity;
 import com.lynxis.orca.runtime.workitem.api.WorkItemErrorCode;
 
 /**
- * §C2's lane reset, as a route. One transaction behind it — see
+ * Exposes lane reset as a route. One transaction sits behind it — see
  * {@link LaneResetService}. The actor is the authenticated caller; a reset is an
  * operator's deliberate act and lands in the failed items' audit trails as one.
  */

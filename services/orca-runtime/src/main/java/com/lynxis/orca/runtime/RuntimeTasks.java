@@ -10,11 +10,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * The outbox relay's first invocation — Phase 0 built it and nothing ran it.
+ * Schedules runtime's outbox relay, which the platform primitive does not schedule
+ * for itself.
  *
  * <p>{@code SystemContextRule} fails the build on any {@code @Scheduled} method
  * that does not enter a {@link SystemContext}, and this is why: no user invoked
- * this, so §B6 and §D3 require it to say who it is rather than run anonymously.
+ * this task, so it must identify itself rather than run anonymously.
  *
  * <p>⚠️ It calls {@code deliverPendingUnderCurrentIdentity} and <strong>not</strong>
  * {@code deliverPending}, and the difference is a contradiction that running this
@@ -27,9 +28,9 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <p>⚠️ <strong>No consumer is registered, and that is the honest state.</strong>
  * {@code orca.outbox.consumers} is empty, so {@code OutboxWriter} writes the fact
- * and zero delivery rows, and this relay has nothing to deliver. Nothing on-site
- * consumes {@code visit.completed} in Phase 1 — the cloud tier that would is
- * scoped later (register NEW-1b) — and registering a consumer nobody has written
+ * and zero delivery rows, and this relay has nothing to deliver. No on-site
+ * component currently consumes {@code visit.completed}; its destination belongs
+ * to the deferred cloud tier. Registering a consumer nobody has written
  * would make retention wait for an acknowledgement that never comes. The fact is
  * still recorded, in the visit's own transaction, which is the guarantee that
  * matters; delivery arrives with a destination.

@@ -19,11 +19,11 @@ public enum ExecutionErrorCode implements ErrorCode {
 	 * what is wrong is that this installation cannot act on it. A 404 would read as
 	 * "no such endpoint" to a caller that is retrying a batch.
 	 *
-	 * <p>The batch is refused whole, so edge keeps it buffered and in order. §C2
-	 * says an unmatched event is <em>made visible</em> rather than dropped; the
-	 * operator surface that shows one is Phase 2, so until then it stays in edge's
-	 * buffer, is retried, and becomes {@code DEAD} there — bounded, and visible
-	 * through the buffer's own diagnostics rather than nowhere.
+	 * <p>The batch is refused whole, so edge keeps it buffered and in order. An
+	 * unmatched event must be made visible rather than dropped. Runtime exposes no
+	 * dedicated operator view for it yet, so it stays in edge's buffer, is retried,
+	 * and becomes {@code DEAD} there — bounded and visible through the buffer's
+	 * diagnostics rather than nowhere.
 	 */
 	LANE_NOT_AT_THIS_INSTALLATION("LANE_NOT_AT_THIS_INSTALLATION", 422);
 
