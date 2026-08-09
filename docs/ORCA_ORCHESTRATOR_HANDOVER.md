@@ -12,7 +12,7 @@ You are picking up an engagement that has been running for some weeks. The archi
 
 **When you write code there:** the ground rules are in `AGENTS.md` and each phase plan's §2 — `platform/` holds no domain types, tests prove properties rather than exercise paths, and build checks land with the code they govern. **Ten build checks enforce them; they fail the build.**
 
-**Onboard yourself properly before acting.** §7 tells you what to read and in what order. Do not act on this handover alone; it is a map, not the territory.
+**Onboard yourself properly before acting.** §7 tells you what to read and in what order; **§10 tells you how to go deep into both codebases** — the method, the load-bearing code, and what a delegable implementation plan looks like. Do not act on this handover alone; it is a map, not the territory.
 
 ---
 
@@ -203,4 +203,36 @@ These are not preferences. Each was learned by getting it wrong.
 
 ### For a fresh orchestrator session
 
-Everything durable is in three places: this document (the map), the phase reports and reference sheets in `~/Documents/Projects/orca/docs/` (the detail), and git history. The orchestrator's own working memory (the `orca-rewrite-initiative` ledger) loads automatically and is current through Phase 3. Onboard via §7, skim the four phase reports, then continue: prep Phase 4, or take up whichever standing item the product owner directs.
+Everything durable is in three places: this document (the map), the phase reports and reference sheets in `~/Documents/Projects/orca/docs/` (the detail), and git history. The orchestrator's own working memory (the `orca-rewrite-initiative` ledger) loads automatically and is current through Phase 3. Onboard via §7, then go deep per §10 before advising on anything.
+
+---
+
+## 10 · Going deep — the understanding this role actually needs
+
+§7 gets you the documents. **The documents are the design; the code is the truth**, and this programme has been wrong about its own systems more than once. You are expected to reach the understanding of a senior engineer *and* a senior architect on both systems — able to answer "how does this actually work?" from the code, not from a summary. That is achievable, but only if you go deep **strategically**: ORCA 1.x alone is roughly 556,000 lines of Go across 25 services, and no one reads that end to end.
+
+**The method that works, in order:**
+
+1. **Run it before you read much of it.** An hour of executing teaches more than a day of reading. From `~/Documents/Projects/orca`: bring up the stack and bootstrap (`docs/deployment.md`), run `./gradlew check integrationTest --rerun-tasks`, boot the three gate-path services, then drive a truck through (`./gradlew sendPlate`) and follow it in the database. Then force the exception branch and take a work item through claim → complete. You now understand the product's spine from the outside.
+2. **Read the load-bearing code directly** — this is the short list that carries the design:
+   - `platform/` — the five primitives. Start with `platform/outbox` and `platform/scope`; they are the two everything else leans on.
+   - `build-checks/src/test/java/com/lynxis/orca/checks/` — **ten rules; read all of them.** They are the architecture written as executable constraints, and reading them tells you what the codebase will and will not permit.
+   - `services/orca-runtime/src/main/java/com/lynxis/orca/runtime/execution` (admission, the engine gateway, delegates) and `.../workitem` (the clerk lifecycle) — the two hardest pieces of domain logic.
+   - `services/orca-runtime/src/main/resources/processes/gate-visit.bpmn20.xml` — the process the whole platform exists to run.
+   - The property suites under `services/orca-runtime/src/integrationTest/` — `AdmissionPropertiesIT`, `WorkItemLifecycleIT`, `WorkItemSlaIT`. **In this codebase the tests are the specification**; they state the guarantees as executable claims.
+3. **Sweep breadth with read-only agents, not by reading everything.** For questions spanning many files or the whole 1.x estate, dispatch explore/search agents that return conclusions and `file:line` anchors rather than file dumps. That is how every DERIVED-FROM-1X sheet in `orca/docs/` was produced.
+4. **For ORCA 1.x, read with `CLAUDE.md` open.** Its conventions (soft-delete filters, singular table names, dual keys, per-engine migrations) are the difference between reading that code and misreading it. Trace both the production *and* the consumption path before asserting that something does not exist — the most damaging error in this engagement came from tracing only one direction.
+5. **Write down what you learn, once, where it survives.** A new fact about 1.x becomes a `*-from-1x.md` reference sheet with evidence; a decision becomes a register row; a correction to the corpus becomes an edit to the architecture. Nothing important should live only in a conversation.
+
+**What "good" looks like:** you can explain why the outbox exists and what breaks without it; why a query cannot escape its scope; why admission is one atomic operation and what proves it; why a service-task timer cannot fire but a wait-state timer can; and where ORCA 2.0 deliberately reverses ORCA 1.x rather than copying it.
+
+### Implementation plans that a developer can take
+
+The programme's output is increasingly **plans other people execute** — human developers, not only build sessions. Every phase so far followed one shape, and it is the shape to keep (`docs/phase-2-plan.md` and `docs/phase-3-plan.md` are the worked examples):
+
+1. **Extract the reference first.** If the work touches anything ORCA 1.x does today, produce the DERIVED-FROM-1X sheet before the plan: real columns, real behaviour, `file:line` evidence, the defects deliberately not carried forward, and the translation rules that govern the port. **A plan without its reference sheet invites guessing.**
+2. **Write the plan self-contained** — its reader may have none of your context. Include: what the phase delivers and what it explicitly does *not*; the ground rules; **work packages in dependency order**, each with its own "done when"; a verification table of commands to execute; what to do when blocked; and the report the work must end with.
+3. **Make each work package delegable.** One concern, its own migration/code/tests together, acceptance criteria a reviewer can check, and an explicit statement of what it must not touch. Sequential dependencies named, so packages that can run in parallel are visible.
+4. **State where behaviour comes from.** For anything ported: *1.x is the reference for the data; the architecture governs the behaviour.* Name the inversions explicitly, or they will be copied.
+5. **Anything security-shaped, commercial, or scope-changing is the product owner's** — the plan says PROPOSE-and-report, never implement.
+6. **Close the loop.** When the work lands, verify it yourself by executing: re-run the suite, re-drive the truck, break a check to prove it still fails. A report is a claim until it is re-run.
