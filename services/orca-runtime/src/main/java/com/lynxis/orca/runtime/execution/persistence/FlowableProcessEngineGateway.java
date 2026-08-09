@@ -41,6 +41,17 @@ public class FlowableProcessEngineGateway implements ProcessEngineGateway {
 	}
 
 	@Override
+	public void terminate(String processInstanceId, String reason) {
+		try {
+			runtimeService.deleteProcessInstance(processInstanceId, reason);
+		}
+		catch (org.flowable.common.engine.api.FlowableObjectNotFoundException alreadyGone) {
+			// A reset retried after a crash, or a race with the instance finishing on
+			// its own. The instance not existing is the state the caller wanted.
+		}
+	}
+
+	@Override
 	public Optional<String> currentActivity(String processInstanceId) {
 		List<Execution> executions = runtimeService.createExecutionQuery()
 				.processInstanceId(processInstanceId)

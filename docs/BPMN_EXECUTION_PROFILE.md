@@ -42,8 +42,8 @@ would write by hand that a compiler could not reproduce.
 | `exclusiveGateway` | ✅ | With a `default` flow. See §5 |
 | `sequenceFlow` + `conditionExpression` | ✅ | Conditions read **branch discriminators only**, §6 |
 | `boundaryEvent` + `errorEventDefinition` | ✅ | The failure branch. §7 |
-| `boundaryEvent` + `timerEventDefinition` | ⚠️ **on service tasks: no** | It cannot fire. §8 — read this one |
-| `userTask` | ⏳ Phase 2 | Work items are `workitem`'s, and that module is empty today |
+| `boundaryEvent` + `timerEventDefinition` | ⚠️ **on service tasks: no** · ✅ on `userTask` | On a service task it cannot fire (§8). On a wait state it fires — §8a |
+| `userTask` | ✅ Phase 3 | The manual-input wait state. **Bare — no attributes, no listeners.** §8a |
 | `subProcess`, `callActivity` | ⏳ | Subflows are a builder concept (§C1); the mapping is not settled |
 | `multiInstance` | ⏳ | Map-iterator children exist in the data model (`parent_execution_id`) and the admission index already accommodates them, but nothing emits them yet |
 | Anything else | ❌ | Not "forbidden" — **unspecified**, which means the conformance harness does not cover it and the runtime has never run it |
@@ -107,9 +107,12 @@ none of them.
 - **Name your end events.** The runtime and the console distinguish outcomes by
   end-event id, so `visitReleased` and `manualHandlingRequired` mean different
   things to an operator. An unnamed end event is an outcome nobody can report on.
-- `manualHandlingRequired` is a **named end state, not an error**. A visit that
+- `manualHandlingResolved` is a **named end state, not an error**. A visit that
   needed a human is not a visit that crashed, and the two must stay
-  distinguishable — the clerk workflow that receives it is Phase 2.
+  distinguishable. ⚠️ *Renamed in Phase 3:* the Phase 1 fixture ended at
+  `manualHandlingRequired` because the clerk workflow did not exist; the human
+  branch is now a **wait state** (§8a) and the end event after it records that a
+  person resolved it.
 
 ---
 
@@ -211,6 +214,48 @@ device commands become triggerable tasks. It is the shape §B9's *"commits the s
 as command-issued and releases every lock"* actually describes, and it is what
 would let the engine — rather than a transport — own the deadline. It is a design
 point the Phase 1 plan did not settle, and Phase 1 did not settle it either.
+
+---
+
+## 8a · The manual-input wait state — `userTask`, bare
+
+**Added in Phase 3, executed by `WorkItemLifecycleIT`.** A step a person must
+finish compiles to a plain `userTask`:
+
+```xml
+<userTask id="manualInput" name="manual handling"/>
+```
+
+**Emit nothing else on it.** No `flowable:assignee`, no `flowable:candidateGroups`,
+no form key, no task listeners. Assignment, routing and eligibility live in the
+platform's work item, not in the engine's identity tables — and every attribute a
+compiler emits is a binding a designer could break.
+
+**Work-item creation is platform behaviour, not process design.** An engine event
+listener (`WorkItemCreationListener`, registered once at startup) notices every
+task creation and writes the work item **in the same transaction that parks the
+engine**. The compiler emits no binding for this, for the same reason visit
+completion is a listener rather than a mandatory final service task: a designer
+who could omit it would produce a process that parks forever with no item in any
+queue. The listener is `isFailOnException = true`, so the item and the wait state
+commit together or roll back together — proven by fault injection.
+
+**The task's id is the node reference.** The screen identity (core's
+`topology.screen`, Phase 3 WP2) points at the `userTask`'s id; the compiler must
+keep those ids stable across republications of the same design, or every routing
+rule and screen binding breaks (the same discipline as the process definition
+key in §9).
+
+**Completion comes from the platform, never from the console directly.** The
+work item's `complete` presents the engine task id back inside one transaction —
+the item's guarded update, the engine's advance, and whatever the process then
+runs synchronously (for `gate-visit`, the visit's own closing write) are one
+commit. A submit the engine is not waiting on is refused whole
+(`WORK_ITEM_OUT_OF_ORDER`).
+
+**A boundary timer on this task fires.** Unlike §8's service-task case, the wait
+state genuinely parks: the timer job is committed and visible to the async
+executor while the task waits. §8b (Phase 3 WP3) gives the SLA construct.
 
 ---
 

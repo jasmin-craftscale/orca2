@@ -54,7 +54,7 @@
       <errorEventDefinition/>
     </boundaryEvent>
     <sequenceFlow id="connectorFailedToManual" sourceRef="connectorCallFailed"
-                  targetRef="manualHandlingRequired"/>
+                  targetRef="manualInput"/>
 
     <sequenceFlow id="connectorToOutcome" sourceRef="connectorCall" targetRef="connectorOutcome"/>
 
@@ -68,7 +68,7 @@
          never to an implicit success — WP7 wires the per-connector status routing
          behind the same discriminator. -->
     <sequenceFlow id="outcomeNotApproved" sourceRef="connectorOutcome"
-                  targetRef="manualHandlingRequired"/>
+                  targetRef="manualInput"/>
 
     <serviceTask id="deviceCommand" name="command the barrier"
                  flowable:delegateExpression="${deviceCommandDelegate}"
@@ -78,18 +78,36 @@
       <errorEventDefinition/>
     </boundaryEvent>
     <sequenceFlow id="deviceFailedToManual" sourceRef="deviceCommandFailed"
-                  targetRef="manualHandlingRequired"/>
+                  targetRef="manualInput"/>
 
     <sequenceFlow id="deviceToReleased" sourceRef="deviceCommand" targetRef="visitReleased"/>
 
     <endEvent id="visitReleased" name="visit released"/>
 
-    <!-- The terminal state for anything that could not be completed automatically.
-         The clerk workflow that would receive it is Phase 2; ending here is the
-         correct shape for the slice, and it is a NAMED end state rather than an
-         error, so a visit that needed a human is distinguishable from one that
-         crashed. -->
-    <endEvent id="manualHandlingRequired" name="manual handling required"/>
+    <!-- The manual-input WAIT STATE — Phase 3's clerk workflow, where Phase 1's
+         "manual handling required" terminal state used to end.
+
+         A userTask genuinely parks: the engine writes the task and stops, which
+         is what makes it everything the service tasks above cannot be — a step a
+         boundary timer can fire on (phase-1 report §7.1 found the service-task
+         timer cannot), and a step an out-of-order submit can be REFUSED against.
+
+         There is deliberately NOTHING on this element: no assignee, no candidate
+         groups, no listener. Work-item creation is PLATFORM behaviour — an engine
+         event listener attached once at startup (WorkItemCreationListener), for
+         the same reason visit completion is: a compiler-emitted binding a
+         designer could omit would park a process with no item in any queue.
+         Assignment and routing live in the work item, not in the engine's own
+         identity tables. -->
+    <userTask id="manualInput" name="manual handling"/>
+
+    <sequenceFlow id="manualInputResolved" sourceRef="manualInput"
+                  targetRef="manualHandlingResolved"/>
+
+    <!-- Still a NAMED end state, still not an error — but since Phase 3 it is
+         reached AFTER a person resolved the work item (complete-and-advance, one
+         transaction), not instead of one. -->
+    <endEvent id="manualHandlingResolved" name="manual handling resolved"/>
 
   </process>
 </definitions>

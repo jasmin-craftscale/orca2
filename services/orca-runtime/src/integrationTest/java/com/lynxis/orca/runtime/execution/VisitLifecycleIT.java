@@ -111,6 +111,9 @@ class VisitLifecycleIT {
 	@Autowired
 	private DataSource dataSource;
 
+	@Autowired
+	private com.lynxis.orca.runtime.workitem.domain.WorkItemService workItems;
+
 	private JdbcTemplate jdbc;
 	private RestClient runtime;
 
@@ -156,6 +159,8 @@ class VisitLifecycleIT {
 		jdbc = new JdbcTemplate(dataSource);
 		jdbc.execute("DELETE FROM outbox_delivery");
 		jdbc.execute("DELETE FROM outbox");
+		jdbc.execute("DELETE FROM work_item_audit");
+		jdbc.execute("DELETE FROM work_item");
 		jdbc.execute("DELETE FROM execution_event");
 		jdbc.execute("DELETE FROM execution");
 		jdbc.execute("DELETE FROM lane_session");
@@ -228,14 +233,18 @@ class VisitLifecycleIT {
 
 	@Test
 	@Timeout(value = 10, unit = TimeUnit.MINUTES)
-	@DisplayName("a status nobody mapped routes to a human, and the barrier is NOT commanded")
+	@DisplayName("a status nobody mapped queues a WORK ITEM, the barrier is NOT commanded — and completing it closes the visit")
 	void anUnmappedConnectorStatusReachesAHumanAndCommandsNothing() {
 		// 409 has no connector_route row, so the outcome token is HTTP_409, which no
-		// branch matches — and gate-visit's default flow takes it to a human.
+		// branch matches — and gate-visit's default flow takes it to a human. Since
+		// Phase 3 "to a human" means: the process PARKS and a work item queues in
+		// the same transaction; the visit stays ACTIVE, because the truck is still
+		// physically standing at the gate.
 		tosStatus.set(409);
 
 		String visit = admit();
-		awaitStatus(visit, "MANUAL");
+		String workItem = awaitQueuedWorkItem(visit);
+		assertThat(statusOf(visit)).isEqualTo("ACTIVE");
 
 		assertThat(deviceCommands)
 				.as("an answer nobody wrote a branch for must never become an implicit approval")
@@ -243,11 +252,24 @@ class VisitLifecycleIT {
 		assertThat(count("SELECT COUNT(*) FROM outbox"))
 				.as("and no fact is published for a visit that did not complete")
 				.isZero();
+
+		// The clerk resolves it: claim, then complete — and complete ADVANCES the
+		// parked process in the same transaction, so by the time the call returns
+		// the visit is already closed. No awaiting: synchronous is the claim.
+		com.lynxis.orca.platform.scope.ScopeContext.runIn(
+				com.lynxis.orca.platform.scope.Scope.of("site_external_id", java.util.Set.of(SITE)),
+				() -> {
+					workItems.take(workItem, "op-clerk");
+					workItems.complete(workItem, "op-clerk", "{\"decision\":\"let through\"}");
+				});
+		assertThat(statusOf(visit))
+				.as("complete-and-advance is ONE transaction; the visit closed before complete() returned")
+				.isEqualTo("MANUAL");
 	}
 
 	@Test
 	@Timeout(value = 10, unit = TimeUnit.MINUTES)
-	@DisplayName("a customer system slower than its deadline reaches a human rather than holding the lane")
+	@DisplayName("a customer system slower than its deadline queues a work item rather than holding the lane")
 	void aConnectorSlowerThanItsDeadlineReachesAHuman() {
 		// The connector's deadline is 4 s in configuration; this answers in 6.
 		// §B8: every external call has a deadline AND a defined outcome when it is
@@ -255,19 +277,20 @@ class VisitLifecycleIT {
 		tosDelayMillis.set(6_000);
 
 		String visit = admit();
-		awaitStatus(visit, "MANUAL");
+		awaitQueuedWorkItem(visit);
+		assertThat(statusOf(visit)).isEqualTo("ACTIVE");
 
 		assertThat(deviceCommands).isEmpty();
 	}
 
 	@Test
 	@Timeout(value = 10, unit = TimeUnit.MINUTES)
-	@DisplayName("a device outcome of UNKNOWN reaches a human, and the barrier is commanded exactly ONCE")
+	@DisplayName("a device outcome of UNKNOWN queues a work item, and the barrier is commanded exactly ONCE")
 	void anUnknownDeviceOutcomeIsNeverRetried() {
 		deviceOutcome.set("UNKNOWN");
 
 		String visit = admit();
-		awaitStatus(visit, "MANUAL");
+		awaitQueuedWorkItem(visit);
 
 		assertThat(deviceCommands)
 				.as("§B10: an unknown outcome is resolved by LOOKING, never by retrying blindly. "
@@ -347,6 +370,24 @@ class VisitLifecycleIT {
 		}
 		throw new AssertionError("visit " + visitExternalId + " never reached " + expected
 				+ "; it is " + seen);
+	}
+
+	/**
+	 * Waits for the engine to park and the creation listener to queue the item —
+	 * they commit together, so seeing the item means the wait state exists too.
+	 */
+	private String awaitQueuedWorkItem(String visitExternalId) {
+		long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(5);
+		while (System.nanoTime() < deadline) {
+			List<String> queued = jdbc.queryForList(
+					"SELECT external_id FROM work_item WHERE visit_external_id = ? AND status = 'QUEUED'",
+					String.class, visitExternalId);
+			if (!queued.isEmpty()) {
+				return queued.getFirst();
+			}
+			sleep(250);
+		}
+		throw new AssertionError("no QUEUED work item ever appeared for visit " + visitExternalId);
 	}
 
 	private String statusOf(String visitExternalId) {

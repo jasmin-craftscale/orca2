@@ -132,7 +132,13 @@ class ImportedSetGuard {
 						+ "governs a REAL cross-module dependency rather than an empty set")
 				.isPositive();
 
-		for (String module : List.of("workitem", "notify", "readmodel")) {
+		assertThat(classesIn("workitem"))
+				.as("workitem holds Phase 3's lifecycle: the service, its repository, the controller "
+						+ "and the two api seams (WorkItemIntake in, ManualStepPort consumed) — the "
+						+ "first BIDIRECTIONAL pair of module-wall crossings, both through api packages")
+				.isPositive();
+
+		for (String module : List.of("notify", "readmodel")) {
 			assertThat(classesIn(module))
 					.as("runtime module '%s' now has classes — remove it from this list, and remove "
 							+ "allowEmptyShould(true) from ModuleWallRule once every module is populated",

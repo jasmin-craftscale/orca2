@@ -38,6 +38,19 @@ tags:
       it and no token is minted (ADR-011). The identity provider authenticates
       people; putting it on the gate path would make a truck's admission depend on
       it being reachable.
+  - name: workItems
+    description: |
+      The clerk workflow (§C2, §B9) — human work a process could not finish.
+
+      Every state transition is a conditional UPDATE guarded by rows-affected;
+      a caller who loses a race receives a typed 409 carrying the item's current
+      state, never a silent no-op. Completing an item advances the parked
+      process in the same transaction, and a submit for a step the engine is not
+      waiting on is refused.
+  - name: lanes
+    description: |
+      Lane operations. Reset aborts the running visit, fails its open work
+      items and terminates its process instance — one transaction (§C2).
 
 paths:
   /api/v1/health:
@@ -114,8 +127,435 @@ paths:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 
+  /api/v1/work-items:
+    get:
+      tags: [workItems]
+      operationId: listWorkItems
+      summary: The queue, filtered
+      description: |
+        Queue membership is `status` + `queuedAt` + assignee — there is no queue
+        table. Oldest first; the priority ordering from the routing rules joins
+        at this read in the routing work package.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [QUEUED, IN_PROGRESS, COMPLETED, FAILED]
+        - name: laneExternalId
+          in: query
+          schema:
+            type: string
+        - name: assignee
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 100
+            maximum: 500
+      responses:
+        "200":
+          description: The matching items, oldest queued first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkItemListEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/work-items/{workItemExternalId}:
+    get:
+      tags: [workItems]
+      operationId: getWorkItem
+      summary: One item, with its captured and corrected data
+      parameters:
+        - $ref: "#/components/parameters/WorkItemExternalId"
+      responses:
+        "200":
+          description: The item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkItemEnvelope"
+        "404":
+          description: No such item under this installation's scope
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/work-items/{workItemExternalId}/take:
+    post:
+      tags: [workItems]
+      operationId: takeWorkItem
+      summary: Claim the item — a guarded conditional update
+      description: |
+        `QUEUED` → `IN_PROGRESS`, exactly one winner. The loser receives a
+        typed 409 carrying the item's current state and holder — the conditional
+        UPDATE is the only guard; there is no pre-check that can race.
+        A pre-assigned item is claimable by its assignee only.
+      parameters:
+        - $ref: "#/components/parameters/WorkItemExternalId"
+      responses:
+        "200":
+          description: This caller won the claim
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkItemEnvelope"
+        "404":
+          description: No such item under this installation's scope
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: Somebody else acted first. The error detail carries the current state
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/work-items/{workItemExternalId}/takeover:
+    post:
+      tags: [workItems]
+      operationId: takeoverWorkItem
+      summary: Supervisor takeover — reassigns and resets the clock, stays IN_PROGRESS
+      parameters:
+        - $ref: "#/components/parameters/WorkItemExternalId"
+      responses:
+        "200":
+          description: The item, now held by the caller
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkItemEnvelope"
+        "404":
+          description: No such item under this installation's scope
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: The item is not in progress, or its holder changed mid-flight
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/work-items/{workItemExternalId}/park:
+    post:
+      tags: [workItems]
+      operationId: parkWorkItem
+      summary: Return an in-progress item to the queue
+      description: |
+        Park is re-queue — `IN_PROGRESS` → `QUEUED`, assignee and clock cleared.
+        There is no distinct PARKED status; the design choice is stated in the
+        phase report rather than inherited silently.
+      parameters:
+        - $ref: "#/components/parameters/WorkItemExternalId"
+      responses:
+        "200":
+          description: The item, queued again
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkItemEnvelope"
+        "404":
+          description: No such item under this installation's scope
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: The caller does not hold the item
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/work-items/{workItemExternalId}/assign:
+    post:
+      tags: [workItems]
+      operationId: assignWorkItem
+      summary: Pre-assign to a chosen operator; the item stays QUEUED
+      parameters:
+        - $ref: "#/components/parameters/WorkItemExternalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignWorkItemRequest"
+      responses:
+        "200":
+          description: The item, assigned and still queued — the assignee must take it
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkItemEnvelope"
+        "404":
+          description: No such item under this installation's scope
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: The item is no longer queued
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/work-items/{workItemExternalId}/complete:
+    post:
+      tags: [workItems]
+      operationId: completeWorkItem
+      summary: Complete the item AND advance the parked process — one transaction
+      description: |
+        The inversion this phase exists for: the item's completion and the
+        engine's advance commit together or not at all. There is no state where
+        the console believes an item is done and the engine does not.
+
+        `completionDurationSec` is computed by the server from the item's own
+        clock — the request cannot supply it.
+
+        A submit for a step the engine is not waiting on — already completed,
+        reset, or never this item's step — is refused with a typed 409, and
+        nothing moves.
+      parameters:
+        - $ref: "#/components/parameters/WorkItemExternalId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteWorkItemRequest"
+      responses:
+        "200":
+          description: Completed, and the process advanced in the same transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkItemEnvelope"
+        "404":
+          description: No such item under this installation's scope
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: |
+            Refused whole. Either the caller does not hold the item, or the
+            engine is not waiting on this step (the out-of-order submit). The
+            error code distinguishes the two.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/work-items/{workItemExternalId}/audit:
+    get:
+      tags: [workItems]
+      operationId: getWorkItemAudit
+      summary: The action trail for an item
+      parameters:
+        - $ref: "#/components/parameters/WorkItemExternalId"
+      responses:
+        "200":
+          description: Every action on the item, oldest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkItemAuditEnvelope"
+        "404":
+          description: No such item under this installation's scope
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/lanes/{laneExternalId}/reset:
+    post:
+      tags: [lanes]
+      operationId: resetLane
+      summary: Reset the lane in one transaction
+      description: |
+        §C2: abort the running visit, terminate its process instance and fail
+        its open work items — together. This is the writer that makes the
+        work item's FAILED status real. Resetting an already-clear lane is an
+        ordinary outcome, not an error.
+      parameters:
+        - name: laneExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: What was reset — nothing, when the lane was already clear
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LaneResetEnvelope"
+        "422":
+          description: The lane is not published for this installation
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
 components:
+  parameters:
+    WorkItemExternalId:
+      name: workItemExternalId
+      in: path
+      required: true
+      schema:
+        type: string
+        maxLength: 64
+
   schemas:
+
+    WorkItem:
+      type: object
+      properties:
+        externalId:
+          type: string
+        visitExternalId:
+          type: string
+          description: The visit this item belongs to.
+        laneExternalId:
+          type: string
+        processDefinitionKey:
+          type: string
+        nodeReference:
+          type: string
+          description: The step in the process design — the screen identity's node reference points at this.
+        screenExternalId:
+          type: string
+          description: The screen identity this item renders with. Absent until the routing work package resolves it.
+        status:
+          type: string
+          enum: [QUEUED, IN_PROGRESS, COMPLETED, FAILED]
+        assignee:
+          type: string
+          description: The holding or pre-assigned operator's external id; absent = unassigned.
+        queuedAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        completionDurationSec:
+          type: integer
+          format: int32
+          description: Server-computed. The request can never supply it.
+        slaBreachedAt:
+          type: string
+          format: date-time
+          description: When the SLA timer on the wait state fired. Absent = not breached.
+        eventData:
+          type: string
+          description: The captured context of the step, as JSON.
+        correctedEventData:
+          type: string
+          description: What the operator submitted at completion.
+
+    WorkItemAuditEntry:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [TAKE, TAKE_OVER, PARK, ASSIGN, COMPLETE, FAIL, SLA_BREACH]
+        actor:
+          type: string
+        previousAssignee:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        processingDurationSec:
+          type: integer
+          format: int32
+        elapsedSec:
+          type: integer
+          format: int32
+
+    AssignWorkItemRequest:
+      type: object
+      required: [assigneeExternalId]
+      properties:
+        assigneeExternalId:
+          type: string
+          maxLength: 64
+
+    CompleteWorkItemRequest:
+      type: object
+      properties:
+        correctedEventData:
+          type: string
+          description: The operator's corrected data, stored verbatim on the item.
+
+    LaneResetResult:
+      type: object
+      properties:
+        laneExternalId:
+          type: string
+        visitExternalId:
+          type: string
+          description: The visit that was aborted. Absent when the lane was already clear.
+        failedWorkItems:
+          type: integer
+          format: int32
+
+    WorkItemEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/WorkItem"
+
+    WorkItemListEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/WorkItem"
+
+    WorkItemAuditEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/WorkItemAuditEntry"
+
+    LaneResetEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/LaneResetResult"
 
     DeviceEventBatch:
       type: object

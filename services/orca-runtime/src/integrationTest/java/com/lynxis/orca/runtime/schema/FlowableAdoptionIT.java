@@ -312,7 +312,19 @@ class FlowableAdoptionIT {
 				FROM sys.tables t
 				WHERE t.schema_id = SCHEMA_ID(?) AND (t.name LIKE 'ACT[_]%' OR t.name LIKE 'FLW[_]%');
 				EXEC sp_executesql @drop;""", SCHEMA, SCHEMA);
-		jdbc.update("DELETE FROM flyway_schema_history WHERE version LIKE '11%'");
+		// Rewinding "before the engine went under Flyway" now means rewinding
+		// EVERYTHING from V110 up, because Phase 3's V115 is numbered after the
+		// engine's five (Flyway refuses out-of-order, so it could not be V103).
+		// A history holding 115 but not 110 is a state Flyway rejects outright —
+		// so V115's tables go too, and re-migration puts all six back.
+		//
+		// ⚠️ This is a standing cost of the numbering: every future runtime
+		// migration ≥ V115 must be droppable here, or this suite's fixture stops
+		// being constructible. Recorded in the phase-3 report.
+		jdbc.update("""
+				IF OBJECT_ID(N'work_item_audit', 'U') IS NOT NULL DROP TABLE work_item_audit;
+				IF OBJECT_ID(N'work_item', 'U') IS NOT NULL DROP TABLE work_item;""");
+		jdbc.update("DELETE FROM flyway_schema_history WHERE TRY_CAST(version AS INT) >= 110");
 	}
 
 	private static Path repositoryRoot() {

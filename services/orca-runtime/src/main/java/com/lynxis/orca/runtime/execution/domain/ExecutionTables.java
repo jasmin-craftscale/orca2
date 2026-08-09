@@ -52,11 +52,13 @@ public final class ExecutionTables {
 	 * disagree. The build check enforces that a class is <em>named</em> — which is
 	 * what §B10 specifies — and naming one here is not the same as choosing the list.
 	 *
-	 * @param status {@code ACTIVE} · {@code COMPLETED} · {@code MANUAL}.
-	 *               {@code MANUAL} is not a failure: it is the visit that reached
-	 *               the process's "manual handling required" end state and is
-	 *               waiting for a person, which the clerk workflow of Phase 2
-	 *               receives
+	 * @param status {@code ACTIVE} · {@code COMPLETED} · {@code MANUAL} ·
+	 *               {@code FAILED}. Since Phase 3 a visit that needs a person no
+	 *               longer <em>ends</em> — the process parks at the manual-input
+	 *               wait state and the visit stays {@code ACTIVE} with a work item
+	 *               open; {@code MANUAL} now marks the visit whose process ended at
+	 *               the resolved end state after a person acted. {@code FAILED} is
+	 *               lane reset's write (V115)
 	 */
 	@PersistentTable(name = "execution", growth = Growth.TRAFFIC_GROWING)
 	@RetentionClass("visit") // PROVISIONAL — see above
@@ -75,8 +77,11 @@ public final class ExecutionTables {
 		public static final String ACTIVE = "ACTIVE";
 		public static final String COMPLETED = "COMPLETED";
 
-		/** Reached "manual handling required". Distinguishable from a crash, deliberately. */
+		/** Reached the resolved end state after manual handling. Distinguishable from a crash, deliberately. */
 		public static final String MANUAL = "MANUAL";
+
+		/** Lane reset's write (V115): the visit was aborted, its open work items failed with it. */
+		public static final String FAILED = "FAILED";
 	}
 
 	/**

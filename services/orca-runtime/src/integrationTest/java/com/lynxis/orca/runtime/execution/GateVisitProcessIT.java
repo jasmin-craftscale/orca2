@@ -139,13 +139,15 @@ class GateVisitProcessIT {
 
 	@Test
 	@Timeout(value = 5, unit = TimeUnit.MINUTES)
-	@DisplayName("a connector answer nobody wrote a branch for goes to a human, not to an implicit success")
+	@DisplayName("a connector answer nobody wrote a branch for goes to a human — the process PARKS at the wait state")
 	void anUnroutedOutcomeTakesTheDefaultFlow() {
 		recorder.connectorOutcome.set("SOMETHING_NOBODY_MAPPED");
 
 		String instanceId = startVisit();
 
-		assertThat(endStateOf(instanceId)).isEqualTo("manualHandlingRequired");
+		// Phase 3 inverted this: manual handling is no longer a terminal state but
+		// a genuine WAIT STATE. The process parks; a person advances it.
+		awaitParkedAt(instanceId, "manualInput");
 		assertThat(recorder.deviceCommands)
 				.as("the barrier must not be commanded on an outcome nothing approved")
 				.isEmpty();
@@ -153,26 +155,26 @@ class GateVisitProcessIT {
 
 	@Test
 	@Timeout(value = 5, unit = TimeUnit.MINUTES)
-	@DisplayName("an unavailable customer system reaches manual handling, not a dead letter")
+	@DisplayName("an unavailable customer system parks at manual handling, not a dead letter")
 	void anUnavailableConnectorReachesManualHandling() {
 		recorder.connectorUnavailable.set(true);
 
 		String instanceId = startVisit();
 
-		assertThat(endStateOf(instanceId))
-				.as("a BpmnError is caught by the boundary event; a runtime exception would have "
-						+ "retried into a wall and ended as a dead-letter job nobody at the gate sees")
-				.isEqualTo("manualHandlingRequired");
+		// a BpmnError is caught by the boundary event; a runtime exception would
+		// have retried into a wall and ended as a dead-letter job nobody at the
+		// gate ever sees. Since Phase 3 the human branch is a wait state.
+		awaitParkedAt(instanceId, "manualInput");
 	}
 
 	@Test
 	@Timeout(value = 5, unit = TimeUnit.MINUTES)
-	@DisplayName("a device command that FAILS reaches manual handling")
+	@DisplayName("a device command that FAILS parks at manual handling")
 	void aFailedDeviceCommandReachesManualHandling() {
 		recorder.connectorOutcome.set("APPROVED");
 		recorder.deviceOutcome.set(DeviceCommandPort.FAILED);
 
-		assertThat(endStateOf(startVisit())).isEqualTo("manualHandlingRequired");
+		awaitParkedAt(startVisit(), "manualInput");
 	}
 
 	@Test
@@ -184,7 +186,7 @@ class GateVisitProcessIT {
 
 		String instanceId = startVisit();
 
-		assertThat(endStateOf(instanceId)).isEqualTo("manualHandlingRequired");
+		awaitParkedAt(instanceId, "manualInput");
 		assertThat(recorder.deviceCommands)
 				.as("§B10: an unknown outcome is resolved by looking, never by retrying blindly. "
 						+ "One command was issued and exactly one")
@@ -265,6 +267,30 @@ class GateVisitProcessIT {
 		keys.put(ProcessVariables.COMMAND_DEVICE_EXTERNAL_ID, "DEV-DEMO-BARRIER");
 		keys.put(ProcessVariables.COMMAND_DEADLINE_MILLIS, 5_000L);
 		return keys;
+	}
+
+	/**
+	 * Waits for the async executor to carry the instance to a WAIT STATE and stop
+	 * there — running, parked, with no live job. The Phase 3 shape of the human
+	 * branch: these processes have no visit row (started straight through the
+	 * gateway), so no work item is raised for them; what this suite proves is the
+	 * PROCESS's behaviour, and the work-item half lives in WorkItemLifecycleIT.
+	 */
+	private void awaitParkedAt(String processInstanceId, String activityId) {
+		long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(3);
+		while (System.nanoTime() < deadline) {
+			if (gateway.isRunning(processInstanceId)
+					&& gateway.currentActivity(processInstanceId).filter(activityId::equals).isPresent()) {
+				return;
+			}
+			if (!gateway.isRunning(processInstanceId)) {
+				throw new AssertionError("process instance " + processInstanceId
+						+ " finished instead of parking at '" + activityId + "'");
+			}
+			sleep(100);
+		}
+		throw new AssertionError("process instance " + processInstanceId + " never parked at '"
+				+ activityId + "'. Current activity: " + gateway.currentActivity(processInstanceId));
 	}
 
 	/** Waits for the async executor to carry the instance to an end event, and names it. */

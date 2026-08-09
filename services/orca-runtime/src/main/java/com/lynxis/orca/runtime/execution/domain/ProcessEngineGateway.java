@@ -41,4 +41,19 @@ public interface ProcessEngineGateway {
 
 	/** Where the instance currently is, for diagnostics. Empty once it has finished. */
 	Optional<String> currentActivity(String processInstanceId);
+
+	/**
+	 * Terminates a running instance — lane reset's engine half (§C2's
+	 * <em>"abort the visit … in one transaction"</em>).
+	 *
+	 * <p><strong>Called inside the caller's transaction</strong>, like
+	 * {@link #startVisit}: the instance's deletion, the visit's own closing write
+	 * and the failing of its work items commit together or not at all. Terminating
+	 * an instance that no longer exists is a no-op, not an error — a reset retried
+	 * after a crash finds half the work already done.
+	 *
+	 * @param reason recorded in the engine's history, so an operator reading a
+	 *               dead instance can see it was reset rather than crashed
+	 */
+	void terminate(String processInstanceId, String reason);
 }

@@ -16,17 +16,23 @@ import com.lynxis.orca.platform.idempotency.IdempotencyStore;
 import com.lynxis.orca.platform.outbox.OutboxWriter;
 import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.runtime.execution.api.DeviceEventController;
+import com.lynxis.orca.runtime.execution.api.LaneResetController;
+import com.lynxis.orca.runtime.execution.api.ManualStepPort;
 import com.lynxis.orca.runtime.execution.domain.AdmissionService;
 import com.lynxis.orca.runtime.execution.domain.ConnectorCallDelegate;
 import com.lynxis.orca.runtime.execution.domain.DeviceCommandDelegate;
 import com.lynxis.orca.runtime.execution.domain.DeviceCommandPort;
+import com.lynxis.orca.runtime.execution.domain.LaneResetService;
 import com.lynxis.orca.runtime.execution.domain.ProcessEngineGateway;
 import com.lynxis.orca.runtime.execution.domain.VisitCompletion;
 import com.lynxis.orca.runtime.execution.domain.VisitCompletionListener;
+import com.lynxis.orca.runtime.execution.domain.WorkItemCreationListener;
 import com.lynxis.orca.runtime.execution.persistence.AdmissionRepository;
 import com.lynxis.orca.runtime.execution.persistence.EdgeDeviceCommandClient;
+import com.lynxis.orca.runtime.execution.persistence.FlowableManualSteps;
 import com.lynxis.orca.runtime.execution.persistence.FlowableProcessEngineGateway;
 import com.lynxis.orca.runtime.integration.api.ConnectorPort;
+import com.lynxis.orca.runtime.workitem.api.WorkItemIntake;
 
 /**
  * Wires the `execution` module.
@@ -109,18 +115,57 @@ public class ExecutionConfiguration {
 	}
 
 	/**
-	 * Registers the completion listener on the engine.
+	 * Registers the engine listeners — visit completion (WP7) and work-item
+	 * creation (Phase 3 WP1).
 	 *
-	 * <p>Through the engine's configuration rather than as a {@code @Bean} of a
-	 * Flowable type, so that the listener is attached once, at startup, to the one
-	 * engine — and so that this file remains the only place in the module that says
-	 * anything about how the engine is assembled.
+	 * <p>Through the engine's configuration rather than as {@code @Bean}s of a
+	 * Flowable type, so that the listeners are attached once, at startup, to the
+	 * one engine — and so that this file remains the only place in the module that
+	 * says anything about how the engine is assembled.
 	 */
 	@Bean
-	public EngineConfigurationConfigurer<SpringProcessEngineConfiguration> visitCompletionRegistrar(
-			VisitCompletion completion) {
-		return configuration -> configuration.setEventListeners(
-				List.of(new VisitCompletionListener(completion)));
+	public EngineConfigurationConfigurer<SpringProcessEngineConfiguration> engineListenerRegistrar(
+			VisitCompletion completion, WorkItemIntake workItemIntake,
+			AdmissionRepository admissionRepository,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return configuration -> configuration.setEventListeners(List.of(
+				new VisitCompletionListener(completion),
+				new WorkItemCreationListener(workItemIntake, admissionRepository, siteExternalId)));
+	}
+
+	// --- Phase 3 WP1 · the manual-input wait state ---------------------------
+
+	/**
+	 * The engine's side of complete-and-advance, behind the module wall's seam.
+	 *
+	 * <p>The {@code ObjectProvider} breaks a real construction cycle:
+	 * {@code engineListenerRegistrar} (needed to <em>build</em> the engine) →
+	 * {@code WorkItemIntake} → this port → {@code TaskService} → the engine.
+	 * {@code FlowableManualSteps} says why lazy resolution is free here.
+	 */
+	@Bean
+	public ManualStepPort manualStepPort(ObjectProvider<org.flowable.engine.TaskService> taskService) {
+		return new FlowableManualSteps(taskService::getObject);
+	}
+
+	/**
+	 * Lane reset — §C2's one-transaction abort, and the writer that makes
+	 * {@code work_item.FAILED} real. Its own transaction template, for the same
+	 * reason admission's is its own.
+	 */
+	@Bean
+	public LaneResetService laneResetService(AdmissionRepository repository, ProcessEngineGateway engine,
+			WorkItemIntake workItemIntake,
+			org.springframework.transaction.PlatformTransactionManager transactionManager) {
+		return new LaneResetService(repository, engine, workItemIntake,
+				new TransactionTemplate(transactionManager));
+	}
+
+	@Bean
+	public LaneResetController laneResetController(LaneResetService laneReset,
+			com.lynxis.orca.runtime.workitem.api.OperatorIdentity operatorIdentity,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new LaneResetController(laneReset, operatorIdentity, siteExternalId);
 	}
 
 	/**
