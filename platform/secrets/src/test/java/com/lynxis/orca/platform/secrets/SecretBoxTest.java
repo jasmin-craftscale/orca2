@@ -20,7 +20,10 @@ class SecretBoxTest {
 	@Test
 	void unicodePlaintextRoundTrips() {
 		SecretBox box = box("v1", Map.of("v1", key('a')));
-		assertThat(box.open(box.seal(SENTINEL, PURPOSE), PURPOSE)).isEqualTo(SENTINEL);
+		SealedSecret sealed = box.seal(SENTINEL, PURPOSE);
+		assertThat(box.open(sealed, PURPOSE)).isEqualTo(SENTINEL);
+		assertThat(sealed.toString()).isEqualTo("SealedSecret[redacted]")
+				.doesNotContain(sealed.keyId(), sealed.nonceBase64(), sealed.ciphertextBase64());
 	}
 
 	@Test

@@ -3,18 +3,18 @@ package com.lynxis.orca.runtime.integration.domain;
 /** Typed, redacted refusals for a future authorised HTTP adapter. */
 public class ConnectorCredentialException extends RuntimeException {
 
-	protected ConnectorCredentialException(String message) {
+	private ConnectorCredentialException(String message) {
 		super(message);
 	}
 
 	public static final class NotFound extends ConnectorCredentialException {
-		public NotFound() {
+		NotFound() {
 			super("Connector does not exist at this installation.");
 		}
 	}
 
 	public static final class InvalidState extends ConnectorCredentialException {
-		public InvalidState(String category) {
+		InvalidState(String category) {
 			super("Connector credential mutation was refused: " + category + ".");
 		}
 	}
@@ -23,7 +23,7 @@ public class ConnectorCredentialException extends RuntimeException {
 		private final long expected;
 		private final long current;
 
-		public StaleVersion(long expected, long current) {
+		StaleVersion(long expected, long current) {
 			super("Connector credential version conflict.");
 			this.expected = expected;
 			this.current = current;

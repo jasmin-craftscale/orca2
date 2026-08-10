@@ -109,13 +109,13 @@ written.
 ./gradlew build              # compile, unit tests, build checks — the whole tree
 ./gradlew test               # unit tests only
 ./gradlew check              # unit tests + the ten build checks
-./gradlew integrationTest    # 224 property tests, real SQL Server, real Flowable
+./gradlew integrationTest    # 266 property tests, real SQL Server, real Flowable
 ```
 
 ⚠️ **`test` runs almost none of what proves this repository.** `integrationTest`
 is a separate source set and a separate task, deliberately **not** wired into
 `check`, so that `build` succeeds on a machine with no Docker daemon. What it
-skips is eighteen suites and every property that matters — the admission race, the
+skips is 33 suites and every property that matters — the admission race, the
 severed link, the lease handover, the expired command, the outbox's atomicity.
 **Full verification is `./gradlew check integrationTest`.**
 

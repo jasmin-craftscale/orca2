@@ -4,6 +4,12 @@ package com.lynxis.orca.runtime.integration.domain;
 public sealed interface CredentialMutation permits CredentialMutation.SetBasic, CredentialMutation.Clear {
 
 	record SetBasic(String principal, PasswordChange passwordChange) implements CredentialMutation {
+
+		@Override
+		public String toString() {
+			String change = passwordChange == null ? "null" : passwordChange.getClass().getSimpleName();
+			return "SetBasic[principal=<redacted>, passwordChange=" + change + "]";
+		}
 	}
 
 	record Clear() implements CredentialMutation {
@@ -13,6 +19,11 @@ public sealed interface CredentialMutation permits CredentialMutation.SetBasic, 
 	}
 
 	record Replace(String plaintext) implements PasswordChange {
+
+		@Override
+		public String toString() {
+			return "Replace[plaintext=<redacted>]";
+		}
 	}
 
 	record Preserve() implements PasswordChange {

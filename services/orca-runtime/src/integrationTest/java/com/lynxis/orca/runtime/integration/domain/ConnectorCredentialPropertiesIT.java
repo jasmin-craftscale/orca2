@@ -23,6 +23,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -34,6 +35,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -59,9 +64,12 @@ import com.lynxis.orca.runtime.integration.domain.CredentialMutation.Replace;
 import com.lynxis.orca.runtime.integration.domain.CredentialMutation.SetBasic;
 import com.lynxis.orca.runtime.integration.persistence.ConnectorConfigRepository;
 import com.lynxis.orca.runtime.integration.persistence.ConnectorCredentialRepository;
+import com.lynxis.orca.runtime.persistence.Utc;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -71,6 +79,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
  * rotation, restore mismatch, and redaction.
  */
 @Timeout(value = 10, unit = TimeUnit.MINUTES)
+@ExtendWith(OutputCaptureExtension.class)
 class ConnectorCredentialPropertiesIT {
 
 	private static final String SCHEMA = "runtime";
@@ -85,6 +94,9 @@ class ConnectorCredentialPropertiesIT {
 	private static DataSource dataSource;
 	private static JdbcTemplate jdbc;
 	private static HttpServer receiver;
+	private static ExecutorService receiverExecutor;
+	private static Logger connectorLogger;
+	private static Level connectorLogLevel;
 	private static final List<String> receivedAuthorization = new CopyOnWriteArrayList<>();
 
 	private ConnectorCredentialRepository repository;
@@ -98,14 +110,24 @@ class ConnectorCredentialPropertiesIT {
 		jdbc = new JdbcTemplate(dataSource);
 		receiver = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
 		receiver.createContext("/connector", ConnectorCredentialPropertiesIT::receive);
-		receiver.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+		receiverExecutor = Executors.newVirtualThreadPerTaskExecutor();
+		receiver.setExecutor(receiverExecutor);
 		receiver.start();
+		connectorLogger = (Logger) LoggerFactory.getLogger(RestConnector.class);
+		connectorLogLevel = connectorLogger.getLevel();
+		connectorLogger.setLevel(Level.TRACE);
 	}
 
 	@AfterAll
 	static void stopReceiver() {
 		if (receiver != null) {
 			receiver.stop(0);
+		}
+		if (receiverExecutor != null) {
+			receiverExecutor.close();
+		}
+		if (connectorLogger != null) {
+			connectorLogger.setLevel(connectorLogLevel);
 		}
 	}
 
@@ -150,6 +172,15 @@ class ConnectorCredentialPropertiesIT {
 				SELECT COLLATION_NAME FROM INFORMATION_SCHEMA.COLUMNS
 				WHERE TABLE_SCHEMA='runtime' AND TABLE_NAME='connector_credential' AND COLUMN_NAME='auth_mode'
 				""", String.class)).isEqualTo("Latin1_General_100_BIN2");
+		assertThat(jdbc.queryForObject("""
+				SELECT COLLATION_NAME FROM INFORMATION_SCHEMA.COLUMNS
+				WHERE TABLE_SCHEMA='runtime' AND TABLE_NAME='connector_credential' AND COLUMN_NAME='key_id'
+				""", String.class)).isEqualTo("Latin1_General_100_BIN2");
+		assertThat(jdbc.queryForList("""
+				SELECT COLLATION_NAME FROM INFORMATION_SCHEMA.COLUMNS
+				WHERE TABLE_SCHEMA='runtime' AND TABLE_NAME='connector_credential_audit'
+				  AND COLUMN_NAME IN ('auth_mode', 'action') ORDER BY COLUMN_NAME
+				""", String.class)).containsExactly("Latin1_General_100_BIN2", "Latin1_General_100_BIN2");
 	}
 
 	@Test
@@ -158,8 +189,10 @@ class ConnectorCredentialPropertiesIT {
 		assertDbRejects("basic", "user", "cipher", "nonce", "old-v1", 1, "actor", "tos");
 		assertDbRejects("Basic", "user", "cipher", "nonce", "old-v1", 1, "actor", "tos");
 		assertDbRejects("NONE", "user", null, null, null, 1, "actor", "tos");
+		assertDbRejects("NONE", null, "cipher", null, null, 1, "actor", "tos");
+		assertDbRejects("NONE", null, null, "nonce", null, 1, "actor", "tos");
+		assertDbRejects("NONE", null, null, null, "old-v1", 1, "actor", "tos");
 		assertDbRejects("BASIC", null, "cipher", "nonce", "old-v1", 1, "actor", "tos");
-		assertDbRejects("BASIC", " ", "cipher", "nonce", "old-v1", 1, "actor", "tos");
 		assertDbRejects("BASIC", "user:name", "cipher", "nonce", "old-v1", 1, "actor", "tos");
 		assertDbRejects("BASIC", "user", null, "nonce", "old-v1", 1, "actor", "tos");
 		assertDbRejects("BASIC", "user", " ", "nonce", "old-v1", 1, "actor", "tos");
@@ -168,8 +201,35 @@ class ConnectorCredentialPropertiesIT {
 		assertDbRejects("BASIC", "user", "cipher", "nonce", null, 1, "actor", "tos");
 		assertDbRejects("BASIC", "user", "cipher", "nonce", " ", 1, "actor", "tos");
 		assertDbRejects("BASIC", "user", "cipher", "nonce", "old-v1", 0, "actor", "tos");
-		assertDbRejects("BASIC", "user", "cipher", "nonce", "old-v1", 1, " ", "tos");
 		assertDbRejects("BASIC", "user", "cipher", "nonce", "old-v1", 1, "actor", "missing");
+		assertAuditDbRejects("basic", "SET", 1, "actor");
+		assertAuditDbRejects("Basic", "SET", 1, "actor");
+		assertAuditDbRejects("BASIC", "set", 1, "actor");
+		assertAuditDbRejects("BASIC", "Set", 1, "actor");
+		assertAuditDbRejects("BASIC", "SET", 0, "actor");
+	}
+
+	@Test
+	@DisplayName("SQL nonblank backstops reject spaces and control whitespace but permit internal spaces")
+	void databaseNonblankChecksMatchTheApplicationBoundary() {
+		for (String blank : List.of(" ", "\t", "\r", "\n", "\u000B", "\f")) {
+			assertDbRejects("BASIC", blank, "cipher", "nonce", "old-v1", 1, "actor", "tos");
+			assertDbRejects("BASIC", "user", "cipher", "nonce", "old-v1", 1, blank, "tos");
+			assertAuditDbRejects("BASIC", "SET", 1, blank);
+		}
+
+		assertThat(jdbc.update("""
+				INSERT INTO connector_credential
+				(site_external_id, connector_name, auth_mode, auth_principal, secret_ciphertext,
+				 secret_nonce, key_id, credential_version, updated_at, updated_by)
+				VALUES (?, 'tos', 'BASIC', 'user name', 'cipher', 'nonce', 'old-v1', 1,
+				 SYSUTCDATETIME(), 'review actor')
+				""", SITE)).isEqualTo(1);
+		assertThat(jdbc.update("""
+				INSERT INTO connector_credential_audit
+				(site_external_id, connector_name, credential_version, auth_mode, action, occurred_at, actor)
+				VALUES (?, 'tos', 1, 'BASIC', 'SET', SYSUTCDATETIME(), 'audit actor')
+				""", SITE)).isEqualTo(1);
 	}
 
 	@Test
@@ -254,9 +314,19 @@ class ConnectorCredentialPropertiesIT {
 				.isInstanceOf(InvalidState.class).hasMessageNotContaining("user:name")
 				.hasMessageNotContaining(SENTINEL);
 		assertThatThrownBy(() -> mutate(service, "tos", 0,
+				new SetBasic(" ", new Replace(SENTINEL)), "actor"))
+				.isInstanceOf(InvalidState.class).hasMessageNotContaining(SENTINEL);
+		assertThatThrownBy(() -> mutate(service, "tos", 0,
+				new SetBasic(rejected.repeat(10), new Replace(SENTINEL)), "actor"))
+				.isInstanceOf(InvalidState.class).hasMessageNotContaining(rejected)
+				.hasMessageNotContaining(SENTINEL);
+		assertThatThrownBy(() -> mutate(service, "tos", 0,
 				new SetBasic("user", new Replace(SENTINEL)), rejected.repeat(10)))
 				.isInstanceOf(InvalidState.class).hasMessageNotContaining(rejected)
 				.hasMessageNotContaining(SENTINEL);
+		assertThatThrownBy(() -> mutate(service, "tos", 0,
+				new SetBasic("user", new Replace(SENTINEL)), " "))
+				.isInstanceOf(InvalidState.class).hasMessageNotContaining(SENTINEL);
 		assertThatThrownBy(() -> mutate(service, rejected.repeat(10), 0,
 				new Clear(), "actor"))
 				.isInstanceOf(InvalidState.class).hasMessageNotContaining(rejected);
@@ -309,6 +379,13 @@ class ConnectorCredentialPropertiesIT {
 		Map<String, Object> stored = jdbc.queryForMap("SELECT * FROM connector_credential");
 		assertThat(stored.get("secret_ciphertext").toString()).doesNotContain(SENTINEL);
 		assertThat(stored.values().stream().map(String::valueOf).toList()).noneMatch(SENTINEL::equals);
+		ConnectorCredential credential = credential("tos");
+		assertThat(credential.toString())
+				.doesNotContain(SENTINEL, credential.principal(), credential.sealedSecret().keyId(),
+						credential.sealedSecret().nonceBase64(), credential.sealedSecret().ciphertextBase64());
+		assertThat(new Replace(SENTINEL).toString()).doesNotContain(SENTINEL);
+		assertThat(new SetBasic("principal-must-also-stay-private", new Replace(SENTINEL)).toString())
+				.doesNotContain(SENTINEL, "principal-must-also-stay-private");
 		assertThat(columns("connector_credential_audit"))
 				.noneMatch(name -> name.contains("principal") || name.contains("secret") || name.contains("key"));
 		Map<String, Object> audit = jdbc.queryForMap("SELECT * FROM connector_credential_audit");
@@ -383,7 +460,7 @@ class ConnectorCredentialPropertiesIT {
 		try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
 			CompletableFuture<Void> holder = CompletableFuture.runAsync(() -> scoped(() -> {
 				transaction().executeWithoutResult(status -> {
-					assertThat(repository.lockConnector("tos")).isTrue();
+					assertThat(repository.lockConnector("tos")).isPresent();
 					locked.countDown();
 					await(release);
 				});
@@ -404,7 +481,7 @@ class ConnectorCredentialPropertiesIT {
 
 	@Test
 	@DisplayName("absence and NONE send no Authorization while BASIC is applied exactly per request")
-	void connectorAuthenticationModesReachTheReceiverExactly() {
+	void connectorAuthenticationModesReachTheReceiverExactly(CapturedOutput output) {
 		RestConnector connector = connector(repository, oldCurrent,
 				CircuitBreakerRegistry.ofDefaults(), BulkheadRegistry.ofDefaults());
 		assertThat(call(connector, "tos")).isEqualTo("APPROVED");
@@ -412,11 +489,105 @@ class ConnectorCredentialPropertiesIT {
 
 		mutate(service, "tos", 0, new SetBasic("üser", new Replace(SENTINEL)), "actor");
 		assertThat(call(connector, "tos")).isEqualTo("APPROVED");
-		assertThat(receivedAuthorization.getLast()).isEqualTo(basic("üser", SENTINEL));
+		String expectedAuthorization = basic("üser", SENTINEL);
+		assertThat(receivedAuthorization.getLast()).isEqualTo(expectedAuthorization);
 
 		mutate(service, "tos", 1, new Clear(), "actor");
 		assertThat(call(connector, "tos")).isEqualTo("APPROVED");
 		assertThat(receivedAuthorization.getLast()).isEqualTo("<absent>");
+		assertThat(output.getAll()).doesNotContain(SENTINEL, expectedAuthorization);
+	}
+
+	@Test
+	@DisplayName("a case-insensitive connector lookup stores its parent spelling for call and rewrap AAD")
+	void connectorIdentityUsesTheCanonicalParentSpelling() {
+		jdbc.execute("DELETE FROM connector_route");
+		jdbc.execute("DELETE FROM connector_config");
+		insertConnector(SITE, "TOS");
+
+		mutate(service, "tos", 0, new SetBasic("user", new Replace(SENTINEL)), "actor");
+		ConnectorCredential stored = credential("tos");
+		assertThat(stored.connectorName()).isEqualTo("TOS");
+		assertThat(oldCurrent.open(stored.sealedSecret(),
+				ConnectorCredential.purpose(SITE, "TOS"))).isEqualTo(SENTINEL);
+
+		RestConnector beforeRewrap = connector(repository, oldCurrent,
+				CircuitBreakerRegistry.ofDefaults(), BulkheadRegistry.ofDefaults());
+		assertThat(call(beforeRewrap, "tos")).isEqualTo("APPROVED");
+		assertThat(receivedAuthorization.getLast()).isEqualTo(basic("user", SENTINEL));
+
+		SecretBox newCurrent = box("new-v2");
+		CredentialRewrapService rewrap = new CredentialRewrapService(
+				repository, newCurrent, transaction(), SITE);
+		assertThat(scoped(() -> rewrap.rewrapBatch(10, "rewrapper")))
+				.isEqualTo(new CredentialRewrapService.RewrapResult(1, 1, 0));
+		ConnectorCredential rotated = credential("tos");
+		assertThat(rotated.connectorName()).isEqualTo("TOS");
+		assertThat(rotated.sealedSecret().keyId()).isEqualTo("new-v2");
+		assertThat(newCurrent.open(rotated.sealedSecret(),
+				ConnectorCredential.purpose(SITE, "TOS"))).isEqualTo(SENTINEL);
+		RestConnector afterRewrap = connector(repository, newCurrent,
+				CircuitBreakerRegistry.ofDefaults(), BulkheadRegistry.ofDefaults());
+		assertThat(call(afterRewrap, "tos")).isEqualTo("APPROVED");
+		assertThat(receivedAuthorization.getLast()).isEqualTo(basic("user", SENTINEL));
+	}
+
+	@Test
+	@DisplayName("site spelling canonicalizes new rows and preserves an existing row's exact AAD identity")
+	void installationIdentityUsesTheCanonicalParentSpelling() {
+		String storedSite = "Site-Credential-It";
+		jdbc.execute("DELETE FROM connector_route");
+		jdbc.execute("DELETE FROM connector_config");
+		insertConnector(storedSite, "tos");
+
+		mutate(service, "tos", 0, new SetBasic("user", new Replace(SENTINEL)), "actor");
+		ConnectorCredential stored = credential("tos");
+		assertThat(stored.siteExternalId()).isEqualTo(storedSite);
+
+		RestConnector beforeRewrap = connector(repository, oldCurrent,
+				CircuitBreakerRegistry.ofDefaults(), BulkheadRegistry.ofDefaults());
+		assertThat(call(beforeRewrap, "tos")).isEqualTo("APPROVED");
+		assertThat(receivedAuthorization.getLast()).isEqualTo(basic("user", SENTINEL));
+
+		// Simulate a row written before canonical-parent handling: its FK matches
+		// case-insensitively, and its sealed purpose used the child row's spelling.
+		jdbc.execute("DELETE FROM connector_credential_audit");
+		jdbc.execute("DELETE FROM connector_credential");
+		SealedSecret existingSeal = oldCurrent.seal(SENTINEL + "-existing",
+				ConnectorCredential.purpose(SITE, "tos"));
+		jdbc.update("""
+				INSERT INTO connector_credential
+				(site_external_id, connector_name, auth_mode, auth_principal, secret_ciphertext,
+				 secret_nonce, key_id, credential_version, updated_at, updated_by)
+				VALUES (?, 'tos', 'BASIC', 'user', ?, ?, ?, 1, SYSUTCDATETIME(), 'old-writer')
+				""", SITE, existingSeal.ciphertextBase64(), existingSeal.nonceBase64(), existingSeal.keyId());
+		mutate(service, "tos", 1, new SetBasic("renamed-user", new Preserve()), "preserver");
+		ConnectorCredential preserved = credential("tos");
+		assertThat(preserved.siteExternalId()).isEqualTo(SITE);
+		assertThat(preserved.sealedSecret()).isEqualTo(existingSeal);
+		RestConnector preservedConnector = connector(repository, oldCurrent,
+				CircuitBreakerRegistry.ofDefaults(), BulkheadRegistry.ofDefaults());
+		assertThat(call(preservedConnector, "tos")).isEqualTo("APPROVED");
+		assertThat(receivedAuthorization.getLast())
+				.isEqualTo(basic("renamed-user", SENTINEL + "-existing"));
+
+		SecretBox newCurrent = box("new-v2");
+		CredentialRewrapService rewrap = new CredentialRewrapService(
+				repository, newCurrent, transaction(), SITE);
+		assertThat(scoped(() -> rewrap.rewrapBatch(10, "rewrapper")))
+				.isEqualTo(new CredentialRewrapService.RewrapResult(1, 1, 0));
+		ConnectorCredential rotated = credential("tos");
+		assertThat(rotated.siteExternalId()).isEqualTo(SITE);
+		assertThat(newCurrent.open(rotated.sealedSecret(),
+				ConnectorCredential.purpose(SITE, "tos"))).isEqualTo(SENTINEL + "-existing");
+		assertThat(jdbc.queryForList(
+				"SELECT site_external_id FROM connector_credential_audit ORDER BY credential_audit_id",
+				String.class)).containsExactly(SITE, SITE);
+		RestConnector afterRewrap = connector(repository, newCurrent,
+				CircuitBreakerRegistry.ofDefaults(), BulkheadRegistry.ofDefaults());
+		assertThat(call(afterRewrap, "tos")).isEqualTo("APPROVED");
+		assertThat(receivedAuthorization.getLast())
+				.isEqualTo(basic("renamed-user", SENTINEL + "-existing"));
 	}
 
 	@Test
@@ -445,7 +616,7 @@ class ConnectorCredentialPropertiesIT {
 
 	@Test
 	@DisplayName("tamper, unknown key and wrong purpose fail closed before the receiver and breaker")
-	void credentialFailuresMakeNoCallAndDoNotTouchBreaker() {
+	void credentialFailuresMakeNoCallAndDoNotTouchBreaker(CapturedOutput output) {
 		mutate(service, "tos", 0, new SetBasic("user", new Replace(SENTINEL)), "actor");
 		CircuitBreakerRegistry breakers = CircuitBreakerRegistry.ofDefaults();
 		RestConnector connector = connector(repository, oldCurrent, breakers, BulkheadRegistry.ofDefaults());
@@ -471,6 +642,7 @@ class ConnectorCredentialPropertiesIT {
 				WHERE destination.connector_name='tos' AND source.connector_name='other'
 				""");
 		assertFailedBeforeCall(connector, breaker);
+		assertThat(output.getAll()).doesNotContain(SENTINEL);
 	}
 
 	@Test
@@ -532,6 +704,29 @@ class ConnectorCredentialPropertiesIT {
 				.containsExactly(Action.SET, Action.REWRAP);
 		call(newInstance, "tos");
 		assertThat(receivedAuthorization.getLast()).isEqualTo(basic("old-user", SENTINEL + "-old"));
+	}
+
+	@Test
+	@DisplayName("key generations differing only by case remain distinct and rewrap converges exactly")
+	void keyIdsAreCaseSensitiveInSqlAndJava() {
+		Map<String, String> keys = Map.of("Key-v1", OLD_KEY, "key-v1", NEW_KEY);
+		SecretBox oldCaseCurrent = new SecretBox("Key-v1", keys);
+		SecretBox newCaseCurrent = new SecretBox("key-v1", keys);
+		ConnectorCredentialService oldCaseService = service(repository, oldCaseCurrent);
+		mutate(oldCaseService, "tos", 0,
+				new SetBasic("user", new Replace(SENTINEL)), "old-instance");
+		assertThat(credential("tos").sealedSecret().keyId()).isEqualTo("Key-v1");
+
+		CredentialRewrapService rewrap = new CredentialRewrapService(
+				repository, newCaseCurrent, transaction(), SITE);
+		assertThat(scoped(rewrap::countNeedingRewrap)).isEqualTo(1);
+		assertThat(scoped(() -> rewrap.rewrapBatch(10, "rewrapper")))
+				.isEqualTo(new CredentialRewrapService.RewrapResult(1, 1, 0));
+		assertThat(scoped(rewrap::countNeedingRewrap)).isZero();
+		ConnectorCredential rotated = credential("tos");
+		assertThat(rotated.sealedSecret().keyId()).isEqualTo("key-v1");
+		assertThat(newCaseCurrent.open(rotated.sealedSecret(),
+				ConnectorCredential.purpose(SITE, "tos"))).isEqualTo(SENTINEL);
 	}
 
 	@Test
@@ -601,15 +796,19 @@ class ConnectorCredentialPropertiesIT {
 	}
 
 	private void insertConnector(String name) {
+		insertConnector(SITE, name);
+	}
+
+	private void insertConnector(String siteExternalId, String name) {
 		jdbc.update("""
 				INSERT INTO connector_config
 				(site_external_id, connector_name, base_url, request_path, deadline_ms, is_enabled)
 				VALUES (?, ?, ?, '/connector', 3000, 1)
-				""", SITE, name, "http://localhost:" + receiver.getAddress().getPort());
+				""", siteExternalId, name, "http://localhost:" + receiver.getAddress().getPort());
 		jdbc.update("""
 				INSERT INTO connector_route (site_external_id, connector_name, http_status, outcome)
 				VALUES (?, ?, 200, 'APPROVED')
-				""", SITE, name);
+				""", siteExternalId, name);
 	}
 
 	private ConnectorCredentialRepository repository() {
@@ -649,7 +848,18 @@ class ConnectorCredentialPropertiesIT {
 	}
 
 	private List<ConnectorCredentialAudit> audits(String name) {
-		return scoped(() -> repository.audits(name));
+		return jdbc.query("""
+				SELECT connector_name, credential_version, auth_mode, action, occurred_at, actor
+				FROM connector_credential_audit
+				WHERE site_external_id=? AND connector_name=?
+				ORDER BY credential_audit_id
+				""", (rs, row) -> new ConnectorCredentialAudit(
+					rs.getString("connector_name"),
+					CredentialMode.valueOf(rs.getString("auth_mode")),
+					rs.getLong("credential_version"),
+					Action.valueOf(rs.getString("action")),
+					Utc.instantAt(rs, "occurred_at"),
+					rs.getString("actor")), SITE, name);
 	}
 
 	private static <T> T scoped(java.util.concurrent.Callable<T> action) {
@@ -676,6 +886,15 @@ class ConnectorCredentialPropertiesIT {
 				 secret_nonce, key_id, credential_version, updated_at, updated_by)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, SYSUTCDATETIME(), ?)
 				""", SITE, connector, mode, principal, ciphertext, nonce, keyId, version, actor))
+				.isInstanceOf(DataIntegrityViolationException.class);
+	}
+
+	private void assertAuditDbRejects(String mode, String action, long version, String actor) {
+		assertThatThrownBy(() -> jdbc.update("""
+				INSERT INTO connector_credential_audit
+				(site_external_id, connector_name, credential_version, auth_mode, action, occurred_at, actor)
+				VALUES (?, 'tos', ?, ?, ?, SYSUTCDATETIME(), ?)
+				""", SITE, version, mode, action, actor))
 				.isInstanceOf(DataIntegrityViolationException.class);
 	}
 

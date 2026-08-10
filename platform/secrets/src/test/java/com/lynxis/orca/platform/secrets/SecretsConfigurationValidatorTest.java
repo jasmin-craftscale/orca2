@@ -66,21 +66,23 @@ class SecretsConfigurationValidatorTest {
 	}
 
 	@Test
-	void thePublicFixtureIsRefusedOutsideLocal() {
-		SecretsProperties properties = new SecretsProperties();
-		properties.setCurrentKeyId("local-dev-v1");
-		properties.setKeys(Map.of("local-dev-v1", SecretsProperties.LOCAL_FIXTURE_BASE64));
+	void thePublicFixtureIsRefusedOutsideLocalRegardlessOfBase64Padding() {
+		SecretsProperties properties = localFixture();
 		assertThatThrownBy(() -> validate(properties, new MockEnvironment()))
 				.isInstanceOf(SecretConfigurationException.class)
 				.hasMessageContaining("local development fixture")
 				.hasMessageNotContaining(SecretsProperties.LOCAL_FIXTURE_BASE64);
+
+		properties.setKeys(Map.of("local-dev-v1",
+				SecretsProperties.LOCAL_FIXTURE_BASE64.replace("=", "")));
+		assertThatThrownBy(() -> validate(properties, new MockEnvironment()))
+				.isInstanceOf(SecretConfigurationException.class)
+				.hasMessageContaining("local development fixture");
 	}
 
 	@Test
 	void thePublicFixtureIsAcceptedOnlyUnderLocal() {
-		SecretsProperties properties = new SecretsProperties();
-		properties.setCurrentKeyId("local-dev-v1");
-		properties.setKeys(Map.of("local-dev-v1", SecretsProperties.LOCAL_FIXTURE_BASE64));
+		SecretsProperties properties = localFixture();
 		assertThatCode(() -> validate(properties, new MockEnvironment().withProperty("spring.profiles.active", "local")))
 				.doesNotThrowAnyException();
 	}
@@ -92,10 +94,12 @@ class SecretsConfigurationValidatorTest {
 	}
 
 	@Test
-	void validConfigurationProducesOnlyItsDeclaredCurrentKey() throws Exception {
+	void validatedConfigurationIsSnapshottedIntoTheImmutableSecretBox() throws Exception {
 		SecretsProperties properties = valid();
 		SecretsConfigurationValidator validator = validator(properties, new MockEnvironment());
 		validator.afterPropertiesSet();
+		properties.setCurrentKeyId("changed-after-validation");
+		properties.setKeys(Map.of());
 		assertThat(validator.secretBox().currentKeyId()).isEqualTo("v1");
 	}
 
@@ -119,6 +123,13 @@ class SecretsConfigurationValidatorTest {
 		SecretsProperties properties = new SecretsProperties();
 		properties.setCurrentKeyId("v1");
 		properties.setKeys(Map.of("v1", key()));
+		return properties;
+	}
+
+	private static SecretsProperties localFixture() {
+		SecretsProperties properties = new SecretsProperties();
+		properties.setCurrentKeyId("local-dev-v1");
+		properties.setKeys(Map.of("local-dev-v1", SecretsProperties.LOCAL_FIXTURE_BASE64));
 		return properties;
 	}
 

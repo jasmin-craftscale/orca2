@@ -9,7 +9,7 @@ CREATE TABLE connector_credential (
 	auth_principal    VARCHAR(256) NULL,
 	secret_ciphertext VARCHAR(MAX) NULL,
 	secret_nonce      VARCHAR(64)  NULL,
-	key_id            VARCHAR(64)  NULL,
+	key_id            VARCHAR(64) COLLATE Latin1_General_100_BIN2 NULL,
 	credential_version BIGINT      NOT NULL,
 	updated_at        DATETIME2(7) NOT NULL,
 	updated_by        VARCHAR(128) NOT NULL,
@@ -24,7 +24,10 @@ CREATE TABLE connector_credential (
 	CONSTRAINT ck_connector_credential_version
 		CHECK (credential_version >= 1),
 	CONSTRAINT ck_connector_credential_actor
-		CHECK (LEN(LTRIM(RTRIM(updated_by))) > 0),
+		-- Match Java String.isBlank for the ASCII whitespace/control characters
+		-- representable in these VARCHAR identity fields: space and CHAR(9)..CHAR(13).
+		CHECK (PATINDEX('%[^ ' + CHAR(9) + CHAR(10) + CHAR(11) + CHAR(12) + CHAR(13) + ']%',
+			updated_by COLLATE Latin1_General_100_BIN2) > 0),
 	CONSTRAINT ck_connector_credential_state
 		CHECK (
 			(auth_mode = 'NONE'
@@ -35,7 +38,8 @@ CREATE TABLE connector_credential (
 			OR
 			(auth_mode = 'BASIC'
 				AND auth_principal IS NOT NULL
-				AND LEN(LTRIM(RTRIM(auth_principal))) > 0
+				AND PATINDEX('%[^ ' + CHAR(9) + CHAR(10) + CHAR(11) + CHAR(12) + CHAR(13) + ']%',
+					auth_principal COLLATE Latin1_General_100_BIN2) > 0
 				AND CHARINDEX(':', auth_principal) = 0
 				AND secret_ciphertext IS NOT NULL
 				AND LEN(LTRIM(RTRIM(secret_ciphertext))) > 0
@@ -64,7 +68,8 @@ CREATE TABLE connector_credential_audit (
 	CONSTRAINT ck_connector_credential_audit_version
 		CHECK (credential_version >= 1),
 	CONSTRAINT ck_connector_credential_audit_actor
-		CHECK (LEN(LTRIM(RTRIM(actor))) > 0)
+		CHECK (PATINDEX('%[^ ' + CHAR(9) + CHAR(10) + CHAR(11) + CHAR(12) + CHAR(13) + ']%',
+			actor COLLATE Latin1_General_100_BIN2) > 0)
 );
 
 CREATE INDEX ix_connector_credential_audit_scope_connector_time

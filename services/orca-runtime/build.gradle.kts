@@ -6,9 +6,9 @@
 // Imported rather than written as java.util.zip.ZipFile below, because inside a
 // Gradle Kotlin build script `java` resolves to the JavaPluginExtension accessor
 // and shadows the package — which fails with "Unresolved reference 'util'".
-import java.util.zip.ZipFile
-import java.util.Base64
 import java.security.SecureRandom
+import java.util.Base64
+import java.util.zip.ZipFile
 
 plugins {
 	java

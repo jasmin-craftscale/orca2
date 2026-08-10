@@ -115,14 +115,16 @@ mode, core credential consumer or SFTP behavior was invented.
 | `auth_principal` | `VARCHAR(256) NULL` | required nonblank/no-colon only for Basic |
 | `secret_ciphertext` | `VARCHAR(MAX) NULL` | Base64 sealed bytes; Basic only |
 | `secret_nonce` | `VARCHAR(64) NULL` | Base64 12-byte nonce; Basic only |
-| `key_id` | `VARCHAR(64) NULL` | exact sealing generation; Basic only |
+| `key_id` | `VARCHAR(64)` BIN2, nullable | exact case-sensitive sealing generation; Basic only |
 | `credential_version` | `BIGINT NOT NULL` | positive materialized version |
 | `updated_at` | `DATETIME2(7) NOT NULL` | shared UTC mapping |
 | `updated_by` | `VARCHAR(128) NOT NULL` | nonblank trusted actor |
 
 The composite primary key leads with site. The composite foreign key references the
 runtime-owned connector configuration. Database checks enforce the exact mode/state,
-positive version, actor, and principal constraints.
+positive version, actor, and principal constraints. Principal and actor checks reject
+space and the ASCII control-whitespace range `CHAR(9)`–`CHAR(13)`, matching the Java
+boundary while continuing to allow legitimate internal spaces.
 
 ### `runtime.connector_credential_audit`
 
@@ -196,7 +198,7 @@ edge were booted before `demo-seed` ran.
 
 ### Focused real-context properties
 
-`ConnectorCredentialPropertiesIT` contains 21 SQL Server/local-receiver properties.
+`ConnectorCredentialPropertiesIT` contains 25 SQL Server/local-receiver properties.
 It proves the V128 constraints, exact mutations, concurrency, scoped locking,
 redaction, audit atomicity, credential modes, two-instance visibility, failure
 isolation, rotation, rewrap rollback, restore mismatch and UTC behavior.
@@ -205,6 +207,14 @@ Important observed outcomes:
 
 - The Basic receiver saw the exact expected UTF-8 Authorization value; absent and
   `NONE` sent no Authorization header.
+- A connector parent stored as `TOS` was mutated through `tos`; the credential kept
+  the stored parent spelling, the next call authenticated, and rewrap retained a
+  readable purpose. A case-only installation spelling difference likewise stored a
+  new row with the parent spelling, while an existing differently-spelled child kept
+  its own exact AAD identity through preserve, call and rewrap.
+- Key generations `Key-v1` and `key-v1` remained distinct in SQL and Java. The old
+  row was counted and selected, rewrapped to the exact current id, and the old-key
+  count reached zero.
 - Two independently constructed service/connector graphs had separate repositories
   and client maps. Instance A wrote version 1; instance B called with version 1. A
   replaced it with version 2; B's next call used version 2 without restart. B retained
@@ -234,13 +244,16 @@ and this command was run unpiped:
 ./gradlew check integrationTest --rerun-tasks
 ```
 
-It completed in 6m42s with all 73 tasks executed:
+The latest pre-push review rerun completed in 6m46s with all 73 tasks executed:
 
 | Run | Integration suites | Tests | Failures/errors |
 |---|---:|---:|---:|
 | Baseline | 32 | 240 | 0 |
-| Final | 33 | 262 | 0 |
-| Delta | +1 | +22 | 0 |
+| Final | 33 | 266 | 0 |
+| Delta | +1 | +26 | 0 |
+
+Independent XML parsing also counted 19 unit-test suites and 80 tests, with zero
+failures, errors or skips. The final integration count likewise had zero skips.
 
 The focused runtime uncached gate also completed in 4m28s:
 
@@ -251,10 +264,24 @@ The focused runtime uncached gate also completed in 4m28s:
 
 ### Clean migration, startup and live regression
 
-The local database volume was removed and recreated. Bootstrap created seven schemas
-and logins. Runtime applied all 15 migrations through V128.
+Before review remediation, the local database volume was removed and recreated.
+Bootstrap created seven schemas and logins, and runtime applied all 15 migrations
+through V128. The corrected, still-unmerged V128 is now also exercised on the
+isolated integration schema by the focused and full suites. For a real startup proof,
+the runtime service was pointed at a purpose-built empty review database with its own
+runtime login. Flyway applied all 15 migrations through the corrected V128 before the
+application reached the secrets validator. The review database and login were then
+removed and confirmed absent.
 
-Two negative starts were proved independently with a non-fixture internal credential:
+The owner compose database has the earlier V128 checksum. It was neither repaired
+nor deleted during remediation because that requires explicit approval. Therefore a
+new fresh-volume live proof was not attempted; the prior independent `NONE` live path
+below remains valid because the connector consumer did not change, while the full
+`VisitLifecycleIT` supplies the corrected Basic gate-path proof. A new compose-volume
+live run requires approval to recreate that owner data.
+
+Two negative starts were proved independently against that clean migrated database,
+with a non-fixture internal credential and no active `local` profile:
 
 1. no secrets configuration failed in `SecretsConfigurationValidator` with
    `orca.secrets.current-key-id is missing or blank.`;
@@ -280,9 +307,11 @@ schema and all 30 cross-schema reads were refused.
 ### Leakage scan
 
 The scratch-schema properties assert the known test password is absent from the
-materialized row values, audit values, metadata JSON, exceptions, captured log text,
-receiver-failure surfaces and Flowable history. They also assert that metadata has no
-field capable of returning a principal or sealed material.
+materialized row values, audit values, metadata JSON, exceptions, secret-bearing
+value string representations, captured TRACE log text, receiver-failure surfaces and
+Flowable history. They also assert that the complete encoded Basic Authorization
+header is absent from captured logs and metadata has no field capable of returning a
+principal or sealed material.
 
 After the final suite/live run, a constrained SQL diagnostic searched credential
 state, audit, runtime outbox, Flowable historic variables, execution-event attributes
@@ -323,7 +352,7 @@ were green.
 | 11 | accept malformed Base64 | `malformedBase64IsRefusedWithoutPrintingTheValue` | expected throwable was absent |
 | 12 | accept non-32-byte key | `everyKeyMustDecodeToExactlyThirtyTwoBytes` | expected throwable was absent |
 | 13 | accept invalid/overlong key id | `blankInvalidAndOverlongKeyIdsAreRefused` | required invalid-id failure disappeared |
-| 14 | remove public-fixture profile guard | `thePublicFixtureIsRefusedOutsideLocal` | expected throwable was absent |
+| 14 | remove public-fixture profile guard | `thePublicFixtureIsRefusedOutsideLocalRegardlessOfBase64Padding` | expected throwable was absent |
 | 15 | remove decoded 12-byte nonce check | `nonceMustDecodeToExactlyTwelveBytes` | direct nonce-length assertion failed |
 | 16 | allow null to reach low-level code | `nullPlaintextAndBlankPurposePartsAreDeliberatelyRefused` | low-level NPE escaped instead of deliberate refusal |
 | 17 | append rejected crypto text | `changedCiphertextOrTagFailsRedacted` | exact fixed redacted message assertion failed |
@@ -378,6 +407,21 @@ plaintext to the customer system; this implementation does not claim otherwise.
   that local state.
 - **Audit naming:** preserving sealed bytes while changing credential state records
   the approved `REPLACE` action; no extra action value was invented.
+- **Exact database identity:** SQL Server compares connector/site identifiers without
+  case while purpose AAD is byte-exact. The locked parent read now supplies the stored
+  identity for new rows; existing rows keep their stored identity, and only the
+  already-authorized site scope is restated with that database spelling for writes.
+- **Key-generation collation:** key ids are Java map keys and therefore
+  case-sensitive. V128 now gives `key_id` BIN2 collation so SQL selection, guarded
+  rewrap and convergence counts share that contract.
+- **Database blank backstop:** SQL `LEN(LTRIM(RTRIM(...)))` ignores ordinary spaces
+  but not control whitespace. The actor/principal checks now require a character
+  outside space and `CHAR(9)`–`CHAR(13)`; real SQL tests cover each form and internal
+  spaces.
+- **Separate edge reliability signal:** an independent review saw one timeout in
+  unchanged `EdgeIngestPropertiesIT.aCaptureWithNoDedupKeyIsRefused`; its individual
+  property, class and a second full-tree run passed. This credentials branch makes
+  no edge change; timing reliability remains a separate follow-up.
 - No authorization, key-custody, installer, public-contract, commercial or adjacent
   scope decision was needed or made. No third-party dependency was added.
 
@@ -415,7 +459,7 @@ cd ..
   --tests '*ConnectorCredentialPropertiesIT' --rerun-tasks
 ./gradlew :services:orca-runtime:integrationTest \
   --tests '*VisitLifecycleIT' --rerun-tasks
-./gradlew build
+./gradlew build --rerun-tasks
 ./gradlew check integrationTest --rerun-tasks
 ```
 
@@ -440,9 +484,24 @@ cd ..
 
 Run the three services in separate terminals and run `demo-seed` only after their
 migrations complete. Query the runtime execution/outbox and edge command log for the
-review plate, then stop all three services before any integration suite. Follow
-`docs/LOCAL_DEVELOPMENT.md` §6.1 for SQL diagnostics and the two explicit negative
-startup configurations; do not copy the public fixture value into another profile.
+review plate using `docs/LOCAL_DEVELOPMENT.md` §5, “Looking at the database”. Follow
+§6.1 only to stop all three services and Gradle workers before any integration suite.
+
+The two negative runtime starts use a non-fixture internal credential and deliberately
+do not activate `local`:
+
+```bash
+./gradlew bootRun -p services/orca-runtime \
+  --args='--server.port=18082 --orca.internal.shared-credential=review-only-internal-credential-0000000000000000'
+# expected: orca.secrets.current-key-id is missing or blank.
+
+./gradlew bootRun -p services/orca-runtime \
+  --args='--server.port=18082 --orca.internal.shared-credential=review-only-internal-credential-0000000000000000 --orca.secrets.current-key-id=local-dev-v1 --orca.secrets.keys[local-dev-v1]=b3JjYS1sb2NhbC1zZWNyZXQta2V5LWZpeHR1cmUtMzI='
+# expected: orca.secrets.keys contains the committed local development fixture while the `local` profile is inactive.
+```
+
+That key is committed, public, development-only material. It is shown here solely to
+prove the startup refusal and must never be used or copied into a deployment profile.
 
 Count the final XML without relying on Gradle's console summary:
 

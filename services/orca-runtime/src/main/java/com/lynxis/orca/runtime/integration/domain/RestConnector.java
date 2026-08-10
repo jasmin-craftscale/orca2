@@ -185,7 +185,8 @@ public class RestConnector implements ConnectorPort {
 		}
 		try {
 			String password = secretBox.open(credential.sealedSecret(),
-					ConnectorCredential.purpose(credential.siteExternalId(), connectorName));
+					ConnectorCredential.purpose(
+							credential.siteExternalId(), credential.connectorName()));
 			return RequestCredential.basic(credential.principal(), password, credential.version());
 		}
 		catch (SecretOpenException invalidCredential) {

@@ -1,6 +1,5 @@
 package com.lynxis.orca.runtime.integration.persistence;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,10 +24,10 @@ public class ConnectorCredentialRepository {
 	private final ScopeSeam seam;
 	private final String siteExternalId;
 
-	/** Locks the existing parent row, including when it is disabled. Transaction required. */
-	public boolean lockConnector(String connectorName) {
-		return !seam.select(ScopedSelect.from("connector_config")
-					.columns("connector_name")
+	/** Locks and returns the parent's stored identity, including when disabled. Transaction required. */
+	public Optional<ConnectorIdentity> lockConnector(String connectorName) {
+		return seam.select(ScopedSelect.from("connector_config")
+					.columns(SCOPE_COLUMN, "connector_name")
 					.scopedBy(SCOPE_COLUMN)
 					// SQL Server's JDBC driver sends String parameters as NVARCHAR by
 					// default. Cast the parameter, not the indexed VARCHAR column: a
@@ -36,9 +35,11 @@ public class ConnectorCredentialRepository {
 					// unrelated connector before it reaches its own row.
 					.where("site_external_id = CAST(? AS VARCHAR(64)) "
 							+ "AND connector_name = CAST(? AS VARCHAR(64))",
-							siteExternalId, connectorName)
+								siteExternalId, connectorName)
 					.lockMatchedRows(),
-				(rs, row) -> rs.getString("connector_name")).isEmpty();
+				(rs, row) -> new ConnectorIdentity(
+						rs.getString(SCOPE_COLUMN), rs.getString("connector_name")))
+				.stream().findFirst();
 	}
 
 	public boolean connectorExists(String connectorName) {
@@ -85,10 +86,10 @@ public class ConnectorCredentialRepository {
 						credential.connectorName(), expectedVersion));
 	}
 
-	public void appendAudit(String siteExternalId, ConnectorCredentialAudit audit) {
+	public void appendAudit(String storedSiteExternalId, ConnectorCredentialAudit audit) {
 		seam.insert(ScopedInsert.into("connector_credential_audit")
 				.scopedBy(SCOPE_COLUMN)
-				.value(SCOPE_COLUMN, siteExternalId)
+				.value(SCOPE_COLUMN, storedSiteExternalId)
 				.value("connector_name", audit.connectorName())
 				.value("credential_version", audit.version())
 				.value("auth_mode", audit.mode().name())
@@ -123,21 +124,6 @@ public class ConnectorCredentialRepository {
 				.scopedBy(SCOPE_COLUMN)
 				.where("connector_name = ? AND credential_version = ? AND key_id = ?",
 						credential.connectorName(), expectedVersion, oldKeyId));
-	}
-
-	public List<ConnectorCredentialAudit> audits(String connectorName) {
-		return seam.select(ScopedSelect.from("connector_credential_audit")
-				.columns("connector_name", "credential_version", "auth_mode", "action", "occurred_at", "actor")
-				.scopedBy(SCOPE_COLUMN)
-				.where("connector_name = ?", connectorName)
-				.orderBy("occurred_at"),
-				(rs, row) -> new ConnectorCredentialAudit(
-						rs.getString("connector_name"),
-						CredentialMode.valueOf(rs.getString("auth_mode")),
-						rs.getLong("credential_version"),
-						ConnectorCredentialAudit.Action.valueOf(rs.getString("action")),
-						Utc.instantAt(rs, "occurred_at"),
-						rs.getString("actor")));
 	}
 
 	private ScopedSelect currentSelect() {
@@ -175,5 +161,9 @@ public class ConnectorCredentialRepository {
 
 	private static String keyId(ConnectorCredential credential) {
 		return credential.sealedSecret() == null ? null : credential.sealedSecret().keyId();
+	}
+
+	/** Exact parent spelling read under the installation's already-established scope. */
+	public record ConnectorIdentity(String siteExternalId, String connectorName) {
 	}
 }

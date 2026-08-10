@@ -2,9 +2,11 @@ package com.lynxis.orca.runtime.integration.domain;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Set;
 
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.platform.secrets.SealedSecret;
 import com.lynxis.orca.platform.secrets.SecretBox;
@@ -17,6 +19,7 @@ import com.lynxis.orca.runtime.integration.domain.CredentialMutation.Preserve;
 import com.lynxis.orca.runtime.integration.domain.CredentialMutation.Replace;
 import com.lynxis.orca.runtime.integration.domain.CredentialMutation.SetBasic;
 import com.lynxis.orca.runtime.integration.persistence.ConnectorCredentialRepository;
+import com.lynxis.orca.runtime.integration.persistence.ConnectorCredentialRepository.ConnectorIdentity;
 
 /** Exact SetBasic/Replace/Preserve/Clear semantics in one transaction. */
 public class ConnectorCredentialService {
@@ -48,15 +51,24 @@ public class ConnectorCredentialService {
 			throw new InvalidState("mutation is required");
 		}
 		return Objects.requireNonNull(transactions.execute(status -> {
-			if (!repository.lockConnector(connectorName)) {
-				throw new NotFound();
-			}
-			ConnectorCredential current = repository.byName(connectorName).orElse(null);
-			long currentVersion = current == null ? 0 : current.version();
-			if (expectedVersion != currentVersion) {
-				throw new StaleVersion(expectedVersion, currentVersion);
-			}
-			return apply(connectorName, current, mutation, actor);
+			ConnectorIdentity parent = repository.lockConnector(connectorName)
+					.orElseThrow(NotFound::new);
+			// SQL Server identifiers are case-insensitive, while scope values and AAD
+			// are exact. The authorized parent lookup is the one place that resolves
+			// database spelling; every child write then uses that stored identity.
+			return ScopeContext.callIn(scope(parent.siteExternalId()), () -> {
+				ConnectorCredential current = repository.byName(parent.connectorName()).orElse(null);
+				long currentVersion = current == null ? 0 : current.version();
+				if (expectedVersion != currentVersion) {
+					throw new StaleVersion(expectedVersion, currentVersion);
+				}
+				String storedSiteExternalId = current == null
+						? parent.siteExternalId() : current.siteExternalId();
+				// A pre-merge row may carry the configuration spelling used by the old
+				// writer. Preserve that identity exactly as the AAD which sealed it did.
+				return ScopeContext.callIn(scope(storedSiteExternalId),
+						() -> apply(parent, current, mutation, actor));
+			});
 		}));
 	}
 
@@ -70,9 +82,11 @@ public class ConnectorCredentialService {
 				.orElseGet(() -> new CredentialMetadata(CredentialMode.NONE, false, 0, null, null));
 	}
 
-	private CredentialMetadata apply(String connectorName, ConnectorCredential current,
+	private CredentialMetadata apply(ConnectorIdentity parent, ConnectorCredential current,
 			CredentialMutation mutation, String actor) {
 		Instant changedAt = Instant.now();
+		String storedSiteExternalId = current == null ? parent.siteExternalId() : current.siteExternalId();
+		String storedConnectorName = current == null ? parent.connectorName() : current.connectorName();
 		ConnectorCredential next;
 		Action action;
 
@@ -80,7 +94,7 @@ public class ConnectorCredentialService {
 			if (current == null || current.mode() != CredentialMode.BASIC) {
 				throw new InvalidState("clear requires an existing BASIC credential");
 			}
-			next = new ConnectorCredential(siteExternalId, connectorName, CredentialMode.NONE,
+			next = new ConnectorCredential(storedSiteExternalId, storedConnectorName, CredentialMode.NONE,
 					null, null, current.version() + 1, changedAt, actor);
 			action = Action.CLEAR;
 		}
@@ -93,8 +107,9 @@ public class ConnectorCredentialService {
 				if (!(set.passwordChange() instanceof Replace replace) || replace.plaintext() == null) {
 					throw new InvalidState("setting BASIC requires a replacement password");
 				}
-				SealedSecret sealed = secretBox.seal(replace.plaintext(), purpose(connectorName));
-				next = new ConnectorCredential(siteExternalId, connectorName, CredentialMode.BASIC,
+				SealedSecret sealed = secretBox.seal(replace.plaintext(),
+						ConnectorCredential.purpose(storedSiteExternalId, storedConnectorName));
+				next = new ConnectorCredential(storedSiteExternalId, storedConnectorName, CredentialMode.BASIC,
 						set.principal(), sealed, current == null ? 1 : current.version() + 1,
 						changedAt, actor);
 				action = Action.SET;
@@ -103,7 +118,7 @@ public class ConnectorCredentialService {
 				if (set.principal().equals(current.principal())) {
 					throw new InvalidState("preserve requires a principal change");
 				}
-				next = new ConnectorCredential(siteExternalId, connectorName, CredentialMode.BASIC,
+				next = new ConnectorCredential(storedSiteExternalId, storedConnectorName, CredentialMode.BASIC,
 						set.principal(), current.sealedSecret(), current.version() + 1,
 						changedAt, actor);
 				action = Action.REPLACE;
@@ -112,8 +127,9 @@ public class ConnectorCredentialService {
 				if (replace.plaintext() == null) {
 					throw new InvalidState("replacement password is required");
 				}
-				SealedSecret sealed = secretBox.seal(replace.plaintext(), purpose(connectorName));
-				next = new ConnectorCredential(siteExternalId, connectorName, CredentialMode.BASIC,
+				SealedSecret sealed = secretBox.seal(replace.plaintext(),
+						ConnectorCredential.purpose(storedSiteExternalId, storedConnectorName));
+				next = new ConnectorCredential(storedSiteExternalId, storedConnectorName, CredentialMode.BASIC,
 						set.principal(), sealed, current.version() + 1, changedAt, actor);
 				action = Action.REPLACE;
 			}
@@ -129,16 +145,16 @@ public class ConnectorCredentialService {
 			repository.insert(next);
 		}
 		else if (repository.update(next, current.version()) != 1) {
-			throw new StaleVersion(current.version(), repository.byName(connectorName)
+			throw new StaleVersion(current.version(), repository.byName(storedConnectorName)
 					.map(ConnectorCredential::version).orElse(0L));
 		}
-		repository.appendAudit(siteExternalId, new ConnectorCredentialAudit(
-				connectorName, next.mode(), next.version(), action, changedAt, actor));
+		repository.appendAudit(next.siteExternalId(), new ConnectorCredentialAudit(
+				next.connectorName(), next.mode(), next.version(), action, changedAt, actor));
 		return metadataOf(next);
 	}
 
-	private com.lynxis.orca.platform.secrets.SecretPurpose purpose(String connectorName) {
-		return ConnectorCredential.purpose(siteExternalId, connectorName);
+	private static Scope scope(String storedSiteExternalId) {
+		return Scope.of(SCOPE_DIMENSION, Set.of(storedSiteExternalId));
 	}
 
 	private void requireScope() {

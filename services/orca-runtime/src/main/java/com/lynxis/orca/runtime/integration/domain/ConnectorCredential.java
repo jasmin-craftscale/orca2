@@ -21,4 +21,10 @@ public record ConnectorCredential(
 		return new SecretPurpose("runtime", List.of(siteExternalId, connectorName),
 				"connector-basic-password");
 	}
+
+	@Override
+	public String toString() {
+		return "ConnectorCredential[mode=" + mode + ", version=" + version
+				+ ", credentialMaterial=<redacted>]";
+	}
 }

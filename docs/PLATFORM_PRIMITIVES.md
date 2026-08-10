@@ -30,7 +30,7 @@ Written for engineers who have not used this project shape before. Every pattern
 | `scope` | **Ambient scope** + a **repository guard** | Closest named forms: a Hibernate filter, or the Specification pattern applied centrally |
 | `idempotency` | **Idempotent Receiver** / **Idempotency Key** | Stripe's idempotency-key documentation is the clearest public write-up |
 | `web` | **Response envelope** + **ambient principal** | RFC 7807 is a near relative for the error half |
-| `secrets` | **Envelope encryption boundary** with **authenticated context** | AES-GCM authenticated encryption; OWASP calls the context additional authenticated data (AAD) |
+| `secrets` | **Application-level authenticated encryption boundary** | AES-GCM authenticated encryption with additional authenticated data (AAD) |
 
 ---
 

@@ -239,7 +239,7 @@ second and prints `BUILD SUCCESSFUL` for a suite it never ran.
 
 ⚠️ **`./gradlew test` runs almost nothing that matters.** The property suites live
 in a separate source set so the build works on a machine with no Docker. Full
-verification is `check integrationTest` — **240 integration tests** against a real
+verification is `check integrationTest` — **266 integration tests** against a real
 SQL Server and a real workflow engine.
 
 ⚠️ **Count what ran, do not trust the word "SUCCESSFUL".** A suite that was filtered

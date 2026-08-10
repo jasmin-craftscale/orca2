@@ -3,9 +3,11 @@ package com.lynxis.orca.runtime.integration.domain;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.platform.secrets.SealedSecret;
 import com.lynxis.orca.platform.secrets.SecretBox;
@@ -41,19 +43,25 @@ public class CredentialRewrapService {
 			List<ConnectorCredential> selected = repository.needingRewrap(secretBox.currentKeyId(), limit);
 			Instant changedAt = Instant.now();
 			for (ConnectorCredential credential : selected) {
-				String plaintext = secretBox.open(credential.sealedSecret(),
-						ConnectorCredential.purpose(siteExternalId, credential.connectorName()));
-				SealedSecret resealed = secretBox.seal(plaintext,
-						ConnectorCredential.purpose(siteExternalId, credential.connectorName()));
-				ConnectorCredential next = new ConnectorCredential(siteExternalId, credential.connectorName(),
-						CredentialMode.BASIC, credential.principal(), resealed,
-						credential.version() + 1, changedAt, actor);
-				if (repository.updateRewrapped(next, credential.version(), credential.sealedSecret().keyId()) != 1) {
-					throw new InvalidState("credential changed during rewrap");
-				}
-				repository.appendAudit(siteExternalId, new ConnectorCredentialAudit(
-						credential.connectorName(), CredentialMode.BASIC, next.version(),
-						Action.REWRAP, changedAt, actor));
+				ScopeContext.runIn(scope(credential.siteExternalId()), () -> {
+					String plaintext = secretBox.open(credential.sealedSecret(),
+							ConnectorCredential.purpose(
+									credential.siteExternalId(), credential.connectorName()));
+					SealedSecret resealed = secretBox.seal(plaintext,
+							ConnectorCredential.purpose(
+									credential.siteExternalId(), credential.connectorName()));
+					ConnectorCredential next = new ConnectorCredential(
+							credential.siteExternalId(), credential.connectorName(),
+							CredentialMode.BASIC, credential.principal(), resealed,
+							credential.version() + 1, changedAt, actor);
+					if (repository.updateRewrapped(next, credential.version(),
+							credential.sealedSecret().keyId()) != 1) {
+						throw new InvalidState("credential changed during rewrap");
+					}
+					repository.appendAudit(next.siteExternalId(), new ConnectorCredentialAudit(
+							next.connectorName(), CredentialMode.BASIC, next.version(),
+							Action.REWRAP, changedAt, actor));
+				});
 			}
 			return new RewrapResult(selected.size(), selected.size(),
 					repository.countNeedingRewrap(secretBox.currentKeyId()));
@@ -70,6 +78,10 @@ public class CredentialRewrapService {
 				|| !ScopeContext.current().permitted(SCOPE_DIMENSION).contains(siteExternalId)) {
 			throw new InvalidState("installation site scope is not established");
 		}
+	}
+
+	private static Scope scope(String storedSiteExternalId) {
+		return Scope.of(SCOPE_DIMENSION, Set.of(storedSiteExternalId));
 	}
 
 	public record RewrapResult(int selected, int rewrapped, long remaining) {
