@@ -6,9 +6,12 @@ Companion report: `docs/stream-3-report.md`**
 Self-contained. Where it points at another document, read that document before
 building the thing it describes.
 
-**This is the cleanly parallel stream.** It is the only one in a different service
-from every other stream — different schema, different migration band, no shared
-files. You can work without coordinating with anyone, and that is deliberate.
+**Most of this is a cleanly parallel stream.** It is the only one in a different
+service from every other stream — different schema and migration band. WP1, WP2,
+WP4 and WP5 can proceed without coordinating with another stream. WP3 is the one
+named exception: it consumes the generic `platform/secrets` primitive after the
+connector-credentials feature reaches `develop`, then adds only core-owned storage
+and configuration. Do not create a second crypto implementation while waiting.
 
 ⚠️ **It also contains the single most security-shaped component in the programme.**
 See §5 before you write any of WP2.
@@ -26,15 +29,19 @@ See §5 before you write any of WP2.
    schema.** Nobody else writes there, but read §3.1 anyway: it explains the failure
    you will see when you pull another stream's `runtime` migration.
 4. **This plan, in full.**
-5. **`docs/custom-entities-from-1x.md`** — the DERIVED-FROM-1X reference. **Read its
+5. **`docs/decision-connector-credentials.md`** and
+   **`docs/connector-credentials-plan.md`** — Option A is approved and the generic
+   primitive is built first by Stream 1 Track B. WP3 consumes it after that feature
+   reaches `develop`; core does not create a second crypto implementation.
+6. **`docs/custom-entities-from-1x.md`** — the DERIVED-FROM-1X reference. **Read its
    §0 first: the six inversions**, and its vocabulary warning — 1.x calls this
    *reference data*, and searching for "custom entity" finds nothing.
-6. **`docs/core-config-schema-from-1x.md` §0** — the eleven translation rules. They
+7. **`docs/core-config-schema-from-1x.md` §0** — the eleven translation rules. They
    govern every 1.x→2.0 configuration port and they apply here in full.
-7. **`docs/ORCA_ARCHITECTURE.md`** — §C1 (orca-core: what it owns, the module map,
+8. **`docs/ORCA_ARCHITECTURE.md`** — §C1 (orca-core: what it owns, the module map,
    and the *"single controlled executor"* line), §B6 (licensing — the paragraph that
    was ruled on 8 August), §B10 (the guarantees).
-8. **`docs/phase-2-report.md`** — the configuration world you are extending. Its §7
+9. **`docs/phase-2-report.md`** — the configuration world you are extending. Its §7
    ("found wrong") is where the collation trap is explained.
 
 **Mirror the existing code — it is your template.** `orca-core` is the most complete
@@ -91,7 +98,7 @@ done", never "core is done".
 | **The eleven translation rules in `core-config-schema-from-1x.md` §0 apply in full** | They are why Phase 2's port worked |
 | **Your migration band is `V111–V140`** | `docs/MIGRATION_NUMBER_RANGES.md` |
 | **Every table lands with its feature surface in one work package** | A table nothing reads is drift |
-| **Anything security-shaped is PROPOSE-and-report** — and in this stream that is WP2's whole design | §5 |
+| **Implement a security choice only where a named ruling exists. Credentials at rest now have one; the DDL executor, SFTP host trust and public mutation authorization do not** | §5 and `docs/decision-connector-credentials.md` |
 
 ## 3 · Work packages, in order
 
@@ -158,8 +165,13 @@ Two things 1.x leaves implicit and you must make explicit (sheet §2):
 
 - **What happens to a row that fails validation mid-import** — all-or-nothing, or
   accept-and-report? Pick, state it, prove it.
-- ⚠️ **Where the SFTP credential lives.** Same unanswered question stream 1 hits for
-  connector credentials. **Do not invent a scheme** — §5.
+- **Where the SFTP credential lives is now ruled.** After `platform/secrets` reaches
+  `develop`, add it as a core dependency and store a separate encrypted credential
+  record in core's owning schema, using core's own production key material and the
+  same write-only/versioned/audited/rotation properties as the connector consumer.
+  Bind the purpose to owner `core`, the ingestion record identity and kind
+  `sftp-password`. Do not share a credential table or production raw key with
+  runtime. Host-key verification is trust material and remains separately open.
 
 ⚠️ **A scheduled ingestion is a `@Scheduled` method, and `SystemContextRule` will fail
 the build unless it enters a system identity.** Not a formality: background work with
@@ -229,7 +241,7 @@ command; the report needs it.**
 | # | The question | What to do |
 |---|---|---|
 | **Q1** | **The DDL executor's design is the product owner's, not yours.** It is the one component permitted to change the schema at runtime, and the roadmap says so explicitly: *"Its design is surfaced to the product owner, not settled by whoever implements it."* | **Write the design down and stop.** What DDL verbs are permitted; what happens to data on a narrowing change; whether a drop is ever allowed and who can ask for one; what the recorded migration looks like; what the allow-list is derived from. **Then wait.** Build WP1, WP3, WP4 and WP5 while you wait — none of them is blocked on the answer |
-| **Q2** | **Where an SFTP credential lives at rest.** Stream 1 hits the identical question for connector credentials | **Security-shaped.** Propose; do not implement a scheme. ⚠️ Flag to the product owner that **two streams need one answer** — two schemes would be worse than either |
+| **Q2 — CLOSED 10 Aug** | **Where an SFTP credential lives at rest.** | **Option A and all seven conditions were approved once for both streams.** Consume `platform/secrets` after the credentials feature merges; use a core-owned record and core-specific production key material. SFTP host trust and credential-mutation authorization remain open and must not be inferred from this ruling |
 | **Q3** | **The retention class for any traffic-growing table you add.** `@RetentionClass` takes a free-form string and the check only requires it non-blank, so you are not blocked — but the closed eighteen-value list is unreconciled and nine provisional values exist in code | Name one, follow the existing naming, **mark it provisional in your report**. Stream 4 reconciles and must be able to find yours |
 | **Q4** | **What a failed row does mid-import** (WP3). 1.x's behaviour is per-call-site and stated nowhere | This one **is** yours — decide it, state it, prove it. Recorded here so it is not decided silently |
 
