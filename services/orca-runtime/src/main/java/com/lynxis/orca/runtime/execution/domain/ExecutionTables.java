@@ -103,4 +103,47 @@ public final class ExecutionTables {
 			String attributes,
 			Instant receivedAt) {
 	}
+
+	/**
+	 * One step of one visit: a node the process entered, its outcome, and what it
+	 * saw.
+	 *
+	 * <p>{@link Growth#TRAFFIC_GROWING}: several rows per truck, forever, at every
+	 * lane — strictly more rows than the visit table itself. The retention class
+	 * name is <strong>PROVISIONAL</strong> for the same reason the visit's is: the
+	 * catalog is not yet the closed, constraint-enforced set it is supposed to
+	 * become, and these names are candidates for it, not members of it.
+	 */
+	@PersistentTable(name = "node_execution", growth = Growth.TRAFFIC_GROWING)
+	@RetentionClass("visit") // PROVISIONAL — retained exactly as long as the visit it belongs to
+	public record NodeExecution(
+			long nodeExecutionId,
+			String externalId,
+			String siteExternalId,
+			long executionId,
+			String nodeUuid,
+			String nodeType,
+			String status,
+			String executionPayload,
+			Instant enteredAt,
+			Instant completedAt) {
+	}
+
+	/**
+	 * One current value per key per visit — the visit's dataset, which is what
+	 * site-authored selectors and connector field mappings read.
+	 *
+	 * <p>{@link Growth#TRAFFIC_GROWING}: bounded per visit but unbounded over
+	 * traffic, exactly like the visit row it hangs off.
+	 */
+	@PersistentTable(name = "visit_dataset", growth = Growth.TRAFFIC_GROWING)
+	@RetentionClass("visit") // PROVISIONAL — retained exactly as long as the visit it belongs to
+	public record VisitDataset(
+			long visitDatasetId,
+			String siteExternalId,
+			long executionId,
+			String dataKey,
+			String dataValue,
+			Instant writtenAt) {
+	}
 }

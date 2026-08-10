@@ -44,7 +44,8 @@ against the running database, 10 Aug 2026):
 | **V118–V137** | **Stream 1** — partner event API, dispatch queue, connector breadth |
 | **V138–V157** | **Stream 2** — read models and notifications |
 | **V158–V167** | **Stream 4** — retention and purge, runtime's share |
-| V168–V199 | Reserved: Flowable version upgrades, and anything urgent that cannot wait for a band |
+| **V168–V170** | **OCS-4 runtime migration** — the step trace (`node_execution`), the visit dataset, and the compiled-definition columns on `execution`. Taken from the reserved band, 10 Aug 2026, because the migration is not one of the four streams |
+| V171–V199 | Reserved: Flowable version upgrades, and anything urgent that cannot wait for a band |
 
 **Core**
 
