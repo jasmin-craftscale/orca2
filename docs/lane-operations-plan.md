@@ -1,57 +1,181 @@
 # Implementation Plan — Lane operations: see and control one lane
 
-**For the developer (or AI) implementing this · August 2026 · Companion report: `docs/lane-operations-report.md`**
+**Self-contained. Written to be executed autonomously and verified by the executor.**
 
-**This plan is prescriptive.** Unlike the stream plans, it does not leave design
-choices open. Where a decision has already been made, it is stated as an
-instruction, not an option. If you find yourself about to make a judgement call
-that is not written here, that is a signal to stop and ask — not to decide.
+**This plan is prescriptive.** Where a decision has already been made it is an
+instruction, not an option. If you are about to make a judgement call that is not
+written here, stop and ask — do not decide.
 
-**You are adding three endpoints.** No new database table. No migration. No change
-to any existing behaviour.
+**Scope:** three endpoints. **No new table. No migration. No migration-number band
+needed.** No change to existing behaviour.
+
+**Where to work:** branch `feature/lane-operations` off `main`. Do not commit to
+`main`. Do not touch the `integration`, `readmodel` or `notify` modules — other
+developers own those right now.
 
 ---
 
-## 0 · Before you write anything
+## 0 · Environment — get here before writing any code
 
-### 0.1 · Get it running first
+Every command below was executed against this repository. Run them in order. **If
+any step does not produce what is described, stop and report it — do not continue.**
 
-Do not start reading code. Get the system running and drive a truck through it —
-it takes about twenty minutes and everything below will make sense afterwards.
+### 0.1 · Prerequisites
 
-Follow `docs/LOCAL_DEVELOPMENT.md` end to end. You are finished with this step when
-`./gradlew sendPlate -Pplate=T-YOURNAME-01` puts a row in the database with status
-`COMPLETED`.
+- Docker running
+- A JDK (any recent one; the Java 25 toolchain auto-provisions)
+- Python 3
 
-### 0.2 · Read these, in this order
+### 0.2 · Start the stack
 
-1. **`AGENTS.md`** (repository root) — the rules that fail the build. Not advisory.
-2. **`docs/CODE_PATTERNS.md`** — §1 (a request end to end) and §2 (never check, then act).
-3. **This plan, in full**, including §6, which lists ten traps that have already
-   cost somebody a day each.
+```bash
+cd deploy
+cp .env.example .env          # ONLY if deploy/.env does not already exist — never overwrite it
+docker compose up -d
+docker compose run --rm bootstrap
+```
 
-### 0.3 · The one file to copy from
+`bootstrap` creates seven schemas, seven logins and their grants. It is a no-op on a
+database that already has them.
 
-**`services/orca-runtime/src/main/java/com/lynxis/orca/runtime/execution/` contains
-a worked example of exactly what you are about to build** — the visit read surface,
-added the same way, with the same layers:
+### 0.3 · Ports — read this before booting
+
+The committed ports are `8081`–`8086` for services, `1433` SQL Server, `8080`
+Keycloak, `9100` the camera listener.
+
+**If those ports are free on your machine, use them and ignore the offsets below.**
+If something else already holds them (the old ORCA system does), everything shifts
+by `+10000` and the stack's own ports come from `deploy/.env`. Check first:
+
+```bash
+lsof -nP -iTCP -sTCP:LISTEN | grep -E ":(8081|8082|8083|1433|8080|9100)\b"
+```
+
+The rest of this plan writes the offset form (`18081`, `18082`, `18083`, `21433`,
+`18080`). **Substitute your actual ports throughout.**
+
+### 0.4 · Boot the three gate-path services
+
+Three terminals. **Order matters and the platform enforces it** — core publishes the
+views runtime and edge wait for, and they refuse to start before it has migrated.
+
+```bash
+export ORCA_DB_URL='jdbc:sqlserver://localhost:21433;databaseName=orca;encrypt=true;trustServerCertificate=true'
+export ORCA_OIDC_ISSUER_URI='http://localhost:18080/realms/orca'
+
+./gradlew bootRun -p services/orca-core    --args='--spring.profiles.active=local --server.port=18081'
+./gradlew bootRun -p services/orca-runtime --args='--spring.profiles.active=local --server.port=18082 --orca.runtime.edge-base-url=http://localhost:18083'
+./gradlew bootRun -p services/orca-edge    --args='--spring.profiles.active=local --server.port=18083 --orca.edge.runtime-base-url=http://localhost:18082'
+```
+
+⚠️ **`--spring.profiles.active=local` is not optional.** The committed inter-service
+credential is recognised by name and the service refuses to start with it otherwise.
+Do not weaken that check.
+
+Confirm all three:
+
+```bash
+for p in 18081 18082 18083; do curl -s -o /dev/null -w "$p %{http_code}\n" http://localhost:$p/actuator/health; done
+```
+
+Expect `200` from each.
+
+### 0.5 · Seed the demo site
+
+```bash
+cd deploy && docker compose run --rm demo-seed
+```
+
+One site (`SITE-DEMO`), one lane (`LANE-DEMO-01`), a camera, a barrier, the `tos`
+connector, the routing row mapping `200`→`APPROVED`, plus the clerk world:
+`usr-demo-clerk`, team `team-demo-clerks`, screen `scr-demo-manual`.
+
+### 0.6 · A database shell
+
+```bash
+q(){ docker exec orca-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P 'Orca!Local2026' -C -No -I -d orca -h -1 -W -Q "SET NOCOUNT ON; $1"; }
+```
+
+⚠️ **The `-I` is required, not cosmetic.** Several tables carry filtered indexes and
+SQL Server refuses to write to those unless `QUOTED_IDENTIFIER` is on. Without it a
+write fails with an error naming SET options and no table at all. Reads work either
+way, which is why it is easy to miss.
+
+### 0.7 · Get a token — and link it to an operator
+
+**⚠️ This step is mandatory for work packages B and C, and skipping it is the single
+most likely way to lose an hour.** Those endpoints require a resolvable *operator*,
+and the local Keycloak realm deliberately contains no human users. Without the link
+below, every call returns `401 OPERATOR_UNRESOLVED` and the code is not at fault.
+
+```bash
+TOK=$(curl -s -X POST "http://localhost:18080/realms/orca/protocol/openid-connect/token" \
+  -d "client_id=orca-core" -d "client_secret=local-dev-secret-orca-core" \
+  -d "grant_type=client_credentials" | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+
+SUB=$(echo "$TOK" | cut -d. -f2 | python3 -c "import sys,base64,json; s=sys.stdin.read().strip(); s+='='*(-len(s)%4); print(json.loads(base64.urlsafe_b64decode(s))['sub'])")
+
+q "UPDATE core.user_account SET keycloak_subject = '$SUB' WHERE external_id = 'usr-demo-clerk'"
+q "SELECT user_external_id, keycloak_subject FROM core.topology_operator"
+```
+
+The last query must show `usr-demo-clerk` with a non-null subject. This is the
+operator directory doing its job, not a workaround.
+
+⚠️ **The token expires in five minutes.** Re-run the first command whenever a call
+starts returning `401`.
+
+### 0.8 · Drive a truck, and learn to park one
+
+Happy path — the visit reaches `COMPLETED`:
+
+```bash
+./gradlew sendPlate -Pplate=T-SETUP-01 -Pport=9100
+q "SELECT TOP 1 external_id, status, plate FROM runtime.execution ORDER BY execution_id DESC"
+```
+
+**Parking a truck at the manual step** — you will need this for B and C. Unmap the
+connector's success route so the answer matches no branch, and the process takes its
+default flow to a human:
+
+```bash
+q "UPDATE runtime.connector_route SET http_status = 418 WHERE connector_name = 'tos'"
+./gradlew sendPlate -Pplate=T-PARKED-01 -Pport=9100
+sleep 8
+q "SELECT TOP 1 external_id, status, plate FROM runtime.execution ORDER BY execution_id DESC"   -- ACTIVE
+q "SELECT TOP 1 external_id, status FROM runtime.work_item ORDER BY work_item_id DESC"          -- QUEUED
+```
+
+⚠️ **Always restore it afterwards**, or every later truck parks:
+
+```bash
+q "UPDATE runtime.connector_route SET http_status = 200 WHERE connector_name = 'tos'"
+```
+
+### 0.9 · Read these
+
+1. **`AGENTS.md`** (repository root) — the rules that fail the build.
+2. **`docs/CODE_PATTERNS.md`** §1 and §2.
+3. **This plan, in full — including §6, the traps.**
+
+### 0.10 · The worked example to copy
+
+**The visit read surface is the same shape you are about to build.** Read all six
+files before starting; your work should look like their sibling.
 
 | Layer | File |
 |---|---|
-| Contract | `services/orca-runtime/src/main/resources/openapi/orca-runtime.yaml` (the `/api/v1/visits` paths) |
-| Controller | `execution/api/VisitController.java` |
-| Service | `execution/domain/VisitQueryService.java` |
-| Repository | `execution/persistence/VisitReadRepository.java` |
-| Wiring | `execution/ExecutionConfiguration.java` (`visitController`, `visitQueryService`, `visitReadRepository` beans) |
-| Tests | `src/integrationTest/java/.../execution/VisitReadPropertiesIT.java` |
-
-**Read all six before starting.** Your work should look like a sibling of them.
+| Contract | `services/orca-runtime/src/main/resources/openapi/orca-runtime.yaml` — the `/api/v1/visits` paths |
+| Controller | `services/orca-runtime/src/main/java/com/lynxis/orca/runtime/execution/api/VisitController.java` |
+| Service | `.../execution/domain/VisitQueryService.java` |
+| Repository | `.../execution/persistence/VisitReadRepository.java` |
+| Wiring | `.../execution/ExecutionConfiguration.java` — beans `visitController`, `visitQueryService`, `visitReadRepository` |
+| Tests | `services/orca-runtime/src/integrationTest/java/com/lynxis/orca/runtime/execution/VisitReadPropertiesIT.java` |
 
 ---
 
 ## 1 · What you are building
-
-Three endpoints that let an operator see and act on **one lane**.
 
 | # | Endpoint | In one sentence |
 |---|---|---|
@@ -59,42 +183,46 @@ Three endpoints that let an operator see and act on **one lane**.
 | **B** | `POST /api/v1/lanes/{laneExternalId}/take-next` | Claim the oldest queued work item on this lane's running visit |
 | **C** | `POST /api/v1/visits/{visitExternalId}/abort` | Abort one visit, releasing its lane |
 
-**What you are NOT building** — if you find yourself doing any of these, stop:
-
-- No new table, no migration, no change to `db/migration/`.
-- No change to the BPMN process file.
-- No new build check.
-- Nothing in the `integration`, `readmodel` or `notify` modules — **other developers
-  own those right now and you will collide with them.**
-- No frontend.
+**Explicitly out of scope** — stop if you find yourself doing any of these: a new
+table or migration; a change to the BPMN process; a new build check; anything in
+`integration`, `readmodel` or `notify`; any frontend.
 
 ---
 
 ## 2 · Ground rules
 
-| Rule | What it means for you |
+| Rule | What it means here |
 |---|---|
-| **Contract first, always** | Edit the OpenAPI document, regenerate, then make the controller satisfy the generated interface. Never write a controller method and then describe it in the contract |
-| **Every database read goes through the scope seam** | You will never write `JdbcTemplate`. A build check fails if you do |
-| **Scope comes from configuration, never from the request** | The site identifier is injected from config. A caller never names a site |
+| **Contract first, always** | Edit the OpenAPI document, regenerate, then satisfy the generated interface. The build failing after a contract edit is the mechanism working |
+| **Every read goes through the scope seam** | You will never write `JdbcTemplate`. A build check fails if you do |
+| **Scope comes from configuration, never the request** | A caller never names a site |
 | **Tests prove properties, not paths** | "The endpoint returns a row" is not a test. "Another site's lane returns nothing" is |
-| **Watch every new test fail before you trust it** | Break the thing on purpose, see the test catch it, put it back. A test you have never seen fail may not be wired to anything |
-| **If it is not in this plan, ask** | Do not invent behaviour. A question asked costs an hour; a wrong guess costs a week |
+| **Watch every new test fail before trusting it** | Break the thing, see it caught, restore it. Record what you broke |
+| **If it is not in this plan, ask** | Do not invent behaviour |
 
 ---
 
 ## 3 · Work package A — `GET /lanes/{id}/visit`
 
-### A.1 What it does
+### A.1 Behaviour
 
-Given a lane's external identifier, return the **running visit on that lane**, with
-the step the engine is parked at. If no visit is running, return `200` with `data:
-null` — an empty lane is a normal answer, not an error.
+Return the **running visit on the lane**, with the step the engine is parked at.
 
-### A.2 The contract
+| Case | Answer |
+|---|---|
+| A visit is running | `200`, the visit, `currentActivity` populated |
+| The lane is clear | `200`, `"data": null` |
+| The lane is not published by this installation | `422` `LANE_NOT_AT_THIS_INSTALLATION` |
+| No/invalid credential | `401` |
 
-Add to `services/orca-runtime/src/main/resources/openapi/orca-runtime.yaml`, in the
-`paths:` section, next to the existing `/api/v1/visits/{visitExternalId}`:
+⚠️ **An empty lane is `200`, not `404`.** A lane with no truck is the normal state
+of a gate; reporting it as "not found" makes an ordinary condition
+indistinguishable from a mistyped lane identifier.
+
+### A.2 Contract
+
+Add to `services/orca-runtime/src/main/resources/openapi/orca-runtime.yaml` under
+`paths:`, immediately after `/api/v1/visits/{visitExternalId}`:
 
 ```yaml
   /api/v1/lanes/{laneExternalId}/visit:
@@ -140,22 +268,26 @@ Add to `services/orca-runtime/src/main/resources/openapi/orca-runtime.yaml`, in 
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 ```
 
-Then run `./gradlew :services:orca-runtime:compileJava`. **It will fail**, because
-`VisitController` now does not implement the new method. That failure is the
-contract-first mechanism working. Do not work around it — implement the method.
+Then:
 
-### A.3 The code
+```bash
+./gradlew :services:orca-runtime:compileJava
+```
 
-**Repository** — add ONE method to `execution/persistence/VisitReadRepository.java`:
+**It must fail**, because `VisitController` does not yet implement `getLaneVisit`.
+That failure is contract-first working. Implement the method; do not work around it.
+
+### A.3 Code — three additions, no new classes
+
+**1. Repository** — add to `execution/persistence/VisitReadRepository.java`:
 
 ```java
 	/**
 	 * The running root visit on a lane, if there is one.
 	 *
 	 * <p>Root-only and {@code ACTIVE}: a child execution is a step inside a visit
-	 * rather than a visit of its own, and the same filtered unique index that
-	 * enforces one active root per lane is what makes "the" visit a meaningful
-	 * phrase here.
+	 * rather than a visit of its own, and the filtered unique index that enforces one
+	 * active root per lane is what makes "the" visit a meaningful phrase here.
 	 */
 	public Optional<VisitRow> activeOnLane(long laneId) {
 		return seam.select(ScopedSelect.from("execution")
@@ -167,14 +299,16 @@ contract-first mechanism working. Do not work around it — implement the method
 	}
 ```
 
-**Service** — add ONE method to `execution/domain/VisitQueryService.java`:
+`COLUMNS`, `SCOPE_COLUMN`, `ROOT_ONLY` and `map` already exist in that file.
+
+**2. Service** — add to `execution/domain/VisitQueryService.java`:
 
 ```java
 	/**
 	 * The visit running on a lane, with the engine's live position.
 	 *
-	 * @throws AdmissionService.LaneNotAtThisInstallationException when the lane is
-	 *         not one this installation publishes — refused rather than answered
+	 * @throws AdmissionService.LaneNotAtThisInstallationException when this
+	 *         installation does not publish the lane — refused rather than answered
 	 *         "no visit", because those are different facts and an operator acts on
 	 *         them differently
 	 */
@@ -187,11 +321,11 @@ contract-first mechanism working. Do not work around it — implement the method
 	}
 ```
 
-⚠️ `view(...)` and `livePositionOf(...)` are **private static / private** in that
-class already. `view` takes `(row, laneExternalId, currentActivity)`. Do not change
-their signatures.
+`view(row, laneExternalId, currentActivity)` and `livePositionOf(row)` already exist
+as private members. Do not change their signatures. Add the import for
+`AdmissionService` if it is not present.
 
-**Controller** — add the generated method to `execution/api/VisitController.java`:
+**3. Controller** — add to `execution/api/VisitController.java`:
 
 ```java
 	@Override
@@ -213,24 +347,14 @@ their signatures.
 	}
 ```
 
-⚠️ `toModel` is already `private static` in that class. `inScope` is already there.
-`ExecutionErrorCode.LANE_NOT_AT_THIS_INSTALLATION` already exists — do not add a
-new error code for this.
+`inScope` and `toModel` already exist. `ExecutionErrorCode.LANE_NOT_AT_THIS_INSTALLATION`
+already exists — **do not add a new error code.**
 
-**Wiring** — nothing to do. `VisitController` and `VisitQueryService` already have
-`@Bean` methods in `ExecutionConfiguration`. You added methods, not classes.
+**Wiring:** nothing. You added methods to classes that already have `@Bean` methods.
 
-### A.4 Done when
+### A.4 Tests
 
-- `GET /api/v1/lanes/LANE-DEMO-01/visit` returns the running visit with a
-  `currentActivity` while a truck is parked at the manual step.
-- The same call on a clear lane returns `200` with `"data": null`.
-- `GET /api/v1/lanes/LANE-NOPE/visit` returns `422`.
-- The property tests in A.5 pass, and you have watched each one fail.
-
-### A.5 Tests
-
-Add to `src/integrationTest/java/.../execution/VisitReadPropertiesIT.java`:
+Add to `VisitReadPropertiesIT`:
 
 ```java
 	@Test
@@ -259,51 +383,54 @@ Add to `src/integrationTest/java/.../execution/VisitReadPropertiesIT.java`:
 	}
 ```
 
-**How to watch these fail:** temporarily change `status = 'ACTIVE'` to `status IS
-NOT NULL` in `activeOnLane` — the first test must fail. Put it back.
+`insertVisit`, `asSite`, `OURS`, `THEIRS` and `visits` already exist in that class.
+
+**Watch it fail:** change `status = 'ACTIVE'` to `status IS NOT NULL` in
+`activeOnLane`. `laneCurrentVisit` must fail. Restore it.
+
+### A.5 Done when
+
+- The two tests pass and you have watched each fail.
+- Live: a parked truck's lane returns the visit with `currentActivity`; a clear lane
+  returns `"data": null`; `LANE-NOPE` returns `422`.
 
 ---
 
 ## 4 · Work package B — `POST /lanes/{id}/take-next`
 
-### B.1 What it does
+### B.1 Behaviour
 
-An operator at a lane monitor clicks "take next". Claim **the oldest queued work
-item on that lane's running visit** and return it, exactly as
+Claim **the oldest queued work item on that lane's running visit**, exactly as
 `POST /work-items/{id}/take` would.
 
-**This is a convenience over the existing claim, not a new kind of claim.** Every
-rule that governs `take` governs this: eligibility is checked first, the conditional
-UPDATE is the only race guard, the loser gets a typed `409`, and the action is
-audited as `TAKE`.
+| Case | Answer |
+|---|---|
+| Claimed | `200`, the item `IN_PROGRESS`, caller is assignee, audit row `TAKE` |
+| Lane not published | `422` `LANE_NOT_AT_THIS_INSTALLATION` |
+| No visit running, or no queued item | `404` `WORK_ITEM_NOT_FOUND` |
+| Operator outside the item's eligible teams | `403` `WORK_ITEM_NOT_ELIGIBLE` |
+| Somebody claimed it first | `409` `WORK_ITEM_CONFLICT` |
+| No resolvable operator | `401` `OPERATOR_UNRESOLVED` |
 
-### B.2 The rules, exactly
+### B.2 The rules, in order
 
-Follow these in order. Each has a reason; none is optional.
-
-1. **Resolve the lane.** Not published by this installation → `422`
-   (`LANE_NOT_AT_THIS_INSTALLATION`).
-2. **Find the lane's running visit.** No `ACTIVE` root visit → `404`
-   (`WORK_ITEM_NOT_FOUND`, message: nothing is running on this lane). ⚠️ Do **not**
-   invent a new error code for this.
-3. **Find its open work items**, and keep only those with status `QUEUED`.
-   `IN_PROGRESS` items belong to somebody already.
+1. Resolve the lane. Not published → `422`.
+2. Find the lane's `ACTIVE` root visit. None → `404`.
+3. Take its open items; keep only `QUEUED`. `IN_PROGRESS` belongs to somebody.
 4. **Pick the oldest by `queuedAt`.** ⚠️ **Oldest-first, NOT the priority ordering
-   the queue grid uses.** Reason: take-by-lane answers "the next thing at *this*
-   lane", where a single visit's items are a sequence rather than a ranked queue.
-   The grid ranks across lanes; this does not. **State this in your report.**
-5. **No queued item** → `404` (`WORK_ITEM_NOT_FOUND`).
-6. **Claim it by calling the existing `WorkItemService.take(externalId, actor)`.**
+   the queue grid uses.** The grid ranks work across lanes; this answers "the next
+   thing at *this* lane", where one visit's items are a sequence. **Record this
+   decision in your report.**
+5. No queued item → `404`.
+6. **Claim by calling the existing `WorkItemService.take(externalId, actor)`.**
    ⚠️ **Do not write a second claim.** That method already checks eligibility,
    performs the guarded update, writes the audit row and throws the typed conflict.
-   Duplicating it is how two claim paths drift apart.
-7. **Two operators racing on the same lane**: both may select the same item at
-   step 4; exactly one wins the guarded update inside `take`, and the loser
-   receives the `409` that method already throws. **That is correct and you must
-   not try to prevent it** — the conditional UPDATE is the guard, and a pre-check
-   would be the race, not the fix.
+7. **Two operators racing the same lane may both select the same item at step 4.**
+   Exactly one wins the conditional UPDATE inside `take`; the loser gets the `409`
+   that method already throws. **That is correct — do not add a pre-check to prevent
+   it.** A pre-check would be the race, not the fix.
 
-### B.3 The contract
+### B.3 Contract
 
 ```yaml
   /api/v1/lanes/{laneExternalId}/take-next:
@@ -367,22 +494,17 @@ Follow these in order. Each has a reason; none is optional.
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 ```
 
-### B.4 Where the code goes
+### B.4 Crossing the module wall — read before coding
 
-⚠️ **This one crosses a module wall, and the wall is enforced by a build check.**
+⚠️ `workitem` may not reach `execution.domain` or `execution.persistence`. A build
+check (`ModuleWallRule`) enforces it with three tests. But *which visit is running on
+a lane* is `execution`'s knowledge.
 
-`workitem` may not reach into `execution.domain` or `execution.persistence`. But
-finding a lane's running visit is `execution`'s knowledge. **`workitem` must not
-look it up itself.**
+**The rule: the endpoint lives in `workitem`, and it learns the visit through a port
+published by `execution`.** `execution/api/ManualStepPort.java` is the worked example
+of this exact shape in the other direction — read it first.
 
-**The rule: put the new endpoint in `workitem`, and get the visit's `executionId`
-from `execution` through a port.** `execution/api/ManualStepPort.java` is the
-worked example of exactly this shape — an interface in the callee's `api` package,
-implemented inside the callee, consumed by the caller.
-
-Concretely:
-
-1. **Add to `execution/api/`** a small interface, e.g. `LaneVisitPort`:
+**Step 1** — create `execution/api/LaneVisitPort.java`:
 
 ```java
 package com.lynxis.orca.runtime.execution.api;
@@ -410,12 +532,42 @@ public interface LaneVisitPort {
 }
 ```
 
-2. **Implement it in `execution`** (a small class in `execution/domain/`, or extend
-   the existing `VisitQueryService` to implement it — either is acceptable; say
-   which you chose and why in the report). Register it as a `@Bean` in
-   `ExecutionConfiguration`.
+**Step 2 — implement it on `VisitQueryService`.** ⚠️ *Prescribed, not a choice.* That
+class already holds both dependencies it needs and already resolves lanes; a second
+class would duplicate that. Declare `implements LaneVisitPort`, add:
 
-3. **Consume it in `workitem`** — add a method to `WorkItemService`:
+```java
+	@Override
+	public Optional<Long> activeVisitOn(String laneExternalId) {
+		long laneId = lanes.laneIdOf(laneExternalId)
+				.orElseThrow(() -> new AdmissionService.LaneNotAtThisInstallationException(laneExternalId));
+		return visits.activeOnLane(laneId).map(VisitReadRepository.VisitRow::executionId);
+	}
+```
+
+⚠️ `VisitRow` does **not** currently expose `executionId` — the record is
+`VisitRow(externalId, laneId, status, plate, startedAt, completedAt,
+processInstanceId)`. **Add `long executionId` as its first component**, add
+`execution_id` to `COLUMNS`, and read it in `map` with `rs.getLong("execution_id")`.
+Every existing construction site must be updated; the compiler will list them.
+
+**Step 3 — expose the bean.** In `ExecutionConfiguration`, the existing
+`visitQueryService` bean method now returns a type that also implements the port.
+Add a second bean method that returns the same instance under the port type:
+
+```java
+	@Bean
+	public com.lynxis.orca.runtime.execution.api.LaneVisitPort laneVisitPort(
+			com.lynxis.orca.runtime.execution.domain.VisitQueryService visitQueryService) {
+		return visitQueryService;
+	}
+```
+
+**Step 4 — consume it in `workitem`.** Add to `WorkItemService`: add a
+`private final LaneVisitPort laneVisits;` field, take it as a constructor parameter,
+and pass it from the `workItemService` bean method at
+`workitem/WorkItemConfiguration.java:73` — add `LaneVisitPort laneVisits` to that
+method's parameters and Spring will inject the bean from step 3.
 
 ```java
 	/**
@@ -439,29 +591,24 @@ public interface LaneVisitPort {
 	}
 ```
 
-**These names are verified and you may copy them as written:** `WorkItem.QUEUED` is a
-constant inside the `WorkItem` record in `workitem/domain/WorkItemTables.java`, and
-`queuedAt()` is one of its components.
+**Verified names, copy as written:** `WorkItem.QUEUED` is a constant inside the
+`WorkItem` record in `workitem/domain/WorkItemTables.java`; `queuedAt()` and
+`externalId()` are its components; `repository.openItemsOf(long)` exists and already
+filters to `QUEUED` and `IN_PROGRESS`.
 
-⚠️ **`WorkItemNotFoundException` is the wrong exception here, and this is worth
-understanding rather than working around.** Its only constructor takes an *external
-id* and wraps it in a fixed sentence — *"No work item 'X' exists under this
-installation's scope."* Passing it a sentence produces *"No work item 'no visit is
-running on lane LANE-3' exists…"*, which is gibberish in an operator's face.
-
-**Add a small sibling exception** next to it in `WorkItemService`, and map it to
-`WORK_ITEM_NOT_FOUND` (404) in the controller — the HTTP answer is the same, the
-message is not:
+**Step 5 — the exception.** ⚠️ `WorkItemNotFoundException` is wrong here: its only
+constructor takes an *external id* and wraps it in *"No work item 'X' exists under
+this installation's scope."* Passing it a sentence yields gibberish. Add a sibling in
+`WorkItemService`:
 
 ```java
 	/**
 	 * There is nothing on this lane for the caller to take.
 	 *
 	 * <p>Distinct from {@link WorkItemNotFoundException}, which is about an item the
-	 * caller named. Here the caller named a LANE and the answer is about the lane's
-	 * state, so the message has to say which of the two reasons applies — an
-	 * operator who is told "not found" about an item they never mentioned will go
-	 * looking for the wrong fault.
+	 * caller named. Here the caller named a LANE, so the message has to say which of
+	 * the two reasons applies — an operator told "not found" about an item they never
+	 * mentioned will go looking for the wrong fault.
 	 */
 	public static class NothingToTakeOnLaneException extends RuntimeException {
 
@@ -471,68 +618,142 @@ message is not:
 	}
 ```
 
-4. **Controller** — add the method to `workitem/api/WorkItemController.java`,
-   following how `takeWorkItem` there resolves the operator and maps exceptions.
+**Step 6 — controller.** Add `takeNextOnLane` to `workitem/api/WorkItemController.java`,
+following how `takeWorkItem` in that file resolves the operator and maps exceptions.
+Map `NothingToTakeOnLaneException` → `WorkItemErrorCode.WORK_ITEM_NOT_FOUND` (404)
+and `LaneNotAtThisInstallationException` → `ExecutionErrorCode.LANE_NOT_AT_THIS_INSTALLATION`
+(422).
 
-### B.5 Done when
+### B.5 Tests
 
-- A truck parked at the manual step, then `POST /api/v1/lanes/LANE-DEMO-01/take-next`
-  returns the item as `IN_PROGRESS` with the caller as assignee, and
-  `GET /work-items/{id}/audit` shows a `TAKE` row.
-- A clear lane returns `404`. An unpublished lane returns `422`.
-- The concurrency property in B.6 holds.
+Add to `services/orca-runtime/src/integrationTest/java/com/lynxis/orca/runtime/workitem/WorkItemLifecycleIT.java`.
+**That suite already has every helper you need — use them, do not build a second harness:**
 
-### B.6 Tests
+| Helper | What it gives you |
+|---|---|
+| `admitAndPark()` | Admits a truck and parks it at the manual step; returns the visit's external id |
+| `queuedItemOf(visitExternalId)` | The queued work item for that visit |
+| `controllerFor(operator)` | A controller acting as a named operator |
+| `claim(barrier, itemExternalId, operator)` | The two-thread race helper — see the existing test at line ~232, *"two operators claim the same item at the same instant"* |
+| `itemStatus(itemExternalId)`, `statusOf(visitExternalId)` | Status assertions |
+| `inScope(...)` | Runs an action in the installation's scope |
 
-Add to `src/integrationTest/java/.../workitem/WorkItemLifecycleIT.java` (it already
-has the harness for creating parked visits and work items — **reuse it, do not
-build a second one**):
+Write two tests:
 
-```java
-	@Test
-	@DisplayName("two operators taking next on the same lane: exactly one wins, and the loser is told")
-	void takeNextOnLaneHasOneWinner() {
-		// Reuse this suite's existing helper to park a visit with ONE queued item.
-		// Then race two callers at takeNextOnLane and assert exactly one WorkItem
-		// came back and the other saw the typed conflict — never a silent no-op,
-		// and never two winners.
-	}
-```
+1. **`takeNextOnLaneClaimsTheOldestQueuedItem`** — `admitAndPark()`, then
+   `takeNextOnLane` returns that item as `IN_PROGRESS` with the caller as assignee,
+   and the audit trail contains `TAKE`.
+2. **`takeNextOnLaneHasExactlyOneWinner`** — park a visit with one queued item, race
+   two operators through `takeNextOnLane` using the same `CyclicBarrier` shape as the
+   existing claim race. Assert **exactly one** returned an item and the other saw the
+   typed conflict — never two winners, never a silent no-op.
 
-⚠️ Model it on the existing test in that file that races two operators on `take`.
-**Read that test and copy its threading shape** rather than inventing one.
+**Watch it fail:** in `takeNextOnLane`, replace `return take(next.externalId(), actor);`
+with a direct unguarded repository update. Test 2 must fail. Restore it.
 
-**How to watch it fail:** temporarily change `take(next.externalId(), actor)` to
-skip the guard (call the repository's update without checking its boolean) — the
-race test must fail. Put it back.
+### B.6 Done when
+
+Both tests pass, both watched to fail, and live: a parked truck's lane returns the
+item on `take-next`; a clear lane returns `404`; `LANE-NOPE` returns `422`.
 
 ---
 
 ## 5 · Work package C — `POST /visits/{id}/abort`
 
-### C.1 What it does
+### C.1 Behaviour
 
-Abort **one visit** by its own identifier: terminate its process instance, fail its
-open work items, and free its lane — in one transaction.
+| Case | Answer |
+|---|---|
+| The visit is running | `200`, `LaneResetEnvelope` — visit `FAILED`, open items `FAILED`, lane free |
+| No such visit under this scope | `404` `VISIT_NOT_FOUND` |
+| The visit is not `ACTIVE` | `409` — and **nothing changes** |
+| No resolvable operator | `401` `OPERATOR_UNRESOLVED` |
 
 ### C.2 The critical instruction
 
 ⚠️ **`LaneResetService.reset(laneExternalId, actor)` already does exactly this**,
-addressed by lane instead of by visit. It is in
-`execution/domain/LaneResetService.java` and it returns a
-`LaneReset(laneExternalId, visitExternalId, failedWorkItems)` record.
+addressed by lane. It takes the lane lock, finds the active root visit, fails its
+open work items, terminates the process instance, marks the visit `FAILED` and frees
+the lane — all in one transaction.
 
-**Your job is to add a visit-addressed entry point to that existing service — NOT
-to write a second abort.** Two implementations of "tear a visit down" that drift
-apart is precisely the class of defect this codebase spends build checks
-preventing.
+**Add a visit-addressed entry point to that existing service. Do not write a second
+abort.** Two implementations of "tear a visit down" that drift apart is the defect
+class this codebase spends build checks preventing.
 
-The simplest correct shape: resolve the visit's lane, then delegate to the existing
-reset. If the visit is not `ACTIVE`, answer `409` — aborting a finished visit is not
-an ordinary outcome the way resetting a clear lane is, because the caller named a
-specific visit and was wrong about its state.
+⚠️ **There is a race you must close, and it is the whole reason this is not a
+one-liner.** If abort resolves the visit's lane and then calls `reset(lane)`, the
+visit could finish and a *new* truck be admitted in between — and `reset` would abort
+the new one, because it aborts whatever is active on the lane. **The identity check
+must happen under the lane lock, inside the transaction.**
 
-### C.3 The contract
+**Prescribed shape** — add to `LaneResetService`:
+
+```java
+	/**
+	 * Abort one named visit.
+	 *
+	 * <p>⚠️ The visit's identity is re-checked <em>under the lane lock</em>, not
+	 * before it. Resolving the lane outside the transaction and then resetting it
+	 * would abort whatever is active by then — and between the two, this visit can
+	 * finish and the next truck be admitted. The caller named a visit; anything else
+	 * being aborted in its place is the failure this guard exists to prevent.
+	 *
+	 * @throws VisitNotAbortableException when the visit is no longer the lane's
+	 *         active visit — including when it has already finished
+	 */
+	public LaneReset abort(String visitExternalId, String actor) {
+		AdmissionRepository.VisitRow visit = repository.visitByExternalId(visitExternalId)
+				.orElseThrow(() -> new VisitNotFoundException(visitExternalId));
+
+		return transactions.execute(status -> {
+			if (!repository.lockLane(visit.laneId())) {
+				throw new VisitNotAbortableException(visitExternalId, "its lane has no session row");
+			}
+
+			Optional<AdmissionRepository.ActiveVisit> active = repository.activeRootOn(visit.laneId());
+			if (active.isEmpty() || !active.get().externalId().equals(visitExternalId)) {
+				throw new VisitNotAbortableException(visitExternalId, "it is no longer running");
+			}
+
+			int failedItems = workItems.failOpenItemsFor(visit.executionId(), actor);
+			if (visit.processInstanceId() != null) {
+				engine.terminate(visit.processInstanceId(), "visit aborted by " + actor);
+			}
+			repository.completeVisit(visit.executionId(), Execution.FAILED);
+			repository.bindLane(visit.laneId(), null, false);
+
+			return new LaneReset(null, visit.externalId(), failedItems);
+		});
+	}
+```
+
+⚠️ `LaneReset`'s first component is `laneExternalId`. This path knows the lane's
+internal id, not its external one. **Resolve it** with
+`repository.laneExternalIdOf(visit.laneId()).orElse(null)` and pass that instead of
+`null`, so the response is the same shape a lane reset returns.
+
+**Verified names in the block above — copy as written:**
+
+| Symbol | Where it comes from |
+|---|---|
+| `repository`, `engine`, `workItems`, `transactions` | Existing private final fields on `LaneResetService` (types `AdmissionRepository`, `ProcessEngineGateway`, `WorkItemIntake`, `TransactionTemplate`) |
+| `repository.visitByExternalId(String)` | Returns `Optional<VisitRow>` where `VisitRow(executionId, externalId, laneId, status, plate, processInstanceId)` — note this is `AdmissionRepository`'s `VisitRow`, **not** `VisitReadRepository`'s |
+| `repository.lockLane`, `activeRootOn`, `completeVisit`, `bindLane`, `laneExternalIdOf` | All exist on `AdmissionRepository` |
+| `Execution.FAILED` | `ExecutionTables.Execution.FAILED` — the import in `LaneResetService` is already `com.lynxis.orca.runtime.execution.domain.ExecutionTables.Execution` |
+| `workItems.failOpenItemsFor(long, String)` | On the `WorkItemIntake` port |
+
+⚠️ **Two different records are called `VisitRow`.** `AdmissionRepository.VisitRow`
+carries `executionId` and is what this abort uses. `VisitReadRepository.VisitRow` is
+the read model's, and is the one §4.4 step 2 tells you to add `executionId` to. Do
+not confuse them; the compiler will not always save you because both are in scope
+via different imports.
+
+Add both exceptions as static nested classes on `LaneResetService`, and map them in
+the controller: `VisitNotFoundException` → `ExecutionErrorCode.VISIT_NOT_FOUND` (404,
+already exists); `VisitNotAbortableException` → a **new** code
+`VISIT_NOT_ABORTABLE` (409) added to `ExecutionErrorCode`.
+
+### C.3 Contract
 
 ```yaml
   /api/v1/visits/{visitExternalId}/abort:
@@ -545,10 +766,14 @@ specific visit and was wrong about its state.
         is terminated, the visit's open work items are failed, and the lane is
         released for the next truck.
 
-        Addressed by visit rather than by lane. Aborting a visit that is no longer
-        running answers `409` — unlike resetting an already-clear lane, which is an
-        ordinary outcome, naming a specific visit and being wrong about its state
-        is a mistake worth reporting.
+        Addressed by visit rather than by lane, and the visit's identity is
+        re-checked under the lane lock — so a visit that finished while the request
+        was in flight is refused rather than having the next truck aborted in its
+        place.
+
+        Aborting a visit that is no longer running answers `409`. Unlike resetting an
+        already-clear lane, which is an ordinary outcome, naming a specific visit and
+        being wrong about its state is a mistake worth reporting.
       parameters:
         - name: visitExternalId
           in: path
@@ -583,87 +808,134 @@ specific visit and was wrong about its state.
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 ```
 
-⚠️ Reuse `LaneResetEnvelope` — do not define a new response schema for the same
-data.
+⚠️ Reuse `LaneResetEnvelope`. Do not define a new schema for the same data.
 
-### C.4 Done when
+The controller method goes in `execution/api/VisitController.java`. It needs an actor
+— follow `LaneResetController.resetLane`, which resolves `OperatorIdentity` and
+throws `OPERATOR_UNRESOLVED` when there is none.
 
-- Park a truck at the manual step, `POST /api/v1/visits/{id}/abort`, and observe:
-  the visit is `FAILED`, its work item is `FAILED`, the lane accepts the next truck.
-- Aborting the same visit again returns `409`.
-- An unknown visit returns `404`.
+### C.4 Tests
 
-### C.5 Tests
+Add to `WorkItemLifecycleIT` (⚠️ **there is no separate lane-reset suite** — lane
+reset is tested there, and its helpers are what you need):
 
-Add to `VisitReadPropertiesIT` or the lane-reset suite (**whichever already has the
-harness** — do not create a third):
+1. **`abortFailsTheVisitAndItsItemsAndFreesTheLane`** — `admitAndPark()`, abort,
+   assert visit `FAILED`, item `FAILED`, and a subsequent admission on the lane
+   succeeds.
+2. **`abortingAVisitThatIsNotRunningChangesNothing`** — abort twice; the second
+   raises the conflict and the item's status is unchanged afterwards. **Assert the
+   unchanged part** — a refusal that still mutated is the bug worth catching.
 
-- Aborting a running visit fails its open work items **and** frees the lane.
-- Aborting a visit that is not `ACTIVE` returns the typed conflict and **changes
-  nothing** — assert the work item's status is unchanged afterwards.
+**Watch it fail:** delete the `!active.get().externalId().equals(visitExternalId)`
+clause. Test 2 must fail. Restore it.
 
 ---
 
-## 6 · ⚠️ Ten traps, each of which has already cost somebody a day
-
-**Read this section before you write code, not after the build breaks.**
+## 6 · ⚠️ Ten traps — read before coding, not after the build breaks
 
 1. **The scope seam refuses JOINs.** `ScopedSelect.from("a JOIN b")` throws at
-   runtime — table names are allow-listed as `name` or `schema.name` only. One table
-   per statement. Need data from two? Two reads, joined in Java.
-2. **Column names must be bare.** `.columns("e.external_id")` is refused for the
-   same reason. Use `"external_id"`.
-3. **A `@RestController` that takes a config value needs an explicit `@Bean`
-   method.** Component scanning finds the class and then cannot construct it —
-   there is no bean of type `String` to autowire. **The symptom is every single
-   integration suite in the service failing at once with a context-load error**,
-   which looks catastrophic and is a two-line fix. See `visitController` in
-   `ExecutionConfiguration`.
-4. **`ScopeContext.callIn` takes a `Callable`, not a `Supplier`.** It will not
-   compile with a `Supplier` and the error is unhelpful.
+   runtime; table names are allow-listed as `name` or `schema.name`. One table per
+   statement. Need two? Two reads, joined in Java.
+2. **Column names must be bare.** `.columns("e.external_id")` is refused. Use
+   `"external_id"`.
+3. **A `@RestController` taking a config value needs an explicit `@Bean` method.**
+   Component scanning finds the class and cannot construct it — there is no `String`
+   bean to autowire. **The symptom is every integration suite in the service failing
+   at once with a context-load error**, which looks catastrophic and is a two-line
+   fix. See `visitController` in `ExecutionConfiguration`.
+4. **`ScopeContext.callIn` takes a `Callable`, not a `Supplier`.**
 5. **Generated `StatusEnum.fromValue()` THROWS on an unknown value** — it does not
-   return null. Using it as a validity test turns a caller's typo into a `500`.
-   Compare against `values()` instead.
+   return null. Using it as a validity test turns a typo into a `500`. Compare
+   against `values()`.
 6. **Bean validation enforces `minimum`/`maximum` but NOT `enum` membership.** A
-   declared enum on a query parameter is documentation, not a check. If an invalid
-   value must be refused, refuse it in the controller.
-7. **Resolve lookups once per page, never once per row.** Returning a list and
-   calling a lookup inside `.map()` is an N+1 — measured at 67 queries for 66 rows
-   in this exact codebase before it was fixed. `VisitQueryService.search` shows the
-   batched shape.
+   declared enum on a query parameter is documentation, not a check.
+7. **Resolve lookups once per page, never per row.** A lookup inside `.map()` over a
+   result list is an N+1 — measured at 67 queries for 66 rows in this codebase before
+   it was fixed. `VisitQueryService.search` shows the batched shape.
 8. **Read timestamps as UTC explicitly** —
-   `rs.getTimestamp(column, Calendar.getInstance(TimeZone.getTimeZone("UTC")))`.
-   Plain `getTimestamp` applies the JVM's zone to a UTC value: invisible on a UTC
-   machine, wrong everywhere else.
-9. **`./gradlew check integrationTest` will lie to you without `--rerun-tasks`.** It
-   answers from cache in under a second and reports a success it did not run.
-10. **`core.topology_lane` does not exist in a bare test schema.** It is a view core
-    publishes. A lightweight repository test that migrates only `runtime` cannot
-    resolve lane identifiers — test that behaviour at the service layer with a stub
-    instead. `VisitReadPropertiesIT`'s `CountingLanes` shows how.
+   `rs.getTimestamp(col, Calendar.getInstance(TimeZone.getTimeZone("UTC")))`. Plain
+   `getTimestamp` applies the JVM zone to a UTC value: invisible on a UTC machine,
+   wrong everywhere else.
+9. **`./gradlew check integrationTest` lies without `--rerun-tasks`.** It answers
+   from cache in under a second and reports a success it never ran.
+10. **`core.topology_lane` does not exist in a bare test schema** — it is a view core
+    publishes. A repository test that migrates only `runtime` cannot resolve lane
+    identifiers; test that at the service layer with a stub. `VisitReadPropertiesIT`'s
+    `CountingLanes` shows how.
 
 ---
 
-## 7 · Verification — run these and keep the output
+## 7 · Verification — run every row and paste the real output into the report
 
-| # | Command / check | Expected |
+### 7.1 Build and tests
+
+| # | Command | Expected |
 |---|---|---|
-| 1 | `./gradlew build` | Green from a clean tree |
-| 2 | `./gradlew check integrationTest --rerun-tasks` | Green. **`--rerun-tasks` is not optional** — see trap 9 |
-| 3 | `./gradlew sendPlate -Pplate=T-CHECK-01` | Visit reaches `COMPLETED` — the gate path is unbroken |
-| 4 | `GET /lanes/{id}/visit` on a busy lane | The visit, with `currentActivity` |
-| 5 | `GET /lanes/{id}/visit` on a clear lane | `200`, `"data": null` |
-| 6 | `GET /lanes/LANE-NOPE/visit` | `422` |
-| 7 | `POST /lanes/{id}/take-next` after parking a truck | `200`, item `IN_PROGRESS`, audit shows `TAKE` |
-| 8 | `POST /lanes/{id}/take-next` on a clear lane | `404` |
-| 9 | `POST /visits/{id}/abort` on a running visit | Visit `FAILED`, item `FAILED`, lane free |
-| 10 | `POST /visits/{id}/abort` again | `409`, nothing changed |
-| 11 | **Every new test watched to fail** | Break it, see it caught, restore it. Record what you broke |
-| 12 | All six services boot | A green suite does not prove a service starts |
+| 1 | `./gradlew build` | `BUILD SUCCESSFUL` from a clean tree |
+| 2 | `./gradlew check integrationTest --rerun-tasks` | `BUILD SUCCESSFUL`. **`--rerun-tasks` is not optional** (trap 9) |
 
-**How to drive the live checks:** `docs/phase-1-demo.md` has the full sequence,
-including how to force a truck into the manual branch (remap the connector route off
-`200`) and how to get a Keycloak token. Restore the connector route afterwards.
+**Prove the tests actually ran** — a green build with a filtered-out suite is not a
+pass:
+
+```bash
+python3 - <<'EOF'
+import glob, xml.etree.ElementTree as ET
+tot=f=0; n=0
+for p in glob.glob('**/build/test-results/integrationTest/*.xml', recursive=True):
+    r=ET.parse(p).getroot(); n+=1
+    tot+=int(r.get('tests',0)); f+=int(r.get('failures',0))+int(r.get('errors',0))
+print(f"integrationTest: suites={n} tests={tot} failures={f}")
+EOF
+```
+
+**Expected: `tests` is at least 233** (229 before this work, plus your four or more)
+and `failures=0`. If the count did not rise, your tests did not run.
+
+### 7.2 The gate path still works
+
+| # | Command | Expected |
+|---|---|---|
+| 3 | `./gradlew sendPlate -Pplate=T-CHECK-01 -Pport=9100`, then query `runtime.execution` | Newest row `COMPLETED` |
+
+### 7.3 Live endpoint checks
+
+Token and operator link per §0.7. Park a truck per §0.8.
+
+| # | Call | Expected |
+|---|---|---|
+| 4 | `GET /api/v1/lanes/LANE-DEMO-01/visit` with a truck parked | `200`, the visit, `currentActivity: "manualInput"` |
+| 5 | Same, after aborting or completing | `200`, `"data": null` |
+| 6 | `GET /api/v1/lanes/LANE-NOPE/visit` | `422` |
+| 7 | `GET /api/v1/lanes/LANE-DEMO-01/visit` with no token | `401` |
+| 8 | `POST /api/v1/lanes/LANE-DEMO-01/take-next` with a parked truck | `200`, item `IN_PROGRESS`, assignee `usr-demo-clerk` |
+| 9 | `GET /api/v1/work-items/{id}/audit` after 8 | Contains a `TAKE` row |
+| 10 | Repeat 8 immediately | `404` — the item is no longer `QUEUED` |
+| 11 | `POST /api/v1/lanes/LANE-NOPE/take-next` | `422` |
+| 12 | `POST /api/v1/visits/{id}/abort` on a parked visit | `200`; then `runtime.execution` shows `FAILED` and `runtime.work_item` shows `FAILED` |
+| 13 | Repeat 12 | `409`, and the work item's status is unchanged |
+| 14 | `POST /api/v1/visits/vis-nope/abort` | `404` |
+| 15 | After 12, drive another truck at the lane | It admits — the lane was freed |
+
+### 7.4 Everything watched to fail
+
+| # | Check |
+|---|---|
+| 16 | Each of the three break-and-restore exercises in §3.4, §4.5 and §5.4 performed, the named test observed failing, and the code restored. **Record what you broke and the failure message** |
+
+### 7.5 Services still boot
+
+| # | Check |
+|---|---|
+| 17 | Restart core, runtime and edge; all three answer `200` on `/actuator/health`. **A green suite does not prove a service starts** — every suite builds its beans directly, and this repository has shipped a service that passed everything and could not boot |
+
+### 7.6 Leave the environment as you found it
+
+```bash
+q "UPDATE runtime.connector_route SET http_status = 200 WHERE connector_name = 'tos'"
+q "SELECT connector_name, http_status, outcome FROM runtime.connector_route"
+```
+
+Must read `tos | 200 | APPROVED`.
 
 ---
 
@@ -671,26 +943,46 @@ including how to force a truck into the manual branch (remap the connector route
 
 | Situation | Do this |
 |---|---|
-| A build check fails and you do not understand why | **Read the failure message in full** — they are written to be self-contained and name the violator. Do not disable a check |
-| You need data from another module's tables | You need a port in that module's `api` package. §4.4 is the worked example. **Never** reach into another module's `persistence` |
-| This plan does not say what should happen in some case | **Ask.** Do not decide. Note it and continue with the parts that are specified |
-| Something in this plan appears wrong | Say so, with evidence. This plan has been wrong before and reporting it is worth more than working around it |
+| A build check fails and you do not understand why | **Read the message in full** — they are written to be self-contained and name the violator. **Never disable or weaken a check** |
+| You need another module's data | You need a port in that module's `api` package. §4.4 is the worked example. **Never** reach into another module's `persistence` or `domain` |
+| Every test in the service suddenly fails to start its context | Trap 3. You added a controller without a `@Bean` method |
+| Calls return `401 OPERATOR_UNRESOLVED` | §0.7 — the token's subject is not linked to `usr-demo-clerk`, or the token expired |
+| This plan does not say what should happen in some case | **Ask. Do not decide.** Note it, and continue with the parts that are specified |
+| Something in this plan appears wrong | Say so, with evidence, in the report. This plan has been wrong before; reporting it is worth more than working around it |
 | A test passes and you have not watched it fail | It is not finished |
 
 ---
 
-## 9 · The report — `docs/lane-operations-report.md`
+## 9 · Definition of done
 
-Short, and in this shape:
+Every one of these, with evidence:
+
+1. Three endpoints implemented, contract-first, each satisfying a generated interface.
+2. `./gradlew check integrationTest --rerun-tasks` green, with the test count risen
+   to **≥ 233** and `failures=0`.
+3. All seventeen verification rows in §7 executed, with real output recorded.
+4. Every new test watched to fail, and what was broken recorded.
+5. All three services boot after the change.
+6. The connector route restored to `200 | APPROVED`.
+7. `docs/lane-operations-report.md` written per §10.
+8. Work committed on `feature/lane-operations`, one commit per work package, and
+   **not** on `main`.
+
+---
+
+## 10 · The report — `docs/lane-operations-report.md`
 
 1. **What was built**, per work package — and anything that was not.
-2. **The §7 table with real results**, including command output.
-3. **Every decision this plan did not dictate** — at minimum: where you put the
-   `LaneVisitPort` implementation and why, and how you shaped the abort entry point.
-4. **What you broke to watch each test fail**, and that it was restored.
+2. **The §7 tables with real results**, including command output and the test count.
+3. **Every decision this plan did not dictate** — at minimum: the oldest-first
+   ordering in B, and how the `VisitRow` change in §4.4 step 2 rippled through
+   existing call sites.
+4. **What you broke to watch each test fail**, the failure message, and that it was
+   restored.
 5. **Anything that looked wrong** in this plan, the code, or the documents —
    **reported, not silently corrected.**
 
 ---
 
-*Start with A. It is the smallest and it teaches the shape the other two reuse.*
+*Start with A. It is the smallest, it touches one module, and it teaches the shape
+the other two reuse.*
