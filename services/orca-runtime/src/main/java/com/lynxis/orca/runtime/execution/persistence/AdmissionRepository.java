@@ -1,6 +1,5 @@
 package com.lynxis.orca.runtime.execution.persistence;
 
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -9,6 +8,7 @@ import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.platform.scope.ScopedInsert;
 import com.lynxis.orca.platform.scope.ScopedSelect;
 import com.lynxis.orca.platform.scope.ScopedUpdate;
+import com.lynxis.orca.runtime.persistence.Utc;
 
 import lombok.RequiredArgsConstructor;
 
@@ -211,9 +211,9 @@ public class AdmissionRepository {
 	public void bindLane(long laneId, String plate, boolean bindingIt) {
 		ScopedUpdate update = ScopedUpdate.table("lane_session")
 				.set("bound_plate", plate)
-				.set("updated_at", now());
+				.set("updated_at", Utc.now());
 		if (bindingIt) {
-			update.set("bound_at", now());
+			update.set("bound_at", Utc.now());
 		}
 		seam.update(update.scopedBy(SCOPE_COLUMN).where("lane_id = ?", laneId));
 	}
@@ -236,7 +236,7 @@ public class AdmissionRepository {
 				.value("event_type", eventType)
 				.value("device_external_id", deviceExternalId)
 				.value("attributes", attributes)
-				.value("received_at", occurredAt == null ? now() : Timestamp.from(occurredAt)));
+				.value("received_at", occurredAt == null ? Utc.now() : Utc.timestampOf(occurredAt)));
 	}
 
 	/**
@@ -249,7 +249,7 @@ public class AdmissionRepository {
 	public int completeVisit(long executionId, String status) {
 		return seam.update(ScopedUpdate.table("execution")
 				.set("status", status)
-				.set("completed_at", now())
+				.set("completed_at", Utc.now())
 				.scopedBy(SCOPE_COLUMN)
 				.where("execution_id = ? AND status = 'ACTIVE'", executionId));
 	}
@@ -274,16 +274,6 @@ public class AdmissionRepository {
 				(rs, row) -> new VisitRow(rs.getLong("execution_id"), rs.getString("external_id"),
 						rs.getLong("lane_id"), rs.getString("status"), rs.getString("plate"),
 						rs.getString("process_instance_id"))).stream().findFirst();
-	}
-
-	/**
-	 * Bound as {@link Timestamp} rather than {@link Instant}: the SQL Server driver
-	 * has no binding for {@code java.time.Instant} and fails with a bare
-	 * {@code AssertionError} out of the statement setter, which says nothing at all
-	 * about what is wrong.
-	 */
-	private static Timestamp now() {
-		return Timestamp.from(Instant.now());
 	}
 
 	/** A visit already running on a lane — only what correlation needs. */
