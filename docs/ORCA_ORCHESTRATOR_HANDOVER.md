@@ -83,7 +83,7 @@ You will be asked to verify claims against this codebase. It is the evidence bas
 - **No message broker inside a site.** A transactional outbox, claimed with a skip-locked read.
 - **Multi-instance by design.** Coordination is database-held with leases and fence tokens. Device ingestion elects one owner per lane, because cameras address a single endpoint.
 - **One installation serves exactly one customer.** Cross-customer data (carriers, drivers) is cloud-authoritative.
-- **Five shared primitives** — outbox, lease, scope, idempotency, web envelope — built once, before any service.
+- **Six shared primitives** — outbox, lease, scope, idempotency, web envelope, and purpose-bound secrets — built once rather than per service.
 
 ---
 
@@ -288,7 +288,7 @@ Everything durable is in three places: this document (the map), the phase report
 
 1. **Run it before you read much of it.** An hour of executing teaches more than a day of reading. From `~/Documents/Projects/orca`: bring up the stack and bootstrap (`docs/deployment.md`), run `./gradlew check integrationTest --rerun-tasks`, boot the three gate-path services, then drive a truck through (`./gradlew sendPlate`) and follow it in the database. Then force the exception branch and take a work item through claim → complete. You now understand the product's spine from the outside.
 2. **Read the load-bearing code directly** — this is the short list that carries the design:
-   - `platform/` — the five primitives. Start with `platform/outbox` and `platform/scope`; they are the two everything else leans on.
+   - `platform/` — the six current primitives. Start with `platform/outbox` and `platform/scope`; they are the two most service state leans on, then read `platform/secrets` before adding any recoverable credential.
    - `build-checks/src/test/java/com/lynxis/orca/checks/` — **ten rules; read all of them.** They are the architecture written as executable constraints, and reading them tells you what the codebase will and will not permit.
    - `services/orca-runtime/src/main/java/com/lynxis/orca/runtime/execution` (admission, the engine gateway, delegates) and `.../workitem` (the clerk lifecycle) — the two hardest pieces of domain logic.
    - `services/orca-runtime/src/main/resources/processes/gate-visit.bpmn20.xml` — the process the whole platform exists to run.

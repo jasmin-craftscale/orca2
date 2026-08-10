@@ -37,7 +37,7 @@ This file is a map. It does not restate the architecture — follow the link.
 | **New here? Start with these three, in order** | `docs/LOCAL_DEVELOPMENT.md` (set up and run) → `docs/DEVELOPER_ONBOARDING.md` (how to work) → `docs/BUILD_ROADMAP.md` (**what exists, what is being built, what does NOT exist yet**) |
 | What is the target design, and what does it guarantee? | `docs/ORCA_ARCHITECTURE.md` — **read §B10 first; it is the acceptance criteria** |
 | What is deliberately unsettled? | `docs/ORCA_OPEN_QUESTIONS_REGISTER.md` |
-| What are the five primitives, and what pattern is each? | `docs/PLATFORM_PRIMITIVES.md` |
+| What are the six current primitives, and what pattern is each? | `docs/PLATFORM_PRIMITIVES.md` |
 | Where does anything live in this repository? | `docs/REPOSITORY_GUIDE.md` |
 | What shape does a change take here — the patterns that repeat? | `docs/CODE_PATTERNS.md` |
 | What was built in each phase, what was NOT, and every decision the plan did not dictate | `docs/phase-*-report.md`, newest first. Each one's "what was not built", "decisions the plan did not dictate" and "found wrong" sections are where the value is |

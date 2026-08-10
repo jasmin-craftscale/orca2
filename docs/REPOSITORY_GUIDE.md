@@ -1,6 +1,6 @@
 # ORCA — Repository Guide
 
-**Current as of the Phase 1 hardening · August 2026**
+**Current through the credentials-at-rest slice · August 2026**
 
 What each folder is, why it exists, and how the whole thing builds and runs.
 
@@ -14,7 +14,7 @@ What each folder is, why it exists, and how the whole thing builds and runs.
 orca/                                    git root = Gradle root
 ├── AGENTS.md · CLAUDE.md                the instruction file, and its adapter
 ├── build.gradle.kts                     AGGREGATOR — no src/, no application
-├── settings.gradle.kts                  12 modules registered
+├── settings.gradle.kts                  13 modules registered
 ├── gradle/libs.versions.toml            one version catalog for every module
 │
 ├── platform/                            THE PRIMITIVES — no domain types
@@ -24,6 +24,7 @@ orca/                                    git root = Gradle root
 │   │                                      scope/table/ (@PersistentTable,
 │   │                                      @RetentionClass, Growth)
 │   ├── idempotency/                     recorded outcomes
+│   ├── secrets/                         versioned, purpose-bound AES-GCM
 │   └── web/                             envelope · codes · system identity ·
 │       │                                  web/internal/ (the ADR-011 filter)
 │       └── src/main/resources/openapi/_shared.yaml
@@ -66,7 +67,7 @@ orca/                                    git root = Gradle root
 ```
 
 
-**12 Gradle modules. Six bootable applications.** Phase 0 added zero business logic on purpose; **Phase 1 added exactly one vertical slice** — a plate read in over the camera's wire format, one visit, a connector call, a barrier commanded and confirmed, and the visit's fact recorded in one transaction. Everything else is still deliberately absent.
+**13 Gradle modules. Six bootable applications.** Phase 0 historically delivered twelve modules and added zero business logic on purpose; the thirteenth is the code-only `platform/secrets` primitive. **Phase 1 added exactly one vertical slice** — a plate read in over the camera's wire format, one visit, a connector call, a barrier commanded and confirmed, and the visit's fact recorded in one transaction. Everything else is still deliberately absent.
 
 **Each service owns its schema, its database login, its migrations and its OpenAPI contract.** The shared response envelope lives with `platform/web`, which implements it. Only `orca-runtime` is decomposed into modules — those five are named by the architecture and the module wall depends on them; every other service is flat.
 
@@ -76,9 +77,9 @@ orca/                                    git root = Gradle root
 
 ### `platform/` — the shared primitives
 
-**The problem these five solve is not "shared code". It is that each of them is a place where correctness is hard, the obvious implementation works perfectly in testing, and the failure is silent in production.**
+**The problem these six solve is not "shared code". It is that each of them is a place where correctness is hard, the obvious implementation works perfectly in testing, and the failure is silent in production.**
 
-That combination is why they are built once, first, by everyone — rather than five times, later, by whoever needed one that week.
+That combination is why they are built once rather than six times by whoever needs one that week.
 
 Here is what each one actually prevents.
 
@@ -121,6 +122,14 @@ Here is what each one actually prevents.
 **How it fails:** callers parse strings to tell one failure from another, so any wording change breaks an integration. Internal detail — stack traces, schema names — leaks to the caller. And scheduled work runs with no identity at all, so nothing can be authorised or attributed.
 
 **What the primitive does:** one envelope everywhere with **machine-readable codes a caller can branch on without reading the message**, no internal detail on any path, and an **explicit system identity** for every entry point that no user invoked — the relay, the reconciler, the scheduled job.
+
+#### secrets — *a database alone cannot disclose a recoverable value*
+
+**The obvious implementation:** store a connector password in configuration or encrypt every consumer's field with one unversioned helper and no record context.
+
+**How it fails:** a stolen database or backup discloses plaintext; a valid encrypted blob copied to another row still opens; rotating one key requires every value and every instance to change at once; and a crypto exception prints the rejected value into a log.
+
+**What the primitive does:** `SecretBox` seals with AES-256-GCM, a fresh nonce, a recorded key generation and binary AAD supplied by the owning service. Old and new generations coexist during bounded rewrap. Wrong purpose, tamper, unknown key and malformed storage all fail with one fixed redacted error. The primitive is code-only: each consumer owns its sealed columns and key custody remains deployment configuration.
 
 #### Why first, and not when needed
 
@@ -213,7 +222,7 @@ A module containing **only tests, no production code.** Its entire output is bui
 |---|---|
 | `ORCA_ARCHITECTURE.md` | The specification. **§B10 is the acceptance criteria** |
 | `ORCA_OPEN_QUESTIONS_REGISTER.md` | What is deliberately unsettled. Check it before concluding something was forgotten |
-| `PLATFORM_PRIMITIVES.md` | The five primitives and the named pattern behind each |
+| `PLATFORM_PRIMITIVES.md` | The six current primitives and the named pattern behind each |
 | `REPOSITORY_GUIDE.md` | This file — where things are |
 | `phase-0-report.md` | What the foundations phase built, and what it deliberately did not |
 | `phase-1-report.md` · `phase-1-demo.md` | The first vertical slice — a truck through the gate — and how to run it end to end |
@@ -285,6 +294,6 @@ check; set the profile.
 **Historical. Kept because the answers are decisions, and a decision with no record of the question behind it is the kind that gets quietly reversed.**
 
 1. **Does the frontend live in this repository?** Still open, and no longer urgent: React is decided (register #3), the visual builder is a separate developer's work, and nothing on-site needs a screen yet.
-2. **Is `platform/` the right set of five?** Answered by use. All five are load-bearing in the slice, and the one thing they were missing — a scoped write — was added in Phase 1 WP2 rather than by inventing a sixth primitive. Register **S1** and **S2** ask the sharper version: whether the *dialect SPI* and the six duplicate `service_lease` tables are earning their keep.
+2. **Is `platform/` the right set?** Answered by use, not frozen by the Phase 0 count. The original five are load-bearing; Phase 1 added the scoped write they needed without another module. The credentials-at-rest slice added the sixth only after a second owner (`orca-core`) was identified and kept its consumer tables in the owning services. Register **S1** and **S2** ask the sharper version: whether the *dialect SPI* and the six duplicate `service_lease` tables are earning their keep.
 3. **Is one database with seven schemas acceptable to whoever will operate it?** Not withdrawn. The confinement is proven 36/36 by `deploy/bootstrap/verify-isolation.sh`, and register **S2** carries the cost side.
 4. **Who owns `platform/` after Phase 0?** ⚠️ **Still unanswered, and it is the one on this list with no proxy elsewhere.** Shared code with no owner is how it drifts.

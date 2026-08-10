@@ -2,7 +2,7 @@
 
 **Tests only. No production code. The entire output of this module is build
 failures.** It is also the reason this is a monorepo: these rules have to see all
-twelve modules at once, and a service reaching into another service's internals is
+thirteen modules at once, and a service reaching into another service's internals is
 invisible from inside either one.
 
 Ten classes, run by `./gradlew check`: `PlatformPurityRule`, `ModuleWallRule`,
@@ -66,7 +66,7 @@ nothing; and an operation tagged internal but authored one level above
 `OrcaClasses.production()` imports `com.lynxis.orca` with tests excluded — a test
 may legitimately construct a query outside the seam to prove the seam withheld
 something. **Jars are deliberately *not* excluded:** in a Gradle multi-project the
-other eleven modules arrive on this classpath as jars, and excluding them would
+other twelve modules arrive on this classpath as jars, and excluding them would
 leave the importer with almost nothing and every rule passing vacuously.
 
 Write the rule against what it must enforce, not what it is named. `ModuleWallRule`

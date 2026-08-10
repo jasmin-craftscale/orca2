@@ -21,7 +21,7 @@ Written for engineers who have not used this project shape before. Every pattern
 
 ---
 
-## 2 · The five primitives, by name
+## 2 · The six primitives, by name
 
 | Module | The pattern it implements | Also known as |
 |---|---|---|
@@ -30,6 +30,7 @@ Written for engineers who have not used this project shape before. Every pattern
 | `scope` | **Ambient scope** + a **repository guard** | Closest named forms: a Hibernate filter, or the Specification pattern applied centrally |
 | `idempotency` | **Idempotent Receiver** / **Idempotency Key** | Stripe's idempotency-key documentation is the clearest public write-up |
 | `web` | **Response envelope** + **ambient principal** | RFC 7807 is a near relative for the error half |
+| `secrets` | **Envelope encryption boundary** with **authenticated context** | AES-GCM authenticated encryption; OWASP calls the context additional authenticated data (AAD) |
 
 ---
 
@@ -97,6 +98,19 @@ Written for engineers who have not used this project shape before. Every pattern
 
 **The case it serves.** A partner's integration calls the event API and gets a validation failure. It branches on `code`, not on the wording of `message`, so improving the message never breaks their integration. Meanwhile the outbox relay — which no user invoked — runs under an explicit system identity, so its writes can be authorised and attributed rather than being anonymous.
 
+### `platform/secrets`
+
+**Built:**
+
+- `SecretBox` — versioned AES-256-GCM sealing and opening with a fresh 12-byte nonce and a 128-bit authentication tag.
+- `SecretPurpose` — versioned binary AAD containing an owner namespace, ordered record-identity components and a credential kind.
+- `SecretsConfigurationValidator` — startup refusal for missing generations, malformed or non-256-bit keys, invalid key ids, and the public local fixture outside `local`.
+- Key-generation coexistence: sealing always uses the current generation while opening selects the generation recorded with the value.
+
+**The case it serves.** Runtime must recover a connector password to present it to a customer's system, but SQL Server and a database backup must not contain that password. Runtime seals it before storage and binds it to the installation, connector and credential kind. Copying the sealed fields to another connector fails authentication rather than disclosing or reusing the password.
+
+**Why the purpose and version matter:** encryption without authenticated context permits a valid blob to be moved to the wrong row, while one unversioned key makes rotation a flag day. A wrong purpose, unknown generation, malformed value or changed tag produces the same fixed redacted failure; there is no fallback key search and no plaintext retry.
+
 ---
 
 ## 4 · How a service uses them
@@ -107,6 +121,7 @@ A service depends on the primitives it needs and gets configuration for free:
 dependencies {
     implementation(project(":platform:outbox"))
     implementation(project(":platform:scope"))
+    implementation(project(":platform:secrets"))
     implementation(project(":platform:web"))
 }
 ```
@@ -119,6 +134,7 @@ Each primitive is an **auto-configuration** — a service adds the dependency an
 - A repository extends the scoped base and its queries are scoped.
 - A controller returns `ApiResponse.of(...)`.
 - A handler that needs exclusive work asks `leaseManager.acquire(...)` and checks whether it got it.
+- A service seals with a consumer-owned `SecretPurpose` and stores the returned key id, nonce and ciphertext in its own schema.
 
 That invisibility is the point. **The correct thing is the easy thing, and the incorrect thing does not compile.**
 

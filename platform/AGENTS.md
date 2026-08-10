@@ -1,6 +1,6 @@
 # `platform/` — the primitives
 
-Five primitives, and **never domain**. A class here that names a visit, a lane, a
+Six primitives, and **never domain**. A class here that names a visit, a lane, a
 ticket, a driver or a truck fails `PlatformPurityRule` — in its class name, a
 field name or a method name, camelCase-aware and plural-aware. So does any
 dependency from `platform/` on a service package.
@@ -17,6 +17,7 @@ code appears to be about:
 | `scope` | A `WHERE site_id = ?` written 300 times and omitted once |
 | `idempotency` | A retry receiving *"duplicate"* — the one answer it cannot use |
 | `web` | Callers parsing message strings, and work running with no identity |
+| `secrets` | A stolen database disclosing a recoverable value, or a sealed value being copied to another record |
 
 ## Changing a primitive
 
@@ -34,15 +35,19 @@ run them**:
 
 They need `./gradlew integrationTest` and a Docker daemon — real SQL Server via
 Testcontainers, never an in-memory substitute. `platform/web`'s properties are
-unit tests and do run under `test`.
+unit tests and do run under `test`; `platform/secrets` is code-only and its cipher,
+purpose binding, rotation and startup-validation properties are unit tests too.
 
 ## Where two things live that are not where you would look
 
 - **`@PersistentTable`, `@RetentionClass` and `Growth` are in
   `platform/scope/.../scope/table/`**, not in a module of their own. The retention
-  check needs a declaration visible to every service and the module count is fixed
-  at twelve. Recorded in `phase-0-report.md` §5.1 as the first thing to move if a
-  sixth primitive is ever wanted; `RetentionClassRule` imports them from there.
+  check needs a declaration visible to every service. Phase 0 recorded moving them
+  as the first action if its then-fixed twelve-module premise changed; the approved
+  `platform/secrets` module superseded that premise. The annotations deliberately
+  remain in `platform/scope` as technical debt until a separate cohesion refactor
+  is authorised; moving them would touch every service without improving secret
+  handling. `RetentionClassRule` still imports them from there.
 - **`platform/web` carries three things**: the response envelope (`ApiResponse`,
   `ApiError`, `ErrorCode`, and the handler that never serialises an exception or a
   schema name), `SystemContext` under `web/system/`, and the ADR-011 internal-call
