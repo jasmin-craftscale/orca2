@@ -176,13 +176,41 @@ q "SELECT TOP 1 external_id, status FROM runtime.work_item ORDER BY work_item_id
 q "UPDATE runtime.connector_route SET http_status = 200 WHERE connector_name = 'tos'"
 ```
 
-### 0.9 · Read these
+### 0.9 · Establish the baseline — before you change anything
+
+⚠️ **You cannot claim you ended green unless you know you started green.**
+
+```bash
+git checkout -b feature/lane-operations
+./gradlew check integrationTest --rerun-tasks
+```
+
+Then count what ran:
+
+```bash
+python3 - <<'EOF'
+import glob, xml.etree.ElementTree as ET
+tot=f=0; n=0
+for p in glob.glob('**/build/test-results/integrationTest/*.xml', recursive=True):
+    r=ET.parse(p).getroot(); n+=1
+    tot+=int(r.get('tests',0)); f+=int(r.get('failures',0))+int(r.get('errors',0))
+print(f"BASELINE integrationTest: suites={n} tests={tot} failures={f}")
+EOF
+```
+
+**Expected: `suites=31 tests=229 failures=0`.** Record this number — §7.1 compares
+against it.
+
+If the baseline is not green, **stop and report it.** Something is wrong with the
+environment or the checkout, and anything you build on top will be uninterpretable.
+
+### 0.10 · Read these
 
 1. **`AGENTS.md`** (repository root) — the rules that fail the build.
 2. **`docs/CODE_PATTERNS.md`** §1 and §2.
 3. **This plan, in full — including §6, the traps.**
 
-### 0.10 · The worked example to copy
+### 0.11 · The worked example to copy
 
 **The visit read surface is the same shape you are about to build.** Read all six
 files before starting; your work should look like their sibling.
@@ -911,8 +939,15 @@ print(f"integrationTest: suites={n} tests={tot} failures={f}")
 EOF
 ```
 
-**Expected: `tests` is at least 233** (229 before this work, plus your four or more)
-and `failures=0`. If the count did not rise, your tests did not run.
+**Compare against the baseline you recorded in §0.9.** The count must have risen by
+at least the number of tests you added — four if you wrote exactly the tests this
+plan specifies, so **at least 233** from a baseline of 229 — and `failures` must be
+`0`.
+
+⚠️ **If the count did not rise, your tests did not run**, whatever the build said.
+That is the single most common way a green build hides an empty one: a suite that
+was filtered out, or a class the runner never discovered, still lets
+`BUILD SUCCESSFUL` print.
 
 ### 7.2 The gate path still works
 
