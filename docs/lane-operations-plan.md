@@ -624,25 +624,109 @@ public interface LaneVisitPort {
 	 * The execution id of the visit running on this lane.
 	 *
 	 * @return empty when the lane is clear
-	 * @throws com.lynxis.orca.runtime.execution.domain.AdmissionService.LaneNotAtThisInstallationException
-	 *         when this installation does not publish the lane
+	 * @throws LaneNotPublishedException when this installation does not publish the
+	 *         lane — a different fact from "the lane is clear", and the caller
+	 *         answers them differently
 	 */
-	Optional<Long> activeVisitOn(String laneExternalId);
+	Optional<Long> activeVisitOn(String laneExternalId) throws LaneNotPublishedException;
+
+	/**
+	 * This installation does not publish that lane.
+	 *
+	 * <p><strong>Declared here, on the port, and not reused from {@code execution}'s
+	 * domain.</strong> An exception a caller must catch is part of the contract, so a
+	 * port that throws a domain type has not hidden the module — the caller ends up
+	 * importing {@code execution.domain} to write the catch clause, and
+	 * {@code ModuleWallRule} refuses it. {@code ManualStepPort.ProcessNotWaitingException}
+	 * is the same shape for the same reason.
+	 */
+	class LaneNotPublishedException extends RuntimeException {
+
+		public LaneNotPublishedException(String laneExternalId) {
+			super("Lane '" + laneExternalId + "' is not published by this installation.");
+		}
+	}
 }
 ```
 
-**Step 2 — implement it on `VisitQueryService`.** ⚠️ *Prescribed, not a choice.* That
-class already holds both dependencies it needs and already resolves lanes; a second
-class would duplicate that. Declare `implements LaneVisitPort`, add:
+⚠️ **This is the whole reason the port exists, and it is easy to get wrong.** A port
+that hides a module's *classes* but exposes its *exceptions* has not hidden the
+module. Read `execution/api/ManualStepPort.java` — it nests its own exception, and
+`WorkItemController` catches `ManualStepPort.ProcessNotWaitingException`, never a
+domain type. Copy that.
+
+**Step 2 — implement it in its OWN small class.** ⚠️ *Corrected 10 Aug 2026. An
+earlier version of this plan said to put it on `VisitQueryService` because "that
+class already holds both dependencies". **That reasoning was wrong and it creates a
+dependency cycle Spring cannot start:***
+
+```
+WorkItemService → LaneVisitPort (VisitQueryService) → ProcessEngineGateway
+                → engineListenerRegistrar → WorkItemIntake (WorkItemService)
+
+BeanCurrentlyInCreationException: processEngineGateway is currently in creation
+```
+
+**The cause is a responsibility that was conflated.** `VisitQueryService` needs the
+engine — but only for `currentActivity`, the live position on a *detail* read.
+`activeVisitOn` needs no engine at all: two repositories and nothing else. Putting
+the port on the engine-dependent class dragged the engine into `workitem`'s
+dependency graph for no reason.
+
+Create `execution/domain/LaneVisitLookup.java`:
 
 ```java
+package com.lynxis.orca.runtime.execution.domain;
+
+import java.util.Optional;
+
+import com.lynxis.orca.runtime.execution.api.LaneVisitPort;
+import com.lynxis.orca.runtime.execution.persistence.AdmissionRepository;
+import com.lynxis.orca.runtime.execution.persistence.VisitReadRepository;
+
+/**
+ * Which visit is running on a lane — the whole of {@link LaneVisitPort}.
+ *
+ * <p><strong>Deliberately separate from {@code VisitQueryService}, and the reason is
+ * structural rather than tidiness.</strong> That class needs the workflow engine to
+ * report a visit's live position. This question does not: it is two repository reads.
+ * Implementing the port there would put the engine in the dependency graph of every
+ * consumer of this port — and {@code workitem} is one, while the engine's own
+ * listener registration depends on {@code workitem}. That is a cycle, and Spring
+ * refuses to start on it.
+ *
+ * <p>So the narrow port gets the narrow implementation, and the cycle cannot form.
+ */
+public class LaneVisitLookup implements LaneVisitPort {
+
+	private final VisitReadRepository visits;
+	private final AdmissionRepository lanes;
+
+	public LaneVisitLookup(VisitReadRepository visits, AdmissionRepository lanes) {
+		this.visits = visits;
+		this.lanes = lanes;
+	}
+
 	@Override
 	public Optional<Long> activeVisitOn(String laneExternalId) {
+		// The port's own exception, not execution's domain one: the caller has to
+		// catch this, and a caller that imports execution.domain to write the catch
+		// clause has crossed the wall the port exists to keep.
 		long laneId = lanes.laneIdOf(laneExternalId)
-				.orElseThrow(() -> new AdmissionService.LaneNotAtThisInstallationException(laneExternalId));
+				.orElseThrow(() -> new LaneVisitPort.LaneNotPublishedException(laneExternalId));
 		return visits.activeOnLane(laneId).map(VisitReadRepository.VisitRow::executionId);
 	}
+}
 ```
+
+⚠️ **Package A is unaffected.** `VisitQueryService.onLane` keeps throwing
+`AdmissionService.LaneNotAtThisInstallationException`, and `VisitController` keeps
+catching it — both live in `execution`, so no wall is crossed. Only the cross-module
+path needs the port's own type.
+
+⚠️ **`VisitQueryService` must NOT implement `LaneVisitPort`.** If you already added
+`implements LaneVisitPort` and an `activeVisitOn` method there, remove both. Its own
+`onLane` method (work package A) stays exactly as it is.
 
 ⚠️ `VisitRow` does **not** currently expose `executionId` — the record is
 `VisitRow(externalId, laneId, status, plate, startedAt, completedAt,
@@ -650,17 +734,34 @@ processInstanceId)`. **Add `long executionId` as its first component**, add
 `execution_id` to `COLUMNS`, and read it in `map` with `rs.getLong("execution_id")`.
 Every existing construction site must be updated; the compiler will list them.
 
-**Step 3 — expose the bean.** In `ExecutionConfiguration`, the existing
-`visitQueryService` bean method now returns a type that also implements the port.
-Add a second bean method that returns the same instance under the port type:
+**Step 3 — register the one bean.** In `ExecutionConfiguration`:
 
 ```java
 	@Bean
 	public com.lynxis.orca.runtime.execution.api.LaneVisitPort laneVisitPort(
-			com.lynxis.orca.runtime.execution.domain.VisitQueryService visitQueryService) {
-		return visitQueryService;
+			com.lynxis.orca.runtime.execution.persistence.VisitReadRepository visits,
+			AdmissionRepository lanes) {
+		return new com.lynxis.orca.runtime.execution.domain.LaneVisitLookup(visits, lanes);
 	}
 ```
+
+Both of its dependencies are plain repositories over the scope seam, so nothing here
+reaches the engine and the cycle in step 2 cannot form.
+
+⚠️ **Exactly one bean of this type must exist.** If `VisitQueryService` still
+declares `implements LaneVisitPort`, its bean is a second candidate and Spring
+refuses to choose:
+
+```
+NoUniqueBeanDefinitionException: expected single matching bean but found 2:
+visitQueryService,laneVisitPort
+```
+
+⚠️ **Inject the INTERFACE, never the class.** In step 4, `WorkItemService` takes a
+`LaneVisitPort` — the type from `execution.api`. Taking a concrete class from
+`execution.domain` would compile and then fail `ModuleWallRule`, which forbids any
+module from depending on another module's `domain` package. The port exists to make
+that dependency legal; injecting past it defeats it, and the build check will say so.
 
 **Step 4 — consume it in `workitem`.** Add to `WorkItemService`: add a
 `private final LaneVisitPort laneVisits;` field, take it as a constructor parameter,
@@ -719,9 +820,21 @@ this installation's scope."* Passing it a sentence yields gibberish. Add a sibli
 
 **Step 6 — controller.** Add `takeNextOnLane` to `workitem/api/WorkItemController.java`,
 following how `takeWorkItem` in that file resolves the operator and maps exceptions.
-Map `NothingToTakeOnLaneException` → `WorkItemErrorCode.WORK_ITEM_NOT_FOUND` (404)
-and `LaneNotAtThisInstallationException` → `ExecutionErrorCode.LANE_NOT_AT_THIS_INSTALLATION`
-(422).
+Map:
+
+| Caught | Answer |
+|---|---|
+| `WorkItemService.NothingToTakeOnLaneException` | `WorkItemErrorCode.WORK_ITEM_NOT_FOUND` (404) |
+| `LaneVisitPort.LaneNotPublishedException` | `ExecutionErrorCode.LANE_NOT_AT_THIS_INSTALLATION` (422) |
+
+⚠️ **Catch `LaneVisitPort.LaneNotPublishedException`, never
+`AdmissionService.LaneNotAtThisInstallationException`.** The second lives in
+`execution.domain`, and catching it — or even calling `getMessage()` on it — makes
+`workitem` depend on that package. `ModuleWallRule` fails the build on both.
+
+⚠️ `ExecutionErrorCode` lives in `execution.api`, so referencing it from `workitem` is
+permitted — `api` packages are what modules are allowed to see. `WorkItemController`
+already imports `ExecutionErrorCode` for other routes; check before adding it twice.
 
 ### B.5 Tests
 
@@ -916,17 +1029,51 @@ throws `OPERATOR_UNRESOLVED` when there is none.
 ### C.4 Tests
 
 Add to `WorkItemLifecycleIT` (⚠️ **there is no separate lane-reset suite** — lane
-reset is tested there, and its helpers are what you need):
+reset is tested there, and its helpers are what you need).
+
+⚠️ **The guard has TWO conditions and they need a test each.** This was got wrong the
+first time this plan was written, and the error is worth understanding because it is
+the kind that produces a green suite guarding nothing:
+
+```java
+if (active.isEmpty() || !active.get().externalId().equals(visitExternalId)) {
+```
+
+- `active.isEmpty()` — nothing is running on the lane at all.
+- `!…equals(visitExternalId)` — **something else** is running. This is the condition
+  that stops abort killing the next truck, and it is the entire reason the check
+  happens under the lock.
+
+A test that aborts the same visit twice only ever reaches the **first** condition:
+the successful abort unbinds the lane, so the second attempt finds it empty. **Delete
+the identity comparison and that test still passes** — it certifies a guard it never
+executes.
+
+Write three tests:
 
 1. **`abortFailsTheVisitAndItsItemsAndFreesTheLane`** — `admitAndPark()`, abort,
    assert visit `FAILED`, item `FAILED`, and a subsequent admission on the lane
    succeeds.
-2. **`abortingAVisitThatIsNotRunningChangesNothing`** — abort twice; the second
-   raises the conflict and the item's status is unchanged afterwards. **Assert the
-   unchanged part** — a refusal that still mutated is the bug worth catching.
+2. **`abortingAVisitThatIsNoLongerRunningChangesNothing`** — abort twice. The second
+   raises the conflict and the item's status is unchanged. *(This covers the empty
+   branch only.)*
+3. **`abortingASUPERSEDEDVisitDoesNotTouchTheVisitThatReplacedIT`** — the one that
+   matters:
+   - `admitAndPark()` → visit **A**
+   - abort **A** (succeeds, lane freed)
+   - `admitAndPark()` again → visit **B**, now running on the same lane
+   - abort **A** again → must raise `VisitNotAbortableException`
+   - **assert B is untouched**: still `ACTIVE`, its work item still `QUEUED`, and the
+     lane still bound to B
 
-**Watch it fail:** delete the `!active.get().externalId().equals(visitExternalId)`
-clause. Test 2 must fail. Restore it.
+**Watch each fail, and note they fail for different reasons:**
+
+| Break this | Which test must fail |
+|---|---|
+| Delete `active.isEmpty() \|\|` | Test 2 |
+| Delete `\|\| !active.get().externalId().equals(visitExternalId)` | **Test 3** — and test 2 must still pass, which is the proof that test 2 alone was never enough |
+
+Restore both afterwards.
 
 ---
 
@@ -966,6 +1113,13 @@ clause. Test 2 must fail. Restore it.
     symptom is the 8-lane admission property failing with an unexplained `500` —
     which reads exactly like a real concurrency defect. **Stop the services before
     any suite run.** §0.0.
+12. **A compound guard needs a test per condition, and "watch it fail" must break the
+    condition you mean.** `if (a || b)` with a test that only ever triggers `a` will
+    pass with `b` deleted — so the test certifies a guard it never executes, and the
+    build stays green while the protection is gone. When you break something to watch
+    a test fail, **break the exact clause**, and if the test still passes, the test is
+    wrong rather than the code being safe. This plan shipped that mistake in §5.4 and
+    it was found only by performing the exercise.
 
 ---
 
@@ -1029,6 +1183,7 @@ Token and operator link per §0.7. Park a truck per §0.8.
 | 11 | `POST /api/v1/lanes/LANE-NOPE/take-next` | `422` |
 | 12 | `POST /api/v1/visits/{id}/abort` on a parked visit | `200`; then `runtime.execution` shows `FAILED` and `runtime.work_item` shows `FAILED` |
 | 13 | Repeat 12 | `409`, and the work item's status is unchanged |
+| 13b | Park a second truck on the freed lane, then abort the FIRST visit again | `409`, **and the second visit is still `ACTIVE` with its work item still `QUEUED`** — the identity guard, which row 13 alone does not reach |
 | 14 | `POST /api/v1/visits/vis-nope/abort` | `404` |
 | 15 | After 12, drive another truck at the lane | It admits — the lane was freed |
 
