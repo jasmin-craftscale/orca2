@@ -88,6 +88,22 @@ public class VisitReadRepository {
 				.stream().findFirst();
 	}
 
+	/**
+	 * The running root visit on a lane, if there is one.
+	 *
+	 * <p>Root-only and {@code ACTIVE}: a child execution is a step inside a visit
+	 * rather than a visit of its own, and the filtered unique index that enforces one
+	 * active root per lane is what makes "the" visit a meaningful phrase here.
+	 */
+	public Optional<VisitRow> activeOnLane(long laneId) {
+		return seam.select(ScopedSelect.from("execution")
+								.columns(COLUMNS)
+								.scopedBy(SCOPE_COLUMN)
+								.where(ROOT_ONLY + " AND lane_id = ? AND status = 'ACTIVE'", laneId),
+						VisitReadRepository::map)
+				.stream().findFirst();
+	}
+
 	private static final String[] COLUMNS = { "external_id", "lane_id", "status", "plate",
 			"started_at", "completed_at", "process_instance_id" };
 

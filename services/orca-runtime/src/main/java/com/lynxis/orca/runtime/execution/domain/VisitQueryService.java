@@ -105,6 +105,22 @@ public class VisitQueryService {
 	}
 
 	/**
+	 * The visit running on a lane, with the engine's live position.
+	 *
+	 * @throws AdmissionService.LaneNotAtThisInstallationException when this
+	 *         installation does not publish the lane — refused rather than answered
+	 *         "no visit", because those are different facts and an operator acts on
+	 *         them differently
+	 */
+	public Optional<VisitView> onLane(String laneExternalId) {
+		long laneId = lanes.laneIdOf(laneExternalId)
+				.orElseThrow(() -> new AdmissionService.LaneNotAtThisInstallationException(laneExternalId));
+
+		return visits.activeOnLane(laneId)
+				.map(row -> view(row, laneExternalId, livePositionOf(row)));
+	}
+
+	/**
 	 * The step the engine is parked at, or null once it is not running.
 	 *
 	 * <p>Absent rather than stale: reporting a finished visit's last step as its

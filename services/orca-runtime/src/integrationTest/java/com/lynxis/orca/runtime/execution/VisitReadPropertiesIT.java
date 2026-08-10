@@ -136,6 +136,31 @@ class VisitReadPropertiesIT {
 	}
 
 	@Test
+	@DisplayName("a lane's current visit is the ACTIVE root one, and a clear lane answers empty")
+	void laneCurrentVisit() {
+		insertVisit("vis-lane-done", OURS, 9L, "COMPLETED", Instant.now(), Instant.now());
+		assertThat(asSite(OURS, () -> visits.activeOnLane(9L)))
+				.as("a finished visit is not the lane's current visit — a clear lane must read as clear")
+				.isEmpty();
+
+		insertVisit("vis-lane-live", OURS, 9L, "ACTIVE", Instant.now(), null);
+		assertThat(asSite(OURS, () -> visits.activeOnLane(9L)))
+				.as("the ACTIVE root visit is the lane's current visit")
+				.isPresent();
+	}
+
+	@Test
+	@DisplayName("one site cannot read another site's lane")
+	void laneCurrentVisitIsScoped() {
+		insertVisit("vis-theirs-lane", THEIRS, 11L, "ACTIVE", Instant.now(), null);
+
+		assertThat(asSite(OURS, () -> visits.activeOnLane(11L)))
+				.as("the seam applies the site condition before the filter, so another site's "
+						+ "lane is never selected rather than selected and refused")
+				.isEmpty();
+	}
+
+	@Test
 	@DisplayName("a page of visits resolves its lanes ONCE, not once per row")
 	void laneNamesAreResolvedOncePerPage() {
 		// The defect this guards against was real and was measured before it was fixed:

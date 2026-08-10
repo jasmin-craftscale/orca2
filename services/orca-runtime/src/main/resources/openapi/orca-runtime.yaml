@@ -251,6 +251,48 @@ paths:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 
+  /api/v1/lanes/{laneExternalId}/visit:
+    get:
+      tags: [visits]
+      operationId: getLaneVisit
+      summary: The visit running on this lane right now, if any
+      description: |
+        The lane's current visit, with the step the engine is parked at.
+
+        **An empty lane answers `200` with a null `data`, not `404`.** A lane with
+        no truck at it is the normal state of a gate, and reporting it as "not
+        found" would make an ordinary condition indistinguishable from a
+        misconfigured lane identifier.
+
+        A lane this installation does not publish answers `422` — that IS a
+        configuration fault and must not read as "no truck here".
+      parameters:
+        - name: laneExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: The running visit, or null when the lane is clear
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisitEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: The lane is not published for this installation
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
   /api/v1/work-items:
     get:
       tags: [workItems]
