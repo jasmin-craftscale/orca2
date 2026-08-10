@@ -1,6 +1,5 @@
 package com.lynxis.orca.runtime.workitem.persistence;
 
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -9,6 +8,7 @@ import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.platform.scope.ScopedInsert;
 import com.lynxis.orca.platform.scope.ScopedSelect;
 import com.lynxis.orca.platform.scope.ScopedUpdate;
+import com.lynxis.orca.runtime.persistence.Utc;
 import com.lynxis.orca.runtime.workitem.domain.PresenceTables.UserActivity;
 
 import lombok.RequiredArgsConstructor;
@@ -35,7 +35,7 @@ public class PresenceRepository {
 	/** @return whether an open row was closed (false = the operator had none) */
 	public boolean closeOpenRow(String userExternalId, Instant now) {
 		return seam.update(ScopedUpdate.table("user_activity")
-				.set("ended_at", Timestamp.from(now))
+				.set("ended_at", Utc.timestampOf(now))
 				.scopedBy(SCOPE)
 				.where("user_external_id = ? AND ended_at IS NULL", userExternalId)) > 0;
 	}
@@ -53,7 +53,7 @@ public class PresenceRepository {
 				.value(SCOPE, siteExternalId)
 				.value("user_external_id", userExternalId)
 				.value("status", status)
-				.value("started_at", Timestamp.from(now)));
+				.value("started_at", Utc.timestampOf(now)));
 	}
 
 	/** Every operator whose open row is one of the given statuses, longest-in-state first. */
@@ -79,13 +79,12 @@ public class PresenceRepository {
 	}
 
 	private static UserActivity map(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
-		Timestamp ended = rs.getTimestamp("ended_at");
 		return new UserActivity(
 				rs.getLong("user_activity_id"),
 				rs.getString("site_external_id"),
 				rs.getString("user_external_id"),
 				rs.getString("status"),
-				rs.getTimestamp("started_at").toInstant(),
-				ended == null ? null : ended.toInstant());
+				Utc.instantAt(rs, "started_at"),
+				Utc.instantAt(rs, "ended_at"));
 	}
 }
