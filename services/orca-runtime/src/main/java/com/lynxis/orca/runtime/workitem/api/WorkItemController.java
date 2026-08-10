@@ -24,6 +24,8 @@ import com.lynxis.orca.runtime.api.generated.model.WorkItemAuditEntry;
 import com.lynxis.orca.runtime.api.generated.model.WorkItemAuditEnvelope;
 import com.lynxis.orca.runtime.api.generated.model.WorkItemEnvelope;
 import com.lynxis.orca.runtime.api.generated.model.WorkItemListEnvelope;
+import com.lynxis.orca.runtime.execution.api.ExecutionErrorCode;
+import com.lynxis.orca.runtime.execution.api.LaneVisitPort;
 import com.lynxis.orca.runtime.execution.api.ManualStepPort;
 import com.lynxis.orca.runtime.workitem.domain.WorkItemService;
 import com.lynxis.orca.runtime.workitem.domain.WorkItemTables;
@@ -79,6 +81,12 @@ public class WorkItemController implements WorkItemsApi {
 	public ResponseEntity<WorkItemEnvelope> takeWorkItem(String workItemExternalId) {
 		String actor = actingOperator();
 		return item(() -> workItems.take(workItemExternalId, actor));
+	}
+
+	@Override
+	public ResponseEntity<WorkItemEnvelope> takeNextOnLane(String laneExternalId) {
+		String actor = actingOperator();
+		return item(() -> workItems.takeNextOnLane(laneExternalId, actor));
 	}
 
 	@Override
@@ -141,6 +149,13 @@ public class WorkItemController implements WorkItemsApi {
 		}
 		catch (WorkItemService.WorkItemNotFoundException notFound) {
 			throw new ApiException(WorkItemErrorCode.WORK_ITEM_NOT_FOUND, notFound.getMessage());
+		}
+		catch (WorkItemService.NothingToTakeOnLaneException nothingToTake) {
+			throw new ApiException(WorkItemErrorCode.WORK_ITEM_NOT_FOUND, nothingToTake.getMessage());
+		}
+		catch (LaneVisitPort.LaneNotPublishedException unknownLane) {
+			throw new ApiException(ExecutionErrorCode.LANE_NOT_AT_THIS_INSTALLATION,
+					unknownLane.getMessage());
 		}
 		catch (WorkItemService.WorkItemConflictException conflict) {
 			throw new ApiException(WorkItemErrorCode.WORK_ITEM_CONFLICT, conflict.getMessage());

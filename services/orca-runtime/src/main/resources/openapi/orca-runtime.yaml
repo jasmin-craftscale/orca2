@@ -293,6 +293,66 @@ paths:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 
+  /api/v1/lanes/{laneExternalId}/take-next:
+    post:
+      tags: [workItems]
+      operationId: takeNextOnLane
+      summary: Claim the oldest queued item on this lane's running visit
+      description: |
+        Take-by-lane, for an operator working a lane monitor rather than the queue.
+
+        A convenience over `POST /work-items/{id}/take` and nothing more: the same
+        eligibility check, the same conditional UPDATE as the only race guard, the
+        same typed `409` for the loser, the same `TAKE` audit row.
+
+        **Oldest queued first, not the queue grid's priority order.** The grid ranks
+        work across lanes; this answers "the next thing at this lane", where one
+        visit's items are a sequence.
+      parameters:
+        - name: laneExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: The item, now held by the caller
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkItemEnvelope"
+        "401":
+          description: No credential, or no resolvable operator behind it
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "403":
+          description: The operator is outside the item's eligible teams
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: Nothing is running on this lane, or it has no queued item
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: Somebody else claimed it first
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: The lane is not published for this installation
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
   /api/v1/work-items:
     get:
       tags: [workItems]

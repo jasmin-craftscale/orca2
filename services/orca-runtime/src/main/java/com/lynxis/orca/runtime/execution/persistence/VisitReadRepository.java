@@ -104,11 +104,12 @@ public class VisitReadRepository {
 				.stream().findFirst();
 	}
 
-	private static final String[] COLUMNS = { "external_id", "lane_id", "status", "plate",
+	private static final String[] COLUMNS = { "execution_id", "external_id", "lane_id", "status", "plate",
 			"started_at", "completed_at", "process_instance_id" };
 
 	private static VisitRow map(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
 		return new VisitRow(
+				rs.getLong("execution_id"),
 				rs.getString("external_id"),
 				rs.getLong("lane_id"),
 				rs.getString("status"),
@@ -133,7 +134,7 @@ public class VisitReadRepository {
 	}
 
 	/** One stored visit, before the lane's external identifier and the live step are added. */
-	public record VisitRow(String externalId, long laneId, String status, String plate,
+	public record VisitRow(long executionId, String externalId, long laneId, String status, String plate,
 			Instant startedAt, Instant completedAt, String processInstanceId) {
 	}
 }

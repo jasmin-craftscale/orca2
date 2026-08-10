@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.lynxis.orca.runtime.execution.api.LaneVisitPort;
 import com.lynxis.orca.runtime.execution.api.ManualStepPort;
 import com.lynxis.orca.runtime.workitem.api.WorkItemIntake;
 import com.lynxis.orca.runtime.workitem.domain.WorkItemTables.WorkItem;
@@ -47,16 +48,18 @@ public class WorkItemService implements WorkItemIntake {
 	private final RoutingReadRepository routing;
 	private final PresenceService presence;
 	private final ManualStepPort manualSteps;
+	private final LaneVisitPort laneVisits;
 	private final TransactionTemplate transactions;
 	private final String siteExternalId;
 
 	public WorkItemService(WorkItemRepository repository, RoutingReadRepository routing,
-			PresenceService presence, ManualStepPort manualSteps, TransactionTemplate transactions,
-			String siteExternalId) {
+			PresenceService presence, ManualStepPort manualSteps, LaneVisitPort laneVisits,
+			TransactionTemplate transactions, String siteExternalId) {
 		this.repository = repository;
 		this.routing = routing;
 		this.presence = presence;
 		this.manualSteps = manualSteps;
+		this.laneVisits = laneVisits;
 		this.transactions = transactions;
 		this.siteExternalId = siteExternalId;
 	}
@@ -170,6 +173,26 @@ public class WorkItemService implements WorkItemIntake {
 					null, elapsedSince(before.queuedAt()));
 			return require(externalId);
 		});
+	}
+
+	/**
+	 * Take-by-lane: the oldest queued item on the lane's running visit.
+	 *
+	 * <p>Delegates the claim to {@link #take}; this method only decides WHICH item.
+	 * A second claim implementation is how two paths drift apart, so there is not one.
+	 */
+	public WorkItem takeNextOnLane(String laneExternalId, String actor) {
+		long executionId = laneVisits.activeVisitOn(laneExternalId)
+				.orElseThrow(() -> new NothingToTakeOnLaneException(laneExternalId,
+						"no visit is running on it"));
+
+		WorkItem next = repository.openItemsOf(executionId).stream()
+				.filter(item -> WorkItem.QUEUED.equals(item.status()))
+				.min(java.util.Comparator.comparing(WorkItem::queuedAt))
+				.orElseThrow(() -> new NothingToTakeOnLaneException(laneExternalId,
+						"its running visit has no queued work item"));
+
+		return take(next.externalId(), actor);
 	}
 
 	/**
@@ -469,6 +492,21 @@ public class WorkItemService implements WorkItemIntake {
 
 		public WorkItemNotFoundException(String externalId) {
 			super("No work item '" + externalId + "' exists under this installation's scope.");
+		}
+	}
+
+	/**
+	 * There is nothing on this lane for the caller to take.
+	 *
+	 * <p>Distinct from {@link WorkItemNotFoundException}, which is about an item the
+	 * caller named. Here the caller named a LANE, so the message has to say which of
+	 * the two reasons applies — an operator told "not found" about an item they never
+	 * mentioned will go looking for the wrong fault.
+	 */
+	public static class NothingToTakeOnLaneException extends RuntimeException {
+
+		public NothingToTakeOnLaneException(String laneExternalId, String because) {
+			super("Nothing to take on lane '" + laneExternalId + "': " + because + ".");
 		}
 	}
 

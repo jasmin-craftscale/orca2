@@ -272,6 +272,67 @@ class WorkItemLifecycleIT {
 		};
 	}
 
+	@Test
+	@Timeout(value = 10, unit = TimeUnit.MINUTES)
+	@DisplayName("take-next on a lane claims its oldest queued item and writes the TAKE audit")
+	void takeNextOnLaneClaimsTheOldestQueuedItem() {
+		String visit = admitAndPark();
+		WorkItemRow queued = queuedItemOf(visit);
+
+		var claimed = controllerFor("op-clerk").takeNextOnLane(LANE).getBody().getData();
+
+		assertThat(claimed.getExternalId()).isEqualTo(queued.externalId());
+		assertThat(claimed.getStatus().getValue()).isEqualTo("IN_PROGRESS");
+		assertThat(claimed.getAssignee()).isEqualTo("op-clerk");
+		assertThat(jdbc.queryForList("SELECT action FROM work_item_audit wa JOIN work_item w "
+						+ "ON w.work_item_id = wa.work_item_id WHERE w.external_id = ? "
+						+ "ORDER BY wa.work_item_audit_id", String.class, queued.externalId()))
+				.containsExactly("TAKE");
+	}
+
+	@Test
+	@Timeout(value = 10, unit = TimeUnit.MINUTES)
+	@DisplayName("two operators taking next on the same lane have exactly one winner")
+	void takeNextOnLaneHasExactlyOneWinner() throws Exception {
+		String visit = admitAndPark();
+		WorkItemRow queued = queuedItemOf(visit);
+		ExecutorService racers = Executors.newFixedThreadPool(2);
+		try {
+			CyclicBarrier line = new CyclicBarrier(2);
+			Future<Boolean> a = racers.submit(claimNext(line, "op-a"));
+			Future<Boolean> b = racers.submit(claimNext(line, "op-b"));
+
+			int winners = (a.get() ? 1 : 0) + (b.get() ? 1 : 0);
+			assertThat(winners)
+					.as("the delegated conditional UPDATE admits exactly one lane claimant")
+					.isEqualTo(1);
+		}
+		finally {
+			racers.shutdownNow();
+		}
+
+		assertThat(itemStatus(queued.externalId())).isEqualTo("IN_PROGRESS");
+		assertThat(count("SELECT COUNT(*) FROM work_item_audit WHERE action = 'TAKE'"))
+				.as("the loser writes no audit row")
+				.isEqualTo(1);
+	}
+
+	private Callable<Boolean> claimNext(CyclicBarrier line, String operator) {
+		return () -> {
+			line.await(10, TimeUnit.SECONDS);
+			try {
+				controllerFor(operator).takeNextOnLane(LANE);
+				return true;
+			}
+			catch (ApiException lost) {
+				assertThat(lost.getErrorCode().code())
+						.as("the loser sees the existing typed claim conflict")
+						.isEqualTo(WorkItemErrorCode.WORK_ITEM_CONFLICT.code());
+				return false;
+			}
+		};
+	}
+
 	// ------------------------------------------------------------------------
 	// Inversions 2 and 3 — complete-and-advance, and the out-of-order refusal
 	// ------------------------------------------------------------------------

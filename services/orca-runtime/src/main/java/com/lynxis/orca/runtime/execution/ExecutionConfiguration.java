@@ -72,6 +72,13 @@ public class ExecutionConfiguration {
 	}
 
 	@Bean
+	public com.lynxis.orca.runtime.execution.api.LaneVisitPort laneVisitPort(
+			com.lynxis.orca.runtime.execution.persistence.VisitReadRepository visits,
+			AdmissionRepository lanes) {
+		return new com.lynxis.orca.runtime.execution.domain.LaneVisitLookup(visits, lanes);
+	}
+
+	@Bean
 	public AdmissionRepository admissionRepository(ScopeSeam seam) {
 		return new AdmissionRepository(seam);
 	}

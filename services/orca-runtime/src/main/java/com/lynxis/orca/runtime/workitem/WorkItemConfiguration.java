@@ -14,6 +14,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.platform.scope.ScopeSeam;
+import com.lynxis.orca.runtime.execution.api.LaneVisitPort;
 import com.lynxis.orca.runtime.execution.api.ManualStepPort;
 import com.lynxis.orca.runtime.workitem.api.OperatorIdentity;
 import com.lynxis.orca.runtime.workitem.api.WorkItemController;
@@ -72,9 +73,10 @@ public class WorkItemConfiguration {
 	@Bean
 	public WorkItemService workItemService(WorkItemRepository repository, RoutingReadRepository routing,
 			com.lynxis.orca.runtime.workitem.domain.PresenceService presence,
-			ManualStepPort manualSteps, PlatformTransactionManager transactionManager,
+			ManualStepPort manualSteps, LaneVisitPort laneVisits,
+			PlatformTransactionManager transactionManager,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
-		return new WorkItemService(repository, routing, presence, manualSteps,
+		return new WorkItemService(repository, routing, presence, manualSteps, laneVisits,
 				new TransactionTemplate(transactionManager), siteExternalId);
 	}
 

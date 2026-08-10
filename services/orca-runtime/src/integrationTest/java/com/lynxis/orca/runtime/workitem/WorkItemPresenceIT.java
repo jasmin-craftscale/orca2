@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
@@ -84,7 +85,7 @@ class WorkItemPresenceIT {
 		presence = new PresenceService(new PresenceRepository(seam), transactions, SITE);
 		workItems = new WorkItemService(new WorkItemRepository(seam), new RoutingReadRepository(seam),
 				presence, taskId -> {
-				}, transactions, SITE);
+				}, laneExternalId -> Optional.empty(), transactions, SITE);
 
 		jdbc.update("INSERT INTO execution (external_id, site_external_id, lane_id, status) "
 				+ "VALUES (?, ?, 999, 'MANUAL')", "vis-presence-" + UUID.randomUUID(), SITE);
