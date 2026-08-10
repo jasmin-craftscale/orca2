@@ -229,24 +229,53 @@ These are not preferences. Each was learned by getting it wrong.
 
 **Open, and each is recorded where it belongs rather than here:** the retention-class list (architecture says closed at 18 values and never enumerates them; the hardening report says still blocked; nine provisional classes exist in code — **settle it when stream 4 starts, from the real tables, not before**); the device-host stub returning a corpus tag into `edge.command_log.device_response`; `platform/AGENTS.md` missing a warning that editing a primitive migration invalidates checksums in every schema it reached; and `.github/workflows/ci.yml` still saying five ArchUnit rules when there are eleven.
 
+### Session of 10 August (later) — the streams are handed over and the first outside work has landed
+
+**Everything below is on `main`, pushed, and verified by execution: 31 suites, 236 integration tests, 0 failures.** The repository is hosted at `github.com:jasmin-craftscale/orca2`. Working tree clean, one branch.
+
+**All four developers now have something.** Streams 1–3 each have a reference sheet *and* a self-contained plan; two new extractions were written (`read-models-notify-from-1x.md`, `custom-entities-from-1x.md`), and `MIGRATION_NUMBER_RANGES.md` assigns bands per stream.
+
+**A first slice was built end to end by an outside agent working from a plan** — `docs/lane-operations-plan.md`, three endpoints in modules no stream owns: `GET /lanes/{id}/visit`, `POST /lanes/{id}/take-next`, `POST /visits/{id}/abort`. Report: `docs/lane-operations-report.md`. **That exercise found five defects, and every one was in the plan rather than in the work.** The corrections are in the plan and worth reading before writing another: a running service poisons the suite (they share the `runtime` schema); a port's implementation must not also register a second bean of the same type; a port on an engine-dependent class forms a startup cycle; a port that throws a *domain* exception breaks the module wall the port exists to keep; and — the one that matters most — **a compound guard needs a test per clause**. The prescribed abort test aborted the same visit twice, which only ever reached the empty-lane branch, so deleting the identity comparison left it green. It certified a guard it never executed.
+
+⚠️ **Two defects found by verifying, both real and both recorded:** the UTC timestamp inconsistency (see the block above §9's open list — `docs/utc-timestamps-plan.md` is written and ready to hand over), and the visit search binding its `since` parameter zone-lessly.
+
+**Immediately available to pick up:**
+
+- **`docs/utc-timestamps-plan.md`** — written, prescriptive, ready for an agent. Real shipped defect, proven with data.
+- **Two decision briefs the product owner asked about but which are not yet written:** connector credentials at rest (blocks stream 1's Track B and stream 3's SFTP — **one answer, not two**) and the cross-instance notification fan-out (blocks stream 2's final work package).
+- **The retention-class list.** Stream 4 cannot be *planned* until it is settled. The groundwork is a sweep of the traffic-growing tables that actually exist, offered as a proposal for the product owner to rule on.
+
+⚠️ **`develop` does not exist.** The ruled model is `feature/*` → `develop` → `main`, and both branches this session merged straight to `main` because there was nowhere else.
+
+⚠️ **Retire `docs/lane-operations-plan.md`** now the work is merged and verified — keep the report. That is the established pattern: the plan goes, the report survives.
+
 ### What comes next
 
 **The current goal is the full on-site backend** (product-owner direction). The remaining work is now the **four parallel streams** in the section above rather than sequential phases — but the preparation is unchanged and still the thing that makes them work: extract the 1.x reference sheet → write a self-contained plan → hand it over → verify by executing. The phase framing below is kept because it maps one-to-one onto the streams:
 
-- **Phase 4 — partner event API & integration breadth** (the inbound external-event → workflow path, `event_dispatch`, the frozen partner endpoints, connector breadth). The recommended next build; more CRUD-shaped than Phase 3's engine internals.
-- **Phase 5 — read models & notifications** · **Phase 6 — retention/purge jobs** · **Phase 7 — core remainder** (custom entities + DDL executor, the licensing-verification module). Then the on-site backend is complete.
-- **The deployment phase** (installer, secrets provisioning, release images, licensing) is its own plan later — blocked on the vendor answer and a hosted repo. `docs/deployment.md` Part 2 is its backlog.
+- **Phase 4 — partner event API & integration breadth** — ✅ plan written (`docs/stream-1-plan.md`), not started.
+- **Phase 5 — read models & notifications** ✅ · **Phase 7 — core remainder** ✅ — both planned, not started. **Phase 6 — retention/purge** is still unplannable; see the retention-class list above.
+- **The deployment phase** (installer, secrets provisioning, release images, licensing) is its own plan later — blocked on the vendor answer. `docs/deployment.md` Part 2 is its backlog.
 
 **Standing items that are the product owner's, and should not slip behind the build:**
 
-- **Host the repository.** Everything is on one laptop and CI has never run — the cheapest risk with the biggest downside.
+- ✅ **The repository is hosted** (`github.com:jasmin-craftscale/orca2`). CI exists but its triggers still name only `main` and `phase-*`, so nothing fires for `feature/*` → `develop` — handed to devops, not fixed here.
 - **The vendor call (register NEW-4).** Does the .NET device host validate the `Authorization` token on the barrier command? It blocks the first real device host; the brief is `docs/device-host-outbound-from-1x.md` §3.
 - **The frontend is unstaffed** — two React apps, the kiosk, both builders. Nothing can be demoed to a customer without it.
 - **The builder-developer** owns the BPMN service-task boundary-timer question (`docs/BPMN_EXECUTION_PROFILE.md` §8) and should see the profile.
 
 ### For a fresh orchestrator session
 
-Everything durable is in three places: this document (the map), the phase reports and reference sheets in `~/Documents/Projects/orca/docs/` (the detail), and git history. The orchestrator's own working memory (the `orca-rewrite-initiative` ledger) loads automatically and is current through Phase 3. Onboard via §7, then go deep per §10 before advising on anything.
+Everything durable is in three places: this document (the map), the phase reports and reference sheets in `~/Documents/Projects/orca/docs/` (the detail), and git history. The orchestrator's own working memory (the `orca-rewrite-initiative` ledger) loads automatically. Onboard via §7, then go deep per §10 before advising on anything.
+
+**Four habits this role keeps re-learning. Each cost a session:**
+
+1. **`./gradlew check integrationTest` without `--rerun-tasks` prints `BUILD SUCCESSFUL` from cache for a suite it never ran.** Then count the tests from the result XML — a filtered-out suite also passes.
+2. **Stop the services before any suite run.** They share the `runtime` schema. `docs/LOCAL_DEVELOPMENT.md` §6.1 is the authoritative copy.
+3. **Check which branch you are on immediately before `git add`.** When another agent works in the same checkout there is one `HEAD`, and it moves under you. Three commits landed on a feature branch this session because of that; `git push origin main` answering `Everything up-to-date` is what caught it.
+4. **A running service holds the old classes.** Restart it before verifying a change against it, or you are testing the previous build. This has now caught out two sessions.
+
+⚠️ **This document has been wrong four times in one session** — finished work marked unstarted, two stale test counts, and stale frozen-contract markers, all corrected here. **It is the least-verified document in the repository and the first one every session reads.** When something here matters, check it against the code before acting on it.
 
 ---
 
