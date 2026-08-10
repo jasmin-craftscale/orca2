@@ -27,6 +27,7 @@ import com.lynxis.orca.platform.outbox.testing.PlatformDatabase;
 import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.runtime.RuntimeApplication;
+import com.lynxis.orca.runtime.execution.persistence.VisitReadRepository;
 import com.lynxis.orca.runtime.workitem.persistence.WorkItemRepository;
 
 @SpringBootTest(
@@ -51,6 +52,9 @@ class UtcTimestampPropertiesIT {
 
 	@Autowired
 	private WorkItemRepository workItems;
+
+	@Autowired
+	private VisitReadRepository visits;
 
 	@Autowired
 	private DataSource dataSource;
@@ -134,6 +138,26 @@ class UtcTimestampPropertiesIT {
 		assertThat(durationMillis)
 				.as("a work item completed immediately must not inherit the JVM's UTC offset")
 				.isBetween(0L, 10_000L);
+	}
+
+	@Test
+	@DisplayName("a visit search window is not shifted by the machine's zone")
+	void visitSearchWindowIsHonest() {
+		assertThat(ZoneId.systemDefault()).isEqualTo(NON_UTC_ZONE);
+		String visitExternalId = "vis-window-" + UUID.randomUUID();
+		String plate = "UTC-WINDOW-" + UUID.randomUUID().toString().substring(0, 8);
+		jdbc.update("INSERT INTO execution (external_id, site_external_id, lane_id, status, plate, "
+				+ "started_at) VALUES (?, ?, 1, 'ACTIVE', ?, DATEADD(minute, -1, SYSUTCDATETIME()))",
+				visitExternalId, SITE, plate);
+
+		List<VisitReadRepository.VisitRow> inside = inScope(() ->
+				visits.search(null, null, plate, Instant.now().minusSeconds(5 * 60), 100));
+		List<VisitReadRepository.VisitRow> outside = inScope(() ->
+				visits.search(null, null, plate, Instant.now().plusSeconds(5 * 60), 100));
+
+		assertThat(inside).extracting(VisitReadRepository.VisitRow::externalId)
+				.containsExactly(visitExternalId);
+		assertThat(outside).isEmpty();
 	}
 
 	private ItemFixture insertQueuedItem() {
