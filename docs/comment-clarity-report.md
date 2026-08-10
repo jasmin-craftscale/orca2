@@ -6,8 +6,10 @@ re-read end to end and corrected; not one byte of SQL changed, and that is prove
 mechanically rather than asserted.
 
 The standard, the ground rules and the verification table this work was done
-against are `docs/comment-clarity-plan.md`. This report records what was done,
-what was decided along the way, and what was found wrong while reading.
+against were in `docs/comment-clarity-plan.md`, **which has been removed now that
+the work is finished** — a plan nobody should execute again is a plan somebody
+eventually executes again. This report is what survived it: what was done, what
+was decided along the way, and what was found wrong while reading.
 
 ---
 
@@ -43,8 +45,8 @@ Gradle task; a comment change there would be a fork of a third-party schema.
 
 ### The count in the plan is wrong, and this is what is actually there
 
-`docs/comment-clarity-plan.md` §6 says **30 files** in one sentence and **34** in
-the next, and describes the platform migrations as *"6 under
+The plan's §6 said **30 files** in one sentence and **34** in
+the next, and described the platform migrations as *"6 under
 `platform/*/src/main/resources/db/migration/*.sql`"*.
 
 There are **three**, and they are not under `db/migration/`:
