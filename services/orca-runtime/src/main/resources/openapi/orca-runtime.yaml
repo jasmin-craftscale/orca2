@@ -251,6 +251,57 @@ paths:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 
+  /api/v1/visits/{visitExternalId}/abort:
+    post:
+      tags: [visits]
+      operationId: abortVisit
+      summary: Abort this visit — terminate its process, fail its work items, free its lane
+      description: |
+        One transaction, and the same one lane reset performs: the process instance
+        is terminated, the visit's open work items are failed, and the lane is
+        released for the next truck.
+
+        Addressed by visit rather than by lane, and the visit's identity is
+        re-checked under the lane lock — so a visit that finished while the request
+        was in flight is refused rather than having the next truck aborted in its
+        place.
+
+        Aborting a visit that is no longer running answers `409`. Unlike resetting an
+        already-clear lane, which is an ordinary outcome, naming a specific visit and
+        being wrong about its state is a mistake worth reporting.
+      parameters:
+        - name: visitExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: What was aborted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LaneResetEnvelope"
+        "401":
+          description: No credential, or no resolvable operator behind it
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such visit under this installation's scope
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: The visit is no longer running
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
   /api/v1/lanes/{laneExternalId}/visit:
     get:
       tags: [visits]

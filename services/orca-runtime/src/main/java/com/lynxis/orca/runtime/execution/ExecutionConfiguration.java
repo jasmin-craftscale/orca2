@@ -205,8 +205,11 @@ public class ExecutionConfiguration {
 	@Bean
 	public com.lynxis.orca.runtime.execution.api.VisitController visitController(
 			com.lynxis.orca.runtime.execution.domain.VisitQueryService visits,
+			LaneResetService laneReset,
+			com.lynxis.orca.runtime.workitem.api.OperatorIdentity operatorIdentity,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
-		return new com.lynxis.orca.runtime.execution.api.VisitController(visits, siteExternalId);
+		return new com.lynxis.orca.runtime.execution.api.VisitController(visits, laneReset,
+				operatorIdentity, siteExternalId);
 	}
 
 	// --- the SLA timer ------------------------------------------------------
