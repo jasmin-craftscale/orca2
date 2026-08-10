@@ -56,8 +56,15 @@ The rest of this plan writes the offset form (`18081`, `18082`, `18083`, `21433`
 
 ### 0.4 · Boot the three gate-path services
 
-Three terminals. **Order matters and the platform enforces it** — core publishes the
-views runtime and edge wait for, and they refuse to start before it has migrated.
+⚠️ **`bootRun` never returns.** It runs the service in the foreground until killed.
+If you are an agent executing commands one after another, **run each of these in the
+background** — otherwise the first one hangs and nothing after it happens. A human
+uses three terminals; an agent appends `&`, or uses whatever backgrounding its tool
+offers, and then polls the health check below.
+
+**Order matters and the platform enforces it** — core publishes the views runtime and
+edge wait for, and they refuse to start before it has migrated. Wait for core to
+answer `200` before starting the other two.
 
 ```bash
 export ORCA_DB_URL='jdbc:sqlserver://localhost:21433;databaseName=orca;encrypt=true;trustServerCertificate=true'
@@ -72,13 +79,23 @@ export ORCA_OIDC_ISSUER_URI='http://localhost:18080/realms/orca'
 credential is recognised by name and the service refuses to start with it otherwise.
 Do not weaken that check.
 
-Confirm all three:
+Confirm all three — poll rather than assume, because a service takes tens of seconds
+to migrate and start:
 
 ```bash
+for i in $(seq 1 40); do
+  a=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:18081/actuator/health)
+  [ "$a" = "200" ] && { echo "core UP"; break; }; sleep 5
+done
 for p in 18081 18082 18083; do curl -s -o /dev/null -w "$p %{http_code}\n" http://localhost:$p/actuator/health; done
 ```
 
 Expect `200` from each.
+
+⚠️ **Restart runtime after every code change** before running any live check in §7.3.
+A running service holds the old classes; verifying against it proves nothing about
+what you just wrote. Kill it with
+`kill $(lsof -nP -iTCP:18082 -sTCP:LISTEN -t)` and start it again.
 
 ### 0.5 · Seed the demo site
 
@@ -96,6 +113,12 @@ connector, the routing row mapping `200`→`APPROVED`, plus the clerk world:
 q(){ docker exec orca-sqlserver /opt/mssql-tools18/bin/sqlcmd \
   -S localhost -U sa -P 'Orca!Local2026' -C -No -I -d orca -h -1 -W -Q "SET NOCOUNT ON; $1"; }
 ```
+
+⚠️ **Shell state does not survive between separately invoked commands.** If each of
+your commands runs in a fresh shell, `q` and `$TOK` from an earlier step will not
+exist. Either define `q` at the top of every command that uses it, or write the
+`docker exec …` out in full each time. The same applies to the token in §0.7 —
+re-fetch it in the same command that uses it.
 
 ⚠️ **The `-I` is required, not cosmetic.** Several tables carry filtered indexes and
 SQL Server refuses to write to those unless `QUOTED_IDENTIFIER` is on. Without it a
