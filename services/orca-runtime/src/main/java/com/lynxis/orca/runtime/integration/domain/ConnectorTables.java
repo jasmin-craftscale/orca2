@@ -2,6 +2,7 @@ package com.lynxis.orca.runtime.integration.domain;
 
 import com.lynxis.orca.platform.scope.table.Growth;
 import com.lynxis.orca.platform.scope.table.PersistentTable;
+import com.lynxis.orca.platform.scope.table.RetentionClass;
 
 /**
  * The tables {@code V102__connectors.sql} creates, declared where the build check
@@ -50,5 +51,16 @@ public final class ConnectorTables {
 			String connectorName,
 			int httpStatus,
 			String outcome) {
+	}
+
+	/** One bounded, encrypted current credential record per configured connector. */
+	@PersistentTable(name = "connector_credential", growth = Growth.BOUNDED)
+	public record ConnectorCredentialTable() {
+	}
+
+	/** Append-only redacted history of credential administration and rewrap. */
+	@PersistentTable(name = "connector_credential_audit", growth = Growth.TRAFFIC_GROWING)
+	@RetentionClass("audit")
+	public record ConnectorCredentialAuditTable() {
 	}
 }
