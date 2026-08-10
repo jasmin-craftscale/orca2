@@ -211,6 +211,7 @@ command; the report needs it.**
 
 | # | Item |
 |---|---|
+| 0 | **Stop the services and Gradle daemons first** — `docs/LOCAL_DEVELOPMENT.md` §6.1. The suite and a running service share the `runtime` schema, so a running service makes this fail for reasons that are not your code |
 | 1 | `./gradlew build` green from a clean tree |
 | 2 | `./gradlew check integrationTest --rerun-tasks` — **`--rerun-tasks` is not optional.** Without it Gradle answers from cache in under a second and reports a success it did not run |
 | 3 | **The Phase 1 demo still runs end to end.** You are changing the service the gate path reads its views from, so this is the canary that matters most for your stream |

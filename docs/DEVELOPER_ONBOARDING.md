@@ -106,15 +106,24 @@ that already ran it refuses to start.
 passes. A check nobody has watched fail may not be wired in.
 
 ```bash
-./gradlew build                    # compile, unit tests, the ten checks
-./gradlew check integrationTest    # FULL verification — 222 tests, ~7 minutes
+./gradlew build                                  # compile, unit tests, the ten checks
+./gradlew check integrationTest --rerun-tasks    # FULL verification — 236 tests, ~6 minutes
 ```
+
+⚠️ **Stop the services before any suite run** — they share the `runtime` schema, so a
+running service makes the suite fail for reasons that are not your code. The
+commands, the symptom to recognise, and why, are in **`docs/LOCAL_DEVELOPMENT.md`
+§6.1**. Read it once; it has already cost this project two debugging sessions.
+
+⚠️ **Use `--rerun-tasks`, and count what ran.** Without the flag Gradle prints
+`BUILD SUCCESSFUL` from its cache for a suite it never executed, and a filtered-out
+suite still passes. `LOCAL_DEVELOPMENT.md` §6.2 has the one-liner that counts.
 
 ⚠️ **`./gradlew test` runs almost nothing that matters.** The property suites are a
 separate source set so the build works without Docker.
 
 ⚠️ **A green build does not mean a service starts.** Every suite constructs its
-beans directly, so a broken bean definition passes all 222 tests. This repository
+beans directly, so a broken bean definition passes every test. This repository
 has shipped a service that passed everything and could not boot. **Start the
 services and drive a truck before calling anything done.**
 

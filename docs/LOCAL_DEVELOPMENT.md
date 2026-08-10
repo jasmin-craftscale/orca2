@@ -65,6 +65,13 @@ edge cases somebody hit at three in the morning.
   nothing ever writes so the cleanup job never runs, and a deduplication that can
   start two workflows from one event. All of that is live in production.
 - **Never modify anything in `Lynxis-Gate`.** It is read-only, always.
+- ⚠️ **Clone it. Do not RUN it.** You need the source to read; you never need its
+  stack. Starting its devcontainer brings up a second SQL Server and a second
+  Keycloak alongside this project's, and it holds ports `8081`–`8086`, `1433` and
+  `8080` — the ones this project wants. Two database servers competing for one
+  machine is what turns a passing integration suite into a failing one (§6.1). If it
+  is already running, `docker compose -p devcontainer -f .devcontainer/docker-compose.dev.yaml down`
+  in that repository stops it.
 
 ⚠️ **Before searching that repository — with an AI or by hand — read
 `../Lynxis-Gate/CLAUDE.md`.** It documents the conventions that make its code
@@ -187,21 +194,71 @@ admission race, an unrouted branch and an expired command — is
 
 ## 6 · Build and verify
 
+### ⚠️ 6.1 · Stop the services first — every time
+
+**The integration suite and the running services use the SAME `runtime` schema on the
+SAME database.** The suites migrate it, create visits and let the real engine advance
+them; a running `orca-runtime` has an async executor that will pick up *the suite's*
+jobs, and a running `orca-edge` polls its buffer.
+
+Run them together and you get failures that look exactly like real concurrency
+defects and are not. **This has already cost this project two debugging sessions.**
+
 ```bash
-./gradlew build                    # compile, unit tests, the ten build checks
-./gradlew check integrationTest    # FULL verification — takes about 7 minutes
+# stop the services
+for p in 18081 18082 18083; do
+  PID=$(lsof -nP -iTCP:$p -sTCP:LISTEN -t 2>/dev/null | head -1)
+  [ -n "$PID" ] && kill $PID
+done
+
+# stop Gradle — orphaned workers survive a FAILED run and hold memory and connections
+./gradlew --stop
+ps aux | grep -c "[G]radleWorkerMain"     # expect 0
 ```
+
+| Doing this | Services must be |
+|---|---|
+| `./gradlew check integrationTest` | **STOPPED** |
+| Driving a truck, calling an endpoint | **RUNNING** |
+
+**The signature to recognise:** `AdmissionThroughHttpIT` failing with
+`EOFException: EOF reached while reading`, or a transient SQL Server connection loss.
+That is contention, not your code. Stop everything, re-run once, and only then start
+debugging.
+
+### 6.2 · The commands
+
+```bash
+./gradlew build                                  # compile, unit tests, the ten build checks
+./gradlew check integrationTest --rerun-tasks    # FULL verification — about 6 minutes
+```
+
+⚠️ **Use `--rerun-tasks`.** Without it Gradle answers from its cache in under a
+second and prints `BUILD SUCCESSFUL` for a suite it never ran.
 
 ⚠️ **`./gradlew test` runs almost nothing that matters.** The property suites live
 in a separate source set so the build works on a machine with no Docker. Full
-verification is `check integrationTest` — 222 integration tests against a real SQL
-Server and a real workflow engine.
+verification is `check integrationTest` — **236 integration tests** against a real
+SQL Server and a real workflow engine.
+
+⚠️ **Count what ran, do not trust the word "SUCCESSFUL".** A suite that was filtered
+out or never discovered still lets the build pass:
+
+```bash
+python3 - <<'EOF'
+import glob, xml.etree.ElementTree as ET
+tot=f=0; n=0
+for p in glob.glob('**/build/test-results/integrationTest/*.xml', recursive=True):
+    r=ET.parse(p).getroot(); n+=1
+    tot+=int(r.get('tests',0)); f+=int(r.get('failures',0))+int(r.get('errors',0))
+print(f"integrationTest: suites={n} tests={tot} failures={f}")
+EOF
+```
 
 ⚠️ **A green build does not mean a service starts.** Every suite constructs its
 beans directly rather than starting a service, so a broken bean definition passes
-all 222 tests. This repository has shipped a service that passed everything and
-could not boot. **Start the services and drive a truck before you call something
-done.**
+every test. This repository has shipped a service that passed everything and could
+not boot. **Start the services and drive a truck before you call something done.**
 
 ## 7 · Onboard your AI
 
