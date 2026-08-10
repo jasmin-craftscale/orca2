@@ -225,8 +225,9 @@ Not forgotten. Each is a decision with a reason.
 
 Not when the code is written. When:
 
-1. `./gradlew check integrationTest` is green — **224 integration tests** today, and
-   yours have joined them. Run it with `--rerun-tasks`: without it Gradle answers
+1. `./gradlew check integrationTest` is green — **236 integration tests** on current
+   `main`, independently re-run on 10 August 2026, with yours added to that count.
+   Run it with `--rerun-tasks`: without it Gradle answers
    from cache in under a second and reports a success it did not run.
 2. **Every guarantee you touched has a property test** that would fail if the
    guarantee broke. Not a test that exercises the path — one that states the claim.
