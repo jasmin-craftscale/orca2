@@ -1,6 +1,5 @@
 package com.lynxis.orca.runtime.workitem.persistence;
 
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,6 +9,7 @@ import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.platform.scope.ScopedInsert;
 import com.lynxis.orca.platform.scope.ScopedSelect;
 import com.lynxis.orca.platform.scope.ScopedUpdate;
+import com.lynxis.orca.runtime.persistence.Utc;
 import com.lynxis.orca.runtime.workitem.domain.WorkItemTables.WorkItem;
 import com.lynxis.orca.runtime.workitem.domain.WorkItemTables.WorkItemAudit;
 
@@ -150,7 +150,7 @@ public class WorkItemRepository {
 		return seam.update(ScopedUpdate.table("work_item")
 				.set("status", WorkItem.IN_PROGRESS)
 				.set("assignee", actor)
-				.set("started_at", Timestamp.from(now))
+				.set("started_at", Utc.timestampOf(now))
 				.scopedBy(SCOPE_COLUMN)
 				.where("external_id = ? AND status = 'QUEUED' AND (assignee IS NULL OR assignee = ?)",
 						externalId, actor)) == 1;
@@ -166,7 +166,7 @@ public class WorkItemRepository {
 	public boolean takeover(String externalId, String actor, String previousAssignee, Instant now) {
 		return seam.update(ScopedUpdate.table("work_item")
 				.set("assignee", actor)
-				.set("started_at", Timestamp.from(now))
+				.set("started_at", Utc.timestampOf(now))
 				.scopedBy(SCOPE_COLUMN)
 				.where("external_id = ? AND status = 'IN_PROGRESS' AND assignee = ?",
 						externalId, previousAssignee)) == 1;
@@ -207,7 +207,7 @@ public class WorkItemRepository {
 			String correctedEventData) {
 		return seam.update(ScopedUpdate.table("work_item")
 				.set("status", WorkItem.COMPLETED)
-				.set("completed_at", Timestamp.from(now))
+				.set("completed_at", Utc.timestampOf(now))
 				.set("completion_duration_sec", completionDurationSec)
 				.set("corrected_event_data", correctedEventData)
 				.scopedBy(SCOPE_COLUMN)
@@ -219,7 +219,7 @@ public class WorkItemRepository {
 	public boolean fail(long workItemId) {
 		return seam.update(ScopedUpdate.table("work_item")
 				.set("status", WorkItem.FAILED)
-				.set("completed_at", Timestamp.from(Instant.now()))
+				.set("completed_at", Utc.now())
 				.scopedBy(SCOPE_COLUMN)
 				.where("work_item_id = ? AND status IN ('QUEUED', 'IN_PROGRESS')", workItemId)) == 1;
 	}
@@ -233,7 +233,7 @@ public class WorkItemRepository {
 	 */
 	public boolean recordBreach(String taskId, Instant now) {
 		return seam.update(ScopedUpdate.table("work_item")
-				.set("sla_breached_at", Timestamp.from(now))
+				.set("sla_breached_at", Utc.timestampOf(now))
 				.scopedBy(SCOPE_COLUMN)
 				.where("task_id = ? AND sla_breached_at IS NULL", taskId)) == 1;
 	}
@@ -267,7 +267,7 @@ public class WorkItemRepository {
 						rs.getString("action"),
 						rs.getString("actor"),
 						rs.getString("previous_assignee"),
-						instant(rs.getTimestamp("occurred_at")),
+						Utc.instantAt(rs, "occurred_at"),
 						integer(rs, "processing_duration_sec"),
 						integer(rs, "elapsed_sec")));
 	}
@@ -294,17 +294,13 @@ public class WorkItemRepository {
 				rs.getString("screen_external_id"),
 				rs.getString("status"),
 				rs.getString("assignee"),
-				instant(rs.getTimestamp("queued_at")),
-				instant(rs.getTimestamp("started_at")),
-				instant(rs.getTimestamp("completed_at")),
+				Utc.instantAt(rs, "queued_at"),
+				Utc.instantAt(rs, "started_at"),
+				Utc.instantAt(rs, "completed_at"),
 				integer(rs, "completion_duration_sec"),
-				instant(rs.getTimestamp("sla_breached_at")),
+				Utc.instantAt(rs, "sla_breached_at"),
 				rs.getString("event_data"),
 				rs.getString("corrected_event_data"));
-	}
-
-	private static Instant instant(Timestamp timestamp) {
-		return timestamp == null ? null : timestamp.toInstant();
 	}
 
 	private static Integer integer(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
