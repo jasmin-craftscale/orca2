@@ -84,8 +84,10 @@ class CrashResumeIntegrationTest {
         impl.setDisableIdmEngine(true);
         impl.setDisableEventRegistry(true);
         impl.setEngineName(name);
+        // The async executor runs with Flowable's default job runnable: this
+        // codebase scopes reads through platform/scope at the seam, so there is
+        // no per-thread tenancy to bind onto engine job threads.
         DefaultAsyncJobExecutor asyncExecutor = new DefaultAsyncJobExecutor();
-        asyncExecutor.setExecuteAsyncRunnableFactory(new TenantBindingJobRunnableFactory());
         // Tight recovery timings so the test observes the takeover in seconds: a lock
         // expires after 2s and both engines sweep for expired locks every second.
         asyncExecutor.setAsyncJobLockTimeInMillis(2_000);
