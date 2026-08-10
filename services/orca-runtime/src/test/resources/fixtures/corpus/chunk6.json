@@ -1,0 +1,1514 @@
+[
+  {
+    "source": "TestDeepDiveData_ArrayIndexOutOfRange",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "[5]"
+      ],
+      "value": [
+        "x"
+      ]
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "go": "index out of range: 5 (code: WORK_FLOW_EXECUTOR_VAL_001)"
+      }
+    }
+  },
+  {
+    "source": "TestDeepDiveData_ArrayKeyLookupInMaps",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "name"
+      ],
+      "value": [
+        {
+          "name": "alice"
+        },
+        {
+          "name": "bob"
+        }
+      ]
+    },
+    "source_expected": "alice",
+    "expected": {
+      "value": "alice",
+      "error": null
+    }
+  },
+  {
+    "source": "TestDeepDiveData_ArrayNoIndexNoKey",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        ""
+      ],
+      "value": [
+        1,
+        2
+      ]
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "go": "Cannot access array without an index (code: WORK_FLOW_EXECUTOR_VAL_001)"
+      }
+    }
+  },
+  {
+    "source": "TestDeepDiveData_DefaultTypeError",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "key"
+      ],
+      "value": "string_value"
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "go": "Unexpected type: string (code: WORK_FLOW_EXECUTOR_VAL_001)"
+      }
+    }
+  },
+  {
+    "source": "TestDeepDiveData_ArrayKeyNotFoundInMaps",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "missing"
+      ],
+      "value": [
+        {
+          "a": 1
+        }
+      ]
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "go": "Key not found in array: missing (code: WORK_FLOW_EXECUTOR_VAL_001)"
+      }
+    }
+  },
+  {
+    "source": "TestDeepDiveData_MapKeyWithIndexOutOfBounds",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "items[5]"
+      ],
+      "value": {
+        "items": [
+          "a"
+        ]
+      }
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_ParentDataset",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.workflow.parent.dataset.mykey",
+      "selectorID": "$.wf-uuid.parent.dataset.mykey",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchDataSets": {
+        "returns": [
+          "parent-value",
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "source_expected": "parent-value",
+    "expected": {
+      "value": "parent-value",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_ParentDatasetWithNestedKey",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.workflow.parent.dataset.mykey.nested",
+      "selectorID": "$.wf-uuid.parent.dataset.mykey.nested",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchDataSets": {
+        "returns": [
+          "{\"nested\":\"deep-value\"}",
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "source_expected": "deep-value",
+    "expected": {
+      "value": "deep-value",
+      "error": null
+    }
+  },
+  {
+    "source": "TestUpdateSelectorValue_PrependPadsShortNumeric",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "",
+      "selectorID": "",
+      "selectorValue": "ABCD123",
+      "updation": "prepend(0)",
+      "workflowExecutionID": 0,
+      "workflowExecutionUUID": ""
+    },
+    "source_expected": "ABCD0000000123",
+    "expected": {
+      "value": "ABCD0000000123",
+      "error": null
+    }
+  },
+  {
+    "source": "TestUpdateSelectorValue_PrependNoChangeWhen10Digits",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "",
+      "selectorID": "",
+      "selectorValue": "ABCD1234567890",
+      "updation": "prepend(0)",
+      "workflowExecutionID": 0,
+      "workflowExecutionUUID": ""
+    },
+    "source_expected": "ABCD1234567890",
+    "expected": {
+      "value": "ABCD1234567890",
+      "error": null
+    }
+  },
+  {
+    "source": "TestUpdateSelectorValue_PrependNonMatchingFormat",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "",
+      "selectorID": "",
+      "selectorValue": "12345",
+      "updation": "prepend(0)",
+      "workflowExecutionID": 0,
+      "workflowExecutionUUID": ""
+    },
+    "source_expected": "12345",
+    "expected": {
+      "value": "12345",
+      "error": null
+    }
+  },
+  {
+    "source": "TestUpdateSelectorValue_PrependSliceItems",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "",
+      "selectorID": "",
+      "selectorValue": [
+        "ABCD123",
+        "EFGH456"
+      ],
+      "updation": "prepend(0)",
+      "workflowExecutionID": 0,
+      "workflowExecutionUUID": ""
+    },
+    "source_expected": [
+      "ABCD0000000123",
+      "EFGH0000000456"
+    ],
+    "expected": {
+      "value": [
+        "ABCD0000000123",
+        "EFGH0000000456"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_ConfigurationSite3Parts",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.configuration.site-uuid.key1",
+      "selectorID": "$.configuration.site-uuid.key1",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "{\"site\":\"config\"}",
+          null
+        ]
+      }
+    },
+    "source_expected": "{\"site\":\"config\"}",
+    "expected": {
+      "value": "{\"site\":\"config\"}",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_ConfigurationLane5Parts",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.configuration.site-uuid.area-uuid.lane-uuid.key1",
+      "selectorID": "$.configuration.site-uuid.area-uuid.lane-uuid.key1",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "{\"lane\":\"config\"}",
+          null
+        ]
+      }
+    },
+    "source_expected": "{\"lane\":\"config\"}",
+    "expected": {
+      "value": "{\"lane\":\"config\"}",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_ConfigurationDevice6Parts",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.configuration.site-uuid.area-uuid.lane-uuid.device-uuid.key1",
+      "selectorID": "$.configuration.site-uuid.area-uuid.lane-uuid.device-uuid.key1",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "{\"device\":\"config\"}",
+          null
+        ]
+      }
+    },
+    "source_expected": "{\"device\":\"config\"}",
+    "expected": {
+      "value": "{\"device\":\"config\"}",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_DatasetJSONStringUnmarshal",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.wf-uuid.dataset.mykey.name",
+      "selectorID": "$.wf-uuid.dataset.mykey.name",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchDataSets": {
+        "returns": [
+          "{\"name\":\"john\"}",
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "source_expected": "john",
+    "expected": {
+      "value": "john",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_DatasetArrayWithIndex",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.wf-uuid.dataset.items[1]",
+      "selectorID": "$.wf-uuid.dataset.items[1]",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchDataSets": {
+        "returns": [
+          [
+            "a",
+            "b",
+            "c"
+          ],
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "source_expected": "b",
+    "expected": {
+      "value": "b",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_DatasetFetchError",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.wf-uuid.dataset.mykey",
+      "selectorID": "$.wf-uuid.dataset.mykey",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchDataSets": {
+        "returns": [
+          null,
+          {
+            "dto": "fetch error"
+          }
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "dto": "fetch error"
+      }
+    }
+  },
+  {
+    "source": "TestFetchCDLScanData_DBA_2DigitYearFuture",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "expiration_date"
+      ],
+      "value": "DBA010130",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "expiration_date"
+      ]
+    },
+    "source_expected": "01/01/2030",
+    "expected": {
+      "value": "01/01/2030",
+      "error": null
+    }
+  },
+  {
+    "source": "TestFetchCDLScanData_DBA_4DigitYear",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "expiration_date"
+      ],
+      "value": "DBA01012030",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "expiration_date"
+      ]
+    },
+    "source_expected": "01/01/2030",
+    "expected": {
+      "value": "01/01/2030",
+      "error": null
+    }
+  },
+  {
+    "source": "TestFetchCDLScanData_DBA_DateTooShort",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "expiration_date"
+      ],
+      "value": "DBA0101",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "expiration_date"
+      ]
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestFetchCDLScanData_DBA_3DigitYearInvalid",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "expiration_date"
+      ],
+      "value": "DBA0101030",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "expiration_date"
+      ]
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestFetchCDLScanData_DAJ_AddressState",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "address_state"
+      ],
+      "value": "DAJCA",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "address_state"
+      ]
+    },
+    "source_expected": "CA",
+    "expected": {
+      "value": "CA",
+      "error": null
+    }
+  },
+  {
+    "source": "TestFetchCDLScanData_DCF_DocumentDiscriminator",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "document_discriminator"
+      ],
+      "value": "DCFABC123",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "document_discriminator"
+      ]
+    },
+    "source_expected": "ABC123",
+    "expected": {
+      "value": "ABC123",
+      "error": null
+    }
+  },
+  {
+    "source": "TestFetchCDLScanData_DCG_Country",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "country"
+      ],
+      "value": "DCGUSA",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "country"
+      ]
+    },
+    "source_expected": "USA",
+    "expected": {
+      "value": "USA",
+      "error": null
+    }
+  },
+  {
+    "source": "TestProcessRegexInput_IsMatchInvalidRegex",
+    "kind": "processRegexInput",
+    "args": {
+      "input": "$.helper.regex.ismatch(\"[invalid\",\"test\")"
+    },
+    "expected": {
+      "value": {
+        "matched": false,
+        "matches": null
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestRemoveSpacesFunction_NestedParentheses",
+    "kind": "removeSpacesFunction",
+    "args": {
+      "selector": "removespaces(hello (world))",
+      "selectorParts": null
+    },
+    "source_expected": "hello(world)",
+    "expected": {
+      "value": "hello(world)",
+      "error": null
+    }
+  },
+  {
+    "source": "TestRemoveSpacesFunction_QuotedCommaInTwoArgs",
+    "kind": "removeSpacesFunction",
+    "args": {
+      "selector": "removespaces([{\"name\":\"hello, world\",\"age\":\"25\"}],[\"name\"])",
+      "selectorParts": null
+    },
+    "expected": {
+      "value": [
+        {
+          "age": "25",
+          "name": "hello,world"
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_NestedSelectorPattern",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.wf-uuid.dataset.($.wf-uuid.dataset.inner)",
+      "selectorID": "$.wf-uuid.dataset.($.wf-uuid.dataset.inner)",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchDataSets": [
+        {
+          "returns": [
+            "resolved_key",
+            null
+          ]
+        },
+        {
+          "returns": [
+            "final_value",
+            null
+          ]
+        }
+      ],
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "source_expected": "final_value",
+    "expected": {
+      "value": "final_value",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_NodeSelector3Parts",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.wf-uuid.node.node-uuid",
+      "selectorID": "$.wf-uuid.node.node-uuid",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "source_expected": "node-uuid",
+    "expected": {
+      "value": "node-uuid",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_NodeSelectorWithPayload",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.wf-uuid.node.node-uuid.skip.response.status",
+      "selectorID": "$.wf-uuid.node.node-uuid.skip.response.status",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchNodeExecution": {
+        "returns": [
+          {
+            "ExecutionPayload": "{\"response\":{\"status\":\"ok\",\"data\":{\"id\":42}}}"
+          },
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "source_expected": "ok",
+    "expected": {
+      "value": "ok",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_HelperRemoveSpacesWithNestedSelector",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.helper.removespaces($.wf-uuid.dataset.mykey)",
+      "selectorID": "$.helper.removespaces($.wf-uuid.dataset.mykey)",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchDataSets": {
+        "returns": [
+          "hello world",
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "source_expected": "helloworld",
+    "expected": {
+      "value": "helloworld",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_HelperToUpperWithNestedSelector",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.helper.toUpper($.wf-uuid.dataset.mykey)",
+      "selectorID": "$.helper.toUpper($.wf-uuid.dataset.mykey)",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchDataSets": {
+        "returns": [
+          "hello",
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "source_expected": "HELLO",
+    "expected": {
+      "value": "HELLO",
+      "error": null
+    }
+  },
+  {
+    "source": "TestDeepDiveData_MapKeyWithIndexNotArray",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "items[0]"
+      ],
+      "value": {
+        "items": "not-an-array"
+      }
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestUpdateSelectorValue_PrependWithAlphaNumeric",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "items[0]"
+      ],
+      "value": {
+        "items": "not-an-array"
+      }
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestUpdateSelectorValue_PrependWithAlphaNumericPAd",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "",
+      "selectorID": "",
+      "selectorValue": "ABCD123",
+      "updation": "prepend(0)",
+      "workflowExecutionID": 0,
+      "workflowExecutionUUID": ""
+    },
+    "source_expected": "ABCD0000000123",
+    "expected": {
+      "value": "ABCD0000000123",
+      "error": null
+    }
+  },
+  {
+    "source": "TestUpdateSelectorValue_PrependAlreadyLong",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "",
+      "selectorID": "",
+      "selectorValue": "ABCD1234567890",
+      "updation": "prepend(0)",
+      "workflowExecutionID": 0,
+      "workflowExecutionUUID": ""
+    },
+    "source_expected": "ABCD1234567890",
+    "expected": {
+      "value": "ABCD1234567890",
+      "error": null
+    }
+  },
+  {
+    "source": "TestUpdateSelectorValue_PrependNoMatch",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "",
+      "selectorID": "",
+      "selectorValue": "12345",
+      "updation": "prepend(0)",
+      "workflowExecutionID": 0,
+      "workflowExecutionUUID": ""
+    },
+    "source_expected": "12345",
+    "expected": {
+      "value": "12345",
+      "error": null
+    }
+  },
+  {
+    "source": "TestUpdateSelectorValue_PrependSliceAlphaNumeric",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "",
+      "selectorID": "",
+      "selectorValue": [
+        "AB12",
+        "CD345"
+      ],
+      "updation": "prepend(0)",
+      "workflowExecutionID": 0,
+      "workflowExecutionUUID": ""
+    },
+    "source_expected": [
+      "AB0000000012",
+      "CD0000000345"
+    ],
+    "expected": {
+      "value": [
+        "AB0000000012",
+        "CD0000000345"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestRemoveSpacesFunction_GoMapStringFallback",
+    "kind": "removeSpacesFunction",
+    "args": {
+      "selector": "removespaces(map[name:hello world age:25], [\"name\"])",
+      "selectorParts": null
+    },
+    "expected": {
+      "value": [
+        {
+          "age": "25",
+          "name": "helloworld"
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_RegexIsMatchWithNestedSelector",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.helper.regex.ismatch(\"^[0-9]+$\",$.wf-uuid.workflowExecution.status)",
+      "selectorID": "$.helper.regex.ismatch(\"^[0-9]+$\",$.wf-uuid.workflowExecution.status)",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchWorkflowExecutionData": {
+        "returns": [
+          "12345",
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_RegexGetMatchesWithNestedSelector",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.helper.regex.getmatches(\"[0-9]+\",$.wf-uuid.workflowExecution.data)",
+      "selectorID": "$.helper.regex.getmatches(\"[0-9]+\",$.wf-uuid.workflowExecution.data)",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchWorkflowExecutionData": {
+        "returns": [
+          "abc123def456",
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": [
+        "123",
+        "456"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveLaneSelector_FullPath",
+    "kind": "resolveLaneSelector",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.lane($.workflow_execution($.wf-uuid.workflowExecution.exec_uuid)).lane_name",
+      "selectorID": "$.lane($.workflow_execution($.wf-uuid.workflowExecution.exec_uuid)).lane_name",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "ExtractLanePropertiesByLaneCode": {
+        "returns": [
+          "Lane 1",
+          null
+        ]
+      },
+      "FetchWorkflowExecutionData": {
+        "returns": [
+          "LC001",
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": "Lane 1",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveLaneSelector_MissingSelectorIDCloseParen",
+    "kind": "resolveLaneSelector",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.lane(inner)",
+      "selectorID": "$.lane(inner",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveLaneSelector_NoLastDot",
+    "kind": "resolveLaneSelector",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.lane(inner)",
+      "selectorID": "nodot",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_DatasetNestedMapNavigation",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.wf-uuid.dataset.mydata.items[0].name",
+      "selectorID": "$.wf-uuid.dataset.mydata.items[0].name",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchDataSets": {
+        "returns": [
+          "{\"items\":[{\"name\":\"alice\"},{\"name\":\"bob\"}]}",
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "source_expected": "alice",
+    "expected": {
+      "value": "alice",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveSelectors_ConfigurationDevice6PartsNew",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.configuration.site.area-uuid.lane-uuid.device-uuid.config-key",
+      "selectorID": "$.configuration.site.area-uuid.lane-uuid.device-uuid.config-key",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "device-config-value",
+          null
+        ]
+      }
+    },
+    "source_expected": "device-config-value",
+    "expected": {
+      "value": "device-config-value",
+      "error": null
+    }
+  },
+  {
+    "source": "TestRemoveSpacesFunction_QuotedCommasInKeys",
+    "kind": "removeSpacesFunction",
+    "args": {
+      "selector": "removespaces([{\"name\":\"hello, world\",\"city\":\"new york\"}],[\"name\",\"city\"])",
+      "selectorParts": null
+    },
+    "source_expected": [
+      {
+        "name": "hello,world",
+        "city": "newyork"
+      }
+    ],
+    "expected": {
+      "value": [
+        {
+          "city": "newyork",
+          "name": "hello,world"
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestExtractKeyAndIndex_KeyWithZeroIndex",
+    "kind": "extractKeyAndIndex",
+    "args": {
+      "input": "items[0]"
+    },
+    "source_expected": {
+      "key": "items",
+      "index": 0
+    },
+    "expected": {
+      "value": {
+        "index": 0,
+        "key": "items"
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestExtractKeyAndIndex_OnlyIndex",
+    "kind": "extractKeyAndIndex",
+    "args": {
+      "input": "[3]"
+    },
+    "source_expected": {
+      "key": "",
+      "index": 3
+    },
+    "expected": {
+      "value": {
+        "index": 3,
+        "key": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessMap_PrefillValue_ResolvesToTrue",
+    "kind": "processMap",
+    "args": {
+      "dataMap": {
+        "prefill_value": {
+          "selector_id": "wf-uuid.dataset.terms_accepted",
+          "value": "$.wf-uuid.dataset.terms_accepted"
+        }
+      },
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchDataSets": {
+        "returns": [
+          true,
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "prefill_value": {
+          "selector_id": "wf-uuid.dataset.terms_accepted",
+          "value": "true"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessMap_PrefillValue_ResolvesToFalse",
+    "kind": "processMap",
+    "args": {
+      "dataMap": {
+        "prefill_value": {
+          "selector_id": "wf-uuid.dataset.terms_accepted",
+          "value": "$.wf-uuid.dataset.terms_accepted"
+        }
+      },
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchDataSets": {
+        "returns": [
+          false,
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "prefill_value": {
+          "selector_id": "wf-uuid.dataset.terms_accepted",
+          "value": "false"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessMap_PrefillValue_InvalidSelector_ValueEmpty",
+    "kind": "processMap",
+    "args": {
+      "dataMap": {
+        "prefill_value": {
+          "selector_id": "invalid",
+          "value": "$.invalid"
+        }
+      },
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "expected": {
+      "value": {
+        "prefill_value": {
+          "selector_id": "invalid",
+          "value": ""
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveDeviceSelector_Success",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "$.device(printer).device_url",
+      "selectorID": "$.device(printer).device_url",
+      "workflowExecutionID": 7,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "repo": {
+      "FetchDeviceURLForLane": {
+        "returns": [
+          "http://laneA:8080",
+          null
+        ]
+      },
+      "FetchWorkflowExecutionData": {
+        "returns": [
+          "LANE-A",
+          null
+        ]
+      }
+    },
+    "source_expected": "http://laneA:8080",
+    "expected": {
+      "value": "http://laneA:8080",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveDeviceSelector_DisallowedColumn",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "$.device(printer).encrypted_password",
+      "selectorID": "$.device(printer).encrypted_password",
+      "workflowExecutionID": 7,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveDeviceSelector_NoDevice",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "$.device(printer).device_url",
+      "selectorID": "$.device(printer).device_url",
+      "workflowExecutionID": 7,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "repo": {
+      "FetchDeviceURLForLane": {
+        "returns": [
+          "",
+          {
+            "dto": "RecordNotFound"
+          }
+        ]
+      },
+      "FetchWorkflowExecutionData": {
+        "returns": [
+          "LANE-A",
+          null
+        ]
+      }
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestResolveDeviceSelector_BadFormat",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "$.device().device_url",
+      "selectorID": "$.device().device_url",
+      "workflowExecutionID": 7,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  }
+]
