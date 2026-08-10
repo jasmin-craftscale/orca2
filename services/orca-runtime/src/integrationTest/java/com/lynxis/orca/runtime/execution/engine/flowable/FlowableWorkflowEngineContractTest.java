@@ -88,7 +88,11 @@ class FlowableWorkflowEngineContractTest extends WorkflowEngineContract {
 
         assertThatExceptionOfType(WorkflowEngineException.class)
                 .isThrownBy(() -> engine().deploy(definitionRunningStraightThrough(overLong), SITE_A))
-                .withMessageContaining("C2");
+                // The message names the defect (the engine silently falling back to an
+                // opaque id) and the remedy (shorten the key) — assert on the substance,
+                // not on a wording detail.
+                .withMessageContaining("64 chars")
+                .withMessageContaining("shorten the key");
     }
 
     /** P2: a key that does not match the BPMN process id deploys something nobody can start — fail loud. */
