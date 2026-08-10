@@ -323,7 +323,16 @@ class FlowableAdoptionIT {
 		jdbc.update("""
 				IF OBJECT_ID(N'work_item_audit', 'U') IS NOT NULL DROP TABLE work_item_audit;
 				IF OBJECT_ID(N'work_item', 'U') IS NOT NULL DROP TABLE work_item;
-				IF OBJECT_ID(N'user_activity', 'U') IS NOT NULL DROP TABLE user_activity;""");
+				IF OBJECT_ID(N'user_activity', 'U') IS NOT NULL DROP TABLE user_activity;
+				IF OBJECT_ID(N'visit_dataset', 'U') IS NOT NULL DROP TABLE visit_dataset;
+				IF OBJECT_ID(N'node_execution', 'U') IS NOT NULL DROP TABLE node_execution;
+				IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_execution_process_instance'
+					AND object_id = OBJECT_ID(N'execution'))
+					DROP INDEX ux_execution_process_instance ON execution;
+				IF COL_LENGTH(N'execution', 'workflow_id') IS NOT NULL
+					ALTER TABLE execution DROP COLUMN workflow_id;
+				IF COL_LENGTH(N'execution', 'definition_version') IS NOT NULL
+					ALTER TABLE execution DROP COLUMN definition_version;""");
 		jdbc.update("DELETE FROM flyway_schema_history WHERE TRY_CAST(version AS INT) >= 110");
 	}
 

@@ -67,8 +67,15 @@ final class FreshMssql {
 	 * runs — into the {@code runtime} schema of {@code db}.
 	 */
 	static void migrateRuntime(ProvisionedDatabase db) {
+		// Flyway must run as a login whose DEFAULT_SCHEMA is `runtime`: the
+		// committed migrations use unqualified DDL that lands in the login's
+		// default schema, and an administrative login defaults to dbo — the
+		// tables would exist, in the wrong place, and the engine would report
+		// them missing. Same discipline as the shared PlatformDatabase fixture.
+		ProvisionedDatabase migrator = serviceLogin(db, "orca_flyway_" + db.name(),
+				"Fly!Way2026_" + db.name().hashCode(), "runtime");
 		Flyway.configure()
-				.dataSource(db.jdbcUrl(), db.username(), db.password())
+				.dataSource(migrator.jdbcUrl(), migrator.username(), migrator.password())
 				.schemas("runtime")
 				.defaultSchema("runtime")
 				.createSchemas(false)
