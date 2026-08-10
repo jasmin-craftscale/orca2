@@ -109,7 +109,7 @@ written.
 ./gradlew build              # compile, unit tests, build checks — the whole tree
 ./gradlew test               # unit tests only
 ./gradlew check              # unit tests + the ten build checks
-./gradlew integrationTest    # 138 property tests, real SQL Server, real Flowable
+./gradlew integrationTest    # 224 property tests, real SQL Server, real Flowable
 ```
 
 ⚠️ **`test` runs almost none of what proves this repository.** `integrationTest`

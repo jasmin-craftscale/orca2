@@ -151,6 +151,26 @@ Reading it makes a port far more accurate than guessing.
    one event.
 4. **Never modify anything there.** Read-only, always.
 
+**The sheets that exist today.** Rule 1 is only usable if you can answer *"is there one
+for my area?"* without hunting — so here they are. If your work is in this table, **the
+sheet is the authority and you may not need the old source at all.** If it is not, that
+is rule 2: ask for an extraction before you rely on what you read.
+
+| Sheet | Covers |
+|---|---|
+| `partner-event-api-from-1x.md` | The partner endpoints and the inbound dispatch queue — **seven inversions** |
+| `read-models-notify-from-1x.md` | The operator grids and the notification hub — **six inversions** |
+| `custom-entities-from-1x.md` | Customer-declared entities and runtime schema changes — **six inversions**, and the old system calls these *reference data* |
+| `work-items-schema-from-1x.md` | The clerk workflow — **three inversions**, built in Phase 3 |
+| `core-config-schema-from-1x.md` | The configuration tables — **§0's eleven translation rules govern every further port** |
+| `lpr-wire-format-from-1x.md` | What the camera puts on the wire, and three behaviours 2.0 refuses to copy |
+| `device-host-outbound-from-1x.md` | Barrier, print and IO commands — **§3 is an open question, not a design** |
+| `entitlement-catalog-from-1x.md` · `device-catalog-completion-from-1x.md` | Exact seed rows, script-extracted |
+
+⚠️ **Read the sheet's §0 first, always.** It is the list of things the old system does
+that we deliberately do not repeat, and in every stream plan it is the acceptance
+criteria — not background reading.
+
 ⚠️ **Read `../Lynxis-Gate/CLAUDE.md` before searching that repository.** It
 documents the conventions that make its code readable — soft-delete flags on nearly
 every table, singular table names, dual integer/UUID keys. Search without it and
@@ -172,6 +192,22 @@ Some things are not an implementer's call. Surface them; do not settle them.
 > this programme has been filling a gap with something plausible and writing it up
 > as settled. Every one read well; every one was wrong. **A gap reported is worth
 > more than a gap filled.**
+
+**Three real examples, from writing the stream plans you are about to read.** They are
+here because the rule above reads like boilerplate until it has a scar attached, and
+all three were caught only on a second pass:
+
+| What was written | Why it was wrong |
+|---|---|
+| *"Stream 2 does not build email or push"* | The architecture assigns **both** to the `notify` module, in its module table and again in its diagram. The claim came from reading only the endpoint table, which publishes neither |
+| *"Stream 3 delivers the last of `orca-core`"* | Core also owns workflow and screen design, which no stream builds. "Backend complete" quietly became "core complete" |
+| Stream 1's endpoint list | Omitted the event-type registry — which is not an extra but a **dependency**: without it, an unknown event type and a misconfigured connector cannot be told apart, and telling them apart is the defect that work exists to fix |
+
+**All three share one cause.** The architecture has two views of the same thing — the
+**endpoint tables** and the **module table with its schema map** — both authoritative,
+and they do not agree. Scoping from one and not the other produced three wrong answers
+in a row. **Cross-read both before you conclude that something is or is not yours to
+build**, and when they disagree, report it rather than picking the reading you prefer.
 
 ## 7 · What a good change looks like
 
@@ -198,8 +234,11 @@ Four developers work in parallel on separate streams.
 
 - **Stay inside your stream's scope.** It is named in your stream plan, and the
   module walls are enforced by a build check.
-- **Use your assigned migration number range.** Two people both writing `V118` is a
-  conflict that only appears when someone's database refuses to start.
+- **Use your assigned migration number range** — `docs/MIGRATION_NUMBER_RANGES.md`.
+  Two people both writing `V118` is a conflict that only appears when someone's
+  database refuses to start. That document also tells you what to do when somebody
+  else's lower-numbered migration lands after yours, which will happen and which the
+  committed Flyway settings refuse by default.
 - **Branch per feature**, merged to `develop`, then to `main`.
 - **If you need something from another stream's area, ask** rather than reaching in.
 

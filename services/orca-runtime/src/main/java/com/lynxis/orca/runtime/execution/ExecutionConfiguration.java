@@ -54,6 +54,24 @@ public class ExecutionConfiguration {
 	}
 
 	@Bean
+	public com.lynxis.orca.runtime.execution.persistence.VisitReadRepository visitReadRepository(
+			ScopeSeam seam) {
+		return new com.lynxis.orca.runtime.execution.persistence.VisitReadRepository(seam);
+	}
+
+	/**
+	 * The read side of visits. It takes {@code AdmissionRepository} only for the lane
+	 * identifier mapping, which that class already owns in both directions — the seam
+	 * permits no joins, so the alternative would be a second copy of that lookup.
+	 */
+	@Bean
+	public com.lynxis.orca.runtime.execution.domain.VisitQueryService visitQueryService(
+			com.lynxis.orca.runtime.execution.persistence.VisitReadRepository visits,
+			AdmissionRepository lanes, ProcessEngineGateway engine) {
+		return new com.lynxis.orca.runtime.execution.domain.VisitQueryService(visits, lanes, engine);
+	}
+
+	@Bean
 	public AdmissionRepository admissionRepository(ScopeSeam seam) {
 		return new AdmissionRepository(seam);
 	}
@@ -165,6 +183,23 @@ public class ExecutionConfiguration {
 			com.lynxis.orca.runtime.workitem.api.OperatorIdentity operatorIdentity,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
 		return new LaneResetController(laneReset, operatorIdentity, siteExternalId);
+	}
+
+	/**
+	 * ⚠️ A controller taking a configuration value needs a {@code @Bean} method like
+	 * this one, even though it is annotated {@code @RestController}.
+	 *
+	 * <p>Component scanning finds the class and then cannot construct it: the site
+	 * identifier is a {@code String}, and there is no bean of type {@code String} to
+	 * autowire. Declaring it here replaces the scanned definition with one that
+	 * supplies the value — and the failure without it is not a compile error but a
+	 * context that will not start, which every suite in this service reports at once.
+	 */
+	@Bean
+	public com.lynxis.orca.runtime.execution.api.VisitController visitController(
+			com.lynxis.orca.runtime.execution.domain.VisitQueryService visits,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.runtime.execution.api.VisitController(visits, siteExternalId);
 	}
 
 	// --- the SLA timer ------------------------------------------------------

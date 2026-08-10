@@ -25,7 +25,31 @@ public enum ExecutionErrorCode implements ErrorCode {
 	 * and becomes {@code DEAD} there — bounded and visible through the buffer's
 	 * diagnostics rather than nowhere.
 	 */
-	LANE_NOT_AT_THIS_INSTALLATION("LANE_NOT_AT_THIS_INSTALLATION", 422);
+	LANE_NOT_AT_THIS_INSTALLATION("LANE_NOT_AT_THIS_INSTALLATION", 422),
+
+	/**
+	 * No such visit under this installation's scope.
+	 *
+	 * <p>404 rather than 403, and the wording is deliberate: a visit belonging to
+	 * another site and a visit that never existed are the same answer here. The scope
+	 * seam makes them genuinely indistinguishable to this service — it applies the
+	 * site condition before the filter, so the row is not read and then refused, it is
+	 * never selected. Saying "exists, but not yours" would require reading it first,
+	 * which is the thing the seam exists to prevent.
+	 */
+	VISIT_NOT_FOUND("VISIT_NOT_FOUND", 404),
+
+	/**
+	 * The {@code status} filter names something this platform does not have.
+	 *
+	 * <p>Refused rather than ignored, and 422 rather than 400 for the same reason the
+	 * work-item team filter is: the request is well-formed and the route is right, and
+	 * what is wrong is the value. Filtering on it anyway would answer {@code 200} with
+	 * an empty list — and an empty list reads as "no visits at this gate" rather than
+	 * "you asked for a status that does not exist", which is the reading that sends
+	 * somebody looking for a fault in the gate.
+	 */
+	VISIT_FILTER_UNKNOWN_STATUS("VISIT_FILTER_UNKNOWN_STATUS", 422);
 
 	private final String code;
 	private final int httpStatus;

@@ -987,6 +987,15 @@ stateDiagram-v2
 
 *🔒 marks a contract fixed by the other side (§D2). Everything else is ours to design.*
 
+⚠️ *The partner event rows below carried 🔒 until 10 Aug 2026 and should not have.
+§D2 fixes **four** contracts and the partner event API is not among them; §B2 names
+it explicitly as designed for the target. It was frozen only because fielded
+customers had integration code written against it, and the "new clients only"
+decision of 6 August removed that. **The surface is ours to design — narrowly:**
+register **U2** says keep the route shape and the envelope, and fix the two things
+that are genuinely poor (the nine indistinguishable `400`s, and the lost-race
+response, which is register item **6** — take the `409`).*
+
 | Method | Path | Summary | Consumer |
 |---|---|---|---|
 | GET | `/visits` | Search visits by lane, site, status, time window | ORCA Console |
@@ -1022,13 +1031,13 @@ stateDiagram-v2
 | POST | `/grids/completed-work` | Completed work over a window | ORCA Console |
 | POST | `/grids/export` | Start a streamed export of any grid | ORCA Console |
 | GET | `/exports/{id}` | Export job status and download | ORCA Console |
-| 🔒 POST | `/submit` | Submit one partner event | Customer TOS/WMS |
-| 🔒 POST | `/submit/bulk` | Submit a batch — returns **207** with a per-item result array, deliberately not the standard envelope | Customer TOS/WMS |
-| 🔒 POST | `/callback` | An external system answers a waiting workflow | Customer TOS/WMS |
-| 🔒 GET | `/latest` · `/list` | Query submitted events; `list` supports paging and sorting | Customer TOS/WMS |
-| 🔒 GET | `/next` | **Atomically claim** the highest-priority pending event — for partners that pull rather than receive | Customer TOS/WMS |
-| 🔒 GET · PATCH | `/{uuid}` · `/{uuid}/status` | Inspect an event; report completion or failure | Customer TOS/WMS |
-| 🔒 POST | `/{uuid}/replay` | Replay an event, optionally overriding its data | Customer TOS/WMS |
+| POST | `/submit` | Submit one partner event | Customer TOS/WMS |
+| POST | `/submit/bulk` | Submit a batch — returns **207** with a per-item result array, deliberately not the standard envelope | Customer TOS/WMS |
+| POST | `/callback` | An external system answers a waiting workflow | Customer TOS/WMS |
+| GET | `/latest` · `/list` | Query submitted events; `list` supports paging and sorting | Customer TOS/WMS |
+| GET | `/next` | **Atomically claim** the highest-priority pending event — for partners that pull rather than receive | Customer TOS/WMS |
+| GET · PATCH | `/{uuid}` · `/{uuid}/status` | Inspect an event; report completion or failure | Customer TOS/WMS |
+| POST | `/{uuid}/replay` | Replay an event, optionally overriding its data | Customer TOS/WMS |
 | GET · POST | `/connectors` · PATCH `/connectors/{id}` | **Connector configuration lives here, not in core** : endpoint, auth mode, certificate trust | ORCA Console (builder) |
 | GET · PUT | `/connectors/{id}/response-routing` | Which status code takes which branch, including the catch-all | ORCA Console (builder) |
 | POST | `/connectors/{id}/test` | Invoke a connector with sample data, without a visit | ORCA Console (builder) |

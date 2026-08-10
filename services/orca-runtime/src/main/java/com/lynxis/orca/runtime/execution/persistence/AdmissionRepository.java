@@ -69,6 +69,43 @@ public class AdmissionRepository {
 	}
 
 	/**
+	 * {@link #laneExternalIdOf} for many lanes at once.
+	 *
+	 * <p><strong>This exists because calling the single-lane version per row is a
+	 * defect, not an inefficiency.</strong> A page of visits resolved one lane at a
+	 * time issues one query per row — measured at 67 lookups for 66 rows before this
+	 * method existed — and the cost scales with the page, so the largest permitted
+	 * page is also the worst case. Lanes at a site are few and repeat heavily across
+	 * rows, so the distinct set is small however long the page is.
+	 *
+	 * @return the mapping for the lanes this site actually publishes. A lane absent
+	 *         from the result is one this scope cannot see; the caller decides what
+	 *         that means rather than being handed a guess
+	 */
+	public java.util.Map<Long, String> laneExternalIdsOf(java.util.Collection<Long> laneIds) {
+		java.util.Set<Long> distinct = new java.util.LinkedHashSet<>(laneIds);
+		if (distinct.isEmpty()) {
+			return java.util.Map.of();
+		}
+
+		// The placeholders are generated from the collection's size and the values go
+		// through as parameters — the caller's data never becomes SQL text.
+		StringBuilder in = new StringBuilder("lane_id IN (");
+		for (int i = 0; i < distinct.size(); i++) {
+			in.append(i == 0 ? "?" : ", ?");
+		}
+		in.append(')');
+
+		java.util.Map<Long, String> byId = new java.util.HashMap<>();
+		seam.select(ScopedSelect.from("core.topology_lane")
+						.columns("lane_id", "lane_external_id")
+						.scopedBy(SCOPE_COLUMN)
+						.where(in.toString(), distinct.toArray()),
+				(rs, row) -> byId.put(rs.getLong("lane_id"), rs.getString("lane_external_id")));
+		return byId;
+	}
+
+	/**
 	 * Creates the lane's admission row if it has none. Idempotent.
 	 *
 	 * <p>Called in its own transaction, before the one that admits. It is the row

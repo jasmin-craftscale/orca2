@@ -51,6 +51,14 @@ tags:
     description: |
       Lane operations. Reset aborts the running visit, fails its open work
       items and terminates its process instance — one transaction (§C2).
+  - name: visits
+    description: |
+      Reading what happened to a truck (§C2).
+
+      The direct read of `execution`'s own rows — deliberately NOT a grid
+      projection. A grid is pre-built by `readmodel` so it never fans out across
+      modules; this is the owning module answering about its own table, which is
+      why it can carry the engine's live position and a projection cannot.
   - name: presence
     description: |
       Operator presence (§C2). The open activity row is the current status —
@@ -127,6 +135,117 @@ paths:
             operator surface that shows one is Phase 2, so until then the event
             stays in edge's buffer, is retried, and becomes `DEAD` there — which
             is visible through the buffer's own diagnostics.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/visits:
+    get:
+      tags: [visits]
+      operationId: listVisits
+      summary: Search visits by lane, status and time window
+      description: |
+        **A bounded read of a traffic-growing table.** `execution` grows with every
+        truck, so this never serves the whole table: `limit` is capped and a window
+        that is not given defaults to recent activity rather than to all of history.
+        Ordered newest first — the operational question is almost always about the
+        last few minutes.
+
+        Scope is the installation's own site, taken from configuration and never
+        from the request.
+      parameters:
+        - name: laneExternalId
+          in: query
+          schema:
+            type: string
+            maxLength: 64
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, COMPLETED, MANUAL, FAILED]
+        - name: plate
+          in: query
+          description: Exact match. The plate as the camera's most confident hypothesis recorded it.
+          schema:
+            type: string
+            maxLength: 32
+        - name: since
+          in: query
+          description: |
+            Visits started at or after this instant. Absent means the last 24 hours —
+            **a default window rather than no window**, because an unpredicated read
+            of a traffic-growing table is how a support query becomes a table scan.
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 100
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: The matching visits, newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisitListEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: |
+            `status` is not one this platform has.
+
+            Refused rather than ignored. A mistyped status that filtered nothing
+            would answer `200` with an empty list — which reads as "no visits at
+            this gate" and is the same silent-narrowing mistake the work-item
+            team filter refuses.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/visits/{visitExternalId}:
+    get:
+      tags: [visits]
+      operationId: getVisit
+      summary: One visit, with the step it is currently parked at
+      description: |
+        The stored row **plus the engine's live position** for a running visit —
+        which is the reason this route exists on the owning module rather than on a
+        projection. `currentActivity` is read from the engine at request time and is
+        absent once the visit is no longer running.
+      parameters:
+        - name: visitExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: The visit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisitEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such visit under this installation's scope
           content:
             application/json:
               schema:
@@ -605,6 +724,56 @@ components:
         correctedEventData:
           type: string
           description: What the operator submitted at completion.
+
+    Visit:
+      type: object
+      properties:
+        externalId:
+          type: string
+        laneExternalId:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, COMPLETED, MANUAL, FAILED]
+          description: |
+            * `ACTIVE` — running, or parked at a step waiting for a person.
+            * `COMPLETED` — the truck was released.
+            * `MANUAL` — the process ended at a step a person resolved.
+            * `FAILED` — the lane was reset under it.
+        plate:
+          type: string
+          description: The camera's most confident hypothesis, not its first. Absent when the event carried none.
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        currentActivity:
+          type: string
+          description: |
+            The step the engine is parked at, read live at request time. Absent when
+            the visit is no longer running — a finished visit has no current step,
+            and reporting its last one as current would be a lie a support engineer
+            would act on.
+
+    VisitEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Visit"
+
+    VisitListEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Visit"
 
     WorkItemAuditEntry:
       type: object

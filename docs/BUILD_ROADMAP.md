@@ -94,7 +94,11 @@ Three mechanisms. Without them, "parallel" means "merge conflicts".
 - **Migration numbers are assigned in ranges before anyone starts.** Streams 1 and
   2 both add migrations to the `runtime` schema, which is at `V117` today. Two
   developers both writing `V118` is a conflict that surfaces only when somebody's
-  database refuses to start. Agree the ranges up front.
+  database refuses to start. **The ranges are assigned —
+  `docs/MIGRATION_NUMBER_RANGES.md`; use yours.** Read its §3 as well as its table:
+  ranges stop two people writing the same number, and they *guarantee* migrations
+  arriving out of order, which the committed Flyway settings refuse. The fix is a
+  developer-machine one and it is written down there.
 - **One branch per feature**, merged to `develop`, then to `main`.
 
 ### Stream 1 · Partner event API and integration breadth
@@ -106,10 +110,13 @@ out (SOAP, four authentication modes, per-connector certificate trust).
 - **Owns:** `orca-runtime` → the `integration` module
 - **Reference:** `docs/partner-event-api-from-1x.md` — **already written**, and its
   §0 lists seven defects in the old system that must not be repeated
+- **Plan:** ✅ **`docs/stream-1-plan.md`** — work packages, the two-developer split,
+  the verification table, and six questions that must be surfaced rather than settled
 - **Can assume:** the engine, admission, connectors and the outbox all exist
 - **Shape:** splits naturally in two — the partner-facing API surface and its
-  dispatch queue, then the connector breadth. Large enough for two people, and the
-  seam between those halves is where to divide them
+  dispatch queue (Track A), then the connector breadth (Track B). Large enough for
+  two people; they share exactly one work package, and after it they touch different
+  files
 
 ### Stream 2 · Read models and notifications
 
@@ -117,8 +124,13 @@ The two `orca-runtime` modules that are currently empty packages: pre-built
 projections for the operator grids, and the hub that pushes live updates.
 
 - **Owns:** `orca-runtime` → `readmodel` and `notify`
-- **Reference:** needs extracting — the old system's grids and its live-update path
+- **Reference:** ✅ **`docs/read-models-notify-from-1x.md`**, and its §0 lists six
+  defects in the old system that must not be repeated. ⚠️ **Read its §5 before
+  planning this stream** — how a live update reaches a browser across more than one
+  instance with no broker is unsettled, and it is the decision the stream turns on
 - **Can assume:** visits and work items exist and are stable
+- **Plan:** ✅ **`docs/stream-2-plan.md`** — sequenced so the open question in its §5
+  blocks only the last work package
 - ⚠️ **`readmodel` is the one sanctioned exception to the module walls.** The lane
   monitor legitimately needs running visits *beside* queued work items — two
   modules' data. It must not read another module's tables; it maintains its own
@@ -126,7 +138,9 @@ projections for the operator grids, and the hub that pushes live updates.
   breaks the architecture rather than extending it
 - **Note:** a build check currently asserts these two modules are **empty**. It has
   to be updated in the same commit that fills them; that is deliberate, so nobody
-  fills them by accident
+  fills them by accident. **This is also the stream that makes the module wall
+  unconditional** — once both modules are populated, `allowEmptyShould(true)` comes
+  out of `ModuleWallRule`
 
 ### Stream 3 · Core remainder
 
@@ -134,7 +148,11 @@ Custom entities with the single controlled executor of their schema changes, and
 the licence-verification module.
 
 - **Owns:** `orca-core`
-- **Reference:** needs extracting for custom entities
+- **Reference:** ✅ **`docs/custom-entities-from-1x.md`** — six inversions, and a
+  vocabulary warning: the old system calls this *reference data*, so searching it for
+  "custom entity" finds nothing
+- **Plan:** ✅ **`docs/stream-3-plan.md`** — the DDL executor's design is written and
+  handed over before it is built, so the other four work packages are never blocked
 - **Can assume:** nothing from the other streams — **this is the cleanly parallel
   one.** Different service, different schema, no shared files
 - ⚠️ **The DDL executor is security-shaped.** It is the one component allowed to
@@ -207,8 +225,9 @@ Not forgotten. Each is a decision with a reason.
 
 Not when the code is written. When:
 
-1. `./gradlew check integrationTest` is green — **222 integration tests** today, and
-   yours have joined them.
+1. `./gradlew check integrationTest` is green — **224 integration tests** today, and
+   yours have joined them. Run it with `--rerun-tasks`: without it Gradle answers
+   from cache in under a second and reports a success it did not run.
 2. **Every guarantee you touched has a property test** that would fail if the
    guarantee broke. Not a test that exercises the path — one that states the claim.
 3. **The services start and a truck goes through the gate.** A green suite does not

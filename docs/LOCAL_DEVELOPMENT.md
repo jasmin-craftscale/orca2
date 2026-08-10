@@ -224,15 +224,36 @@ The system being replaced is cloned as a sibling of this repository at
 ../Lynxis-Gate. It is READ-ONLY — never modify anything there. Before you search
 it, read ../Lynxis-Gate/CLAUDE.md, or you will misread what you find.
 
+Two standing rules. They look like housekeeping and they are not — they are the
+two things that have gone wrong most often here:
+
+  1. WHERE A docs/*-from-1x.md SHEET COVERS YOUR AREA, THE SHEET IS THE AUTHORITY,
+     not the old source. Each one carries both what the old system does and the
+     defects deliberately NOT carried forward, and its §0 is the acceptance
+     criteria for the work. DEVELOPER_ONBOARDING.md §5 lists every sheet that
+     exists. If none covers your work, say so and ask for one — do not port from
+     source.
+  2. WHEN SOMETHING IS UNSPECIFIED, REPORT THE GAP — never fill it with something
+     plausible. Your stream plan's §5 lists the questions already known to be
+     open; anything you find beyond them goes into your report unresolved. A gap
+     reported is worth more than a gap filled.
+
 When you have read both, tell me in your own words: what ORCA does, the two
-properties that shape every decision in it, the rules you must never break, and
-which parts of the system do NOT exist yet. Then wait for my task — do not start
-work.
+properties that shape every decision in it, the rules you must never break, which
+parts of the system do NOT exist yet, and what you will do when you hit something
+the documents do not answer. Then wait for my task — do not start work.
 ```
 
 **The comprehension check at the end is deliberate.** If the answer is vague, the
 onboarding did not land and anything built on it will be wrong. Re-point it at the
 document rather than proceeding.
+
+⚠️ **The last clause of that check — *what you will do when you hit something the
+documents do not answer* — is the one worth reading carefully.** An assistant that
+answers "I'll make a reasonable assumption and note it" has not understood the
+rule, and that is precisely the failure this programme has repeated most. The
+answer you want is that it stops and reports. Correct it before you give it work,
+not after.
 
 For a specific piece of work you will also be given a **stream plan** — a
 self-contained document naming what to build, what not to touch, and how to prove
