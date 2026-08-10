@@ -22,6 +22,7 @@ dependencies {
 	testImplementation(project(":platform:scope"))
 	testImplementation(project(":platform:idempotency"))
 	testImplementation(project(":platform:web"))
+	testImplementation(project(":platform:secrets"))
 	testImplementation(project(":services:orca-core"))
 	testImplementation(project(":services:orca-runtime"))
 	testImplementation(project(":services:orca-edge"))

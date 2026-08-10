@@ -13,7 +13,7 @@ plugins {
 
 rootProject.name = "orca"
 
-// Twelve modules. The root is an aggregator and holds no code.
+// Thirteen modules. The root is an aggregator and holds no code.
 // `services/orca-media` is a README placeholder and is deliberately NOT a Gradle module.
 
 include(
@@ -22,6 +22,7 @@ include(
 	":platform:scope",
 	":platform:idempotency",
 	":platform:web",
+	":platform:secrets",
 )
 
 include(

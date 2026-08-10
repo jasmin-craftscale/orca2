@@ -7,7 +7,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 /**
  * Every ORCA class, imported once.
  *
- * <p>These rules have to see all twelve modules at the same time — a service
+ * <p>These rules have to see all thirteen modules at the same time — a service
  * reaching into another service's internals is invisible from inside either one.
  * That need is why the checks run from the monorepo: in seven repositories they
  * would degrade into a code-review convention, the same weak protection used by
@@ -32,7 +32,7 @@ final class OrcaClasses {
 	 * fixture may name a domain concept. The rules govern what ships.
 	 *
 	 * <p>Jars are <strong>not</strong> excluded, and that is load-bearing rather
-	 * than incidental. In a Gradle multi-project the other eleven modules arrive on
+	 * than incidental. In a Gradle multi-project the other twelve modules arrive on
 	 * this classpath as jars; excluding them would leave the importer with almost
 	 * nothing, and every rule below would pass by seeing no classes at all. That is
 	 * the failure mode {@link ImportedSetGuard} exists to catch.

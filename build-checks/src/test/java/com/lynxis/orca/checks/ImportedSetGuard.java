@@ -30,7 +30,7 @@ class ImportedSetGuard {
 	}
 
 	@Test
-	@DisplayName("every one of the twelve modules is on the classpath the rules see")
+	@DisplayName("every one of the thirteen modules is on the classpath the rules see")
 	void everyModuleIsVisible() {
 		List<String> mustBePresent = List.of(
 				"com.lynxis.orca.platform.outbox.OutboxRelay",
@@ -38,6 +38,7 @@ class ImportedSetGuard {
 				"com.lynxis.orca.platform.scope.JdbcScopeSeam",
 				"com.lynxis.orca.platform.idempotency.JdbcIdempotencyStore",
 				"com.lynxis.orca.platform.web.ApiResponse",
+				"com.lynxis.orca.platform.secrets.SecretBox",
 				"com.lynxis.orca.core.CoreApplication",
 				"com.lynxis.orca.runtime.RuntimeApplication",
 				"com.lynxis.orca.edge.EdgeApplication",

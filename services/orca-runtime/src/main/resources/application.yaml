@@ -229,6 +229,11 @@ spring:
       on-profile: local
 
 orca:
+  secrets:
+    current-key-id: local-dev-v1
+    keys:
+      local-dev-v1: b3JjYS1sb2NhbC1zZWNyZXQta2V5LWZpeHR1cmUtMzI=
+
   web:
     # Makes the contract and Swagger UI readable without a token, so a developer
     # with docker compose running can open them. Off everywhere else: whether an

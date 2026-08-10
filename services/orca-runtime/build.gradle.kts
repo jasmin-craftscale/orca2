@@ -7,6 +7,8 @@
 // Gradle Kotlin build script `java` resolves to the JavaPluginExtension accessor
 // and shadows the package — which fails with "Unresolved reference 'util'".
 import java.util.zip.ZipFile
+import java.util.Base64
+import java.security.SecureRandom
 
 plugins {
 	java
@@ -176,6 +178,7 @@ dependencies {
 	implementation(project(":platform:outbox")) // records facts transactionally before publishing them
 	implementation(project(":platform:lease")) // one `service_lease` per service schema
 	implementation(project(":platform:idempotency")) // recorded keys, not assumed ones
+	implementation(project(":platform:secrets")) // versioned recoverable values, sealed outside the owning schema
 
 	// --- Spring Boot ----------------------------------------------------
 	implementation(libs.spring.boot.starter.webmvc)
@@ -214,4 +217,15 @@ dependencies {
 	"integrationTestImplementation"(testFixtures(project(":platform:outbox")))
 	"integrationTestImplementation"(libs.spring.boot.starter.test)
 	"integrationTestImplementation"(libs.spring.boot.starter.webmvc.test)
+}
+
+// Runtime refuses to start without a valid secret key ring. Give the real-context
+// integration suite a fresh key for each task execution instead of committing a
+// second production-acceptable fixture.
+tasks.named<Test>("integrationTest") {
+	val generated = Base64.getEncoder().encodeToString(
+		ByteArray(32).also { SecureRandom().nextBytes(it) }
+	)
+	systemProperty("orca.secrets.current-key-id", "integration-test-v1")
+	systemProperty("orca.secrets.keys[integration-test-v1]", generated)
 }
