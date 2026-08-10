@@ -158,12 +158,36 @@ copy would be the moment to make it**, and leave the decision there.
 Rows already written carry both conventions. **There is no migration and no
 backfill.** The product ships to new clients only, and this is development data.
 
-**Wipe and rebuild your local database** so you are not reading pre-fix rows:
+**Wipe and rebuild your local database** so you are not reading pre-fix rows.
+
+⚠️ **`bootstrap` does not create tables.** It creates the seven schemas, seven logins
+and their grants — that is all. **Each service migrates its own schema when it
+boots**, which is what bootstrap's own closing line means by *"every service can now
+migrate its own schema on startup"*. So a freshly wiped database has no tables until
+the services have started once, and `demo-seed` writes to **both** `core.*` (a dozen
+tables) and `runtime.connector_config` / `connector_route`, as two different logins.
+Seed before booting and it fails twice, once per schema.
+
+**The order, in full:**
 
 ```bash
-cd deploy && docker compose down -v && docker compose up -d && docker compose run --rm bootstrap
-docker compose run --rm demo-seed
+cd deploy
+docker compose down -v            # drops the volume — this is what makes it a rebuild
+docker compose up -d
+docker compose run --rm bootstrap # schemas, logins, grants. NO tables.
 ```
+
+Now boot the services once so they migrate (§0.4 has the commands and the port
+notes — core first, it publishes the views the other two wait for). Once all three
+answer `200` on `/actuator/health`:
+
+```bash
+cd deploy && docker compose run --rm demo-seed
+```
+
+⚠️ *Corrected 10 Aug 2026: this section previously ran `demo-seed` straight after
+`bootstrap`, which cannot work. It was written without being executed against a wiped
+volume — the machine it was written on already had a migrated database.*
 
 ⚠️ **Say in your report that any existing dev database holds mixed-zone history**, so
 nobody debugs a two-hour gap that predates the fix.
