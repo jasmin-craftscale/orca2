@@ -80,4 +80,34 @@ public class VisitDatasetRepository {
 				.set("written_at", new java.sql.Timestamp(System.currentTimeMillis()))
 				.where("execution_id = ? AND data_key = ?", executionId, key));
 	}
+
+	/** The visit's key for an engine instance, or empty when none correlates. */
+	public Optional<Long> visitIdByEngineInstance(String processInstanceId) {
+		return seam.select(ScopedSelect.from("execution")
+						.columns("execution_id")
+						.scopedBy(SCOPE_COLUMN)
+						.where("process_instance_id = ?", processInstanceId),
+				(rs, row) -> rs.getLong("execution_id"))
+				.stream().findFirst();
+	}
+
+	/** The visit's key for its stable external identifier. */
+	public Optional<Long> visitIdByExternalId(String externalId) {
+		return seam.select(ScopedSelect.from("execution")
+						.columns("execution_id")
+						.scopedBy(SCOPE_COLUMN)
+						.where("external_id = ?", externalId),
+				(rs, row) -> rs.getLong("execution_id"))
+				.stream().findFirst();
+	}
+
+	/** The engine instance a visit runs as, for the step-payload lookaside. */
+	public Optional<String> engineInstanceByExternalId(String externalId) {
+		return seam.select(ScopedSelect.from("execution")
+						.columns("process_instance_id")
+						.scopedBy(SCOPE_COLUMN)
+						.where("external_id = ?", externalId),
+				(rs, row) -> rs.getString("process_instance_id"))
+				.stream().findFirst();
+	}
 }

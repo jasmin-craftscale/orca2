@@ -27,6 +27,10 @@ import com.lynxis.orca.runtime.execution.domain.ProcessEngineGateway;
 import com.lynxis.orca.runtime.execution.domain.VisitCompletion;
 import com.lynxis.orca.runtime.execution.domain.VisitCompletionListener;
 import com.lynxis.orca.runtime.execution.domain.WorkItemCreationListener;
+import com.lynxis.orca.runtime.execution.engine.flowable.NodeExecutionRecorder;
+import com.lynxis.orca.runtime.execution.internal.VisitDataWriter;
+import com.lynxis.orca.runtime.execution.persistence.NodeExecutionTraceRepository;
+import com.lynxis.orca.runtime.execution.persistence.VisitDatasetRepository;
 import com.lynxis.orca.runtime.execution.persistence.AdmissionRepository;
 import com.lynxis.orca.runtime.execution.persistence.EdgeDeviceCommandClient;
 import com.lynxis.orca.runtime.execution.persistence.FlowableManualSteps;
@@ -144,10 +148,35 @@ public class ExecutionConfiguration {
 	public EngineConfigurationConfigurer<SpringProcessEngineConfiguration> engineListenerRegistrar(
 			VisitCompletion completion, WorkItemIntake workItemIntake,
 			AdmissionRepository admissionRepository,
+			NodeExecutionTraceRepository nodeExecutionTrace,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
 		return configuration -> configuration.setEventListeners(List.of(
 				new VisitCompletionListener(completion),
-				new WorkItemCreationListener(workItemIntake, admissionRepository, siteExternalId)));
+				new WorkItemCreationListener(workItemIntake, admissionRepository, siteExternalId),
+				new NodeExecutionRecorder(nodeExecutionTrace, siteExternalId)));
+	}
+
+	// --- The step trace and the visit dataset --------------------------------
+	//
+	// What a visit's process actually did, and what it knows: written in the
+	// engine's own transaction by the recorder above and by the delegates through
+	// the data sink, read back by the selector data provider when a connector
+	// body or a condition asks.
+
+	@Bean
+	public NodeExecutionTraceRepository nodeExecutionTraceRepository(ScopeSeam seam) {
+		return new NodeExecutionTraceRepository(seam);
+	}
+
+	@Bean
+	public VisitDatasetRepository visitDatasetRepository(ScopeSeam seam) {
+		return new VisitDatasetRepository(seam);
+	}
+
+	@Bean
+	public VisitDataWriter visitDataWriter(VisitDatasetRepository dataset,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new VisitDataWriter(dataset, siteExternalId);
 	}
 
 	// --- the manual-input wait state ----------------------------------------

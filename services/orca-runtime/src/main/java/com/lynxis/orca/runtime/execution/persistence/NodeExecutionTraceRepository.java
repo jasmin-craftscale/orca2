@@ -73,4 +73,72 @@ public class NodeExecutionTraceRepository {
 				(rs, row) -> rs.getString("execution_payload"))
 				.stream().findFirst();
 	}
+
+	/**
+	 * Records a step that the engine reports as completed — one row carrying both
+	 * timestamps and whatever payload the producing delegate left aside. The trace
+	 * is written on completion because that is the moment the engine's event is
+	 * certain; a step that never completes is the engine's story to tell, not a
+	 * phantom row here.
+	 */
+	public long recordCompletedStep(String externalId, String siteExternalId, long executionId,
+			String nodeUuid, String nodeType, String payloadJson, Instant at) {
+		return seam.insertReturningKey(ScopedInsert.into("node_execution")
+				.scopedBy(SCOPE_COLUMN)
+				.value("external_id", externalId)
+				.value(SCOPE_COLUMN, siteExternalId)
+				.value("execution_id", executionId)
+				.value("node_uuid", nodeUuid)
+				.value("node_type", nodeType)
+				.value("status", "COMPLETED")
+				.value("execution_payload", payloadJson)
+				.value("entered_at", Timestamp.from(at))
+				.value("completed_at", Timestamp.from(at)), "node_execution_id");
+	}
+
+	/** The visit a process instance belongs to: its key and lane, for trace and child rows. */
+	public Optional<VisitRef> visitByEngineInstance(String processInstanceId) {
+		return seam.select(ScopedSelect.from("execution")
+						.columns("execution_id", "lane_id")
+						.scopedBy(SCOPE_COLUMN)
+						.where("process_instance_id = ?", processInstanceId),
+				(rs, row) -> new VisitRef(rs.getLong("execution_id"), rs.getLong("lane_id")))
+				.stream().findFirst();
+	}
+
+	/**
+	 * A child execution: a subflow or iterator instance, sharing its parent's lane
+	 * and pointing at it. Roots are admission's to create, never this method's.
+	 */
+	public long insertChildExecution(String externalId, String siteExternalId, long laneId,
+			long parentExecutionId, Long workflowId, Integer definitionVersion,
+			String processInstanceId) {
+		return seam.insertReturningKey(ScopedInsert.into("execution")
+				.scopedBy(SCOPE_COLUMN)
+				.value("external_id", externalId)
+				.value(SCOPE_COLUMN, siteExternalId)
+				.value("lane_id", laneId)
+				.value("parent_execution_id", parentExecutionId)
+				.value("status", "ACTIVE")
+				.value("workflow_id", workflowId)
+				.value("definition_version", definitionVersion)
+				.value("process_instance_id", processInstanceId), "execution_id");
+	}
+
+	/**
+	 * Closes a CHILD execution when its engine instance ends. Root visits are
+	 * deliberately excluded by the predicate — closing those, with the outbound
+	 * fact that closing implies, belongs to the visit-completion path.
+	 */
+	public int completeChildByEngineInstance(String processInstanceId, Instant at) {
+		return seam.update(ScopedUpdate.table("execution")
+				.scopedBy(SCOPE_COLUMN)
+				.set("status", "COMPLETED")
+				.set("completed_at", Timestamp.from(at))
+				.where("process_instance_id = ? AND parent_execution_id IS NOT NULL", processInstanceId));
+	}
+
+	/** The visit's key and lane. */
+	public record VisitRef(long executionId, long laneId) {
+	}
 }
