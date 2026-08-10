@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:orca="http://lynxis.com/orca"
+             targetNamespace="http://lynxis.com/orca">
+  <process id="proc_31656" name="PLT Out-Gate Portal" isExecutable="true">
+    <startEvent id="n_d60a065e-5f9c-4584-9355-2237b84b63b5" name="START"/>
+    <receiveTask id="n_b65129a9-c719-42ce-a5a5-a45fbb334c5e" name="Portal OCR Scan" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_e42a8a0d-7b83-4dc3-bf42-f57e7563c712" name="Portal RFID Read" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_7c7fdf9b-f956-48a1-8b93-c27a4c517df7" name="Change OCR Classification Done" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_e7d04493-2255-49a8-a6e0-dd17d43b178e" name="Change OCR Classification Reject Truck" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_801bba37-99c6-478c-98d6-4d97169662ac" name="Damage Inspection Complete" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_bff819b7-d649-4fbf-b8fa-c94c03a6008e" name="Damage Inspection Reclassify" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_c18767d3-2f42-405f-b30c-1a726070e77f" name="Damage Inspection Reject Truck" orca:kind="wait" orca:topic="orca-device-input"/>
+    <userTask id="n_7487f896-6d0b-4f3b-886f-c8527a0cc4d0" name="Change OCR Classification" flowable:candidateGroups="gate-clerk"/>
+    <userTask id="n_fe5ae854-2fff-4629-ae17-a94b524cd717" name="Damage Inspection" flowable:candidateGroups="gate-clerk"/>
+    <endEvent id="n_dd699ff3-44ab-4239-ac24-6628a836b0b7" name="Passage Complete"/>
+    <endEvent id="n_291070de-364f-4b9e-aad1-6ad8ba2dc9d0" name="Passage Ended - OCR Reject"/>
+    <task id="n_5778a045-b44e-49d7-a579-b3553f61c8d5" name="Close Change OCR Classification (Done)"/>
+    <task id="n_af953612-ae22-4915-b5be-1f619b30676b" name="Close Change OCR Classification (Reject Truck)"/>
+    <task id="n_31c0a076-59f5-4203-ac84-c2d6f90353f4" name="Close Damage Inspection (Complete)"/>
+    <task id="n_8c48efa9-8c2a-4b18-a3b2-8c9693faa4e6" name="Close Damage Inspection (Reclassify)"/>
+    <task id="n_2bd5e25d-bcae-4b57-bab3-d4ea01f1f4e8" name="Close Damage Inspection (Reject Truck)"/>
+    <exclusiveGateway id="n_4fcc43c4-bbfe-4436-836b-0b8d93301159" name="Container on passage?" default="flow_22"/>
+    <exclusiveGateway id="n_0c870e08-15c5-4974-9588-b68b4a3b4a79" name="OCR confidence acceptable?" default="flow_24"/>
+    <sequenceFlow id="flow_1" sourceRef="n_d60a065e-5f9c-4584-9355-2237b84b63b5" targetRef="n_b65129a9-c719-42ce-a5a5-a45fbb334c5e"/>
+    <sequenceFlow id="flow_2" sourceRef="n_b65129a9-c719-42ce-a5a5-a45fbb334c5e" targetRef="n_e42a8a0d-7b83-4dc3-bf42-f57e7563c712"/>
+    <sequenceFlow id="flow_3" sourceRef="n_e42a8a0d-7b83-4dc3-bf42-f57e7563c712" targetRef="n_0c870e08-15c5-4974-9588-b68b4a3b4a79"/>
+    <sequenceFlow id="flow_4" sourceRef="n_7c7fdf9b-f956-48a1-8b93-c27a4c517df7" targetRef="n_5778a045-b44e-49d7-a579-b3553f61c8d5"/>
+    <sequenceFlow id="flow_5" sourceRef="n_e7d04493-2255-49a8-a6e0-dd17d43b178e" targetRef="n_af953612-ae22-4915-b5be-1f619b30676b"/>
+    <sequenceFlow id="flow_6" sourceRef="n_801bba37-99c6-478c-98d6-4d97169662ac" targetRef="n_31c0a076-59f5-4203-ac84-c2d6f90353f4"/>
+    <sequenceFlow id="flow_7" sourceRef="n_bff819b7-d649-4fbf-b8fa-c94c03a6008e" targetRef="n_8c48efa9-8c2a-4b18-a3b2-8c9693faa4e6"/>
+    <sequenceFlow id="flow_8" sourceRef="n_c18767d3-2f42-405f-b30c-1a726070e77f" targetRef="n_2bd5e25d-bcae-4b57-bab3-d4ea01f1f4e8"/>
+    <exclusiveGateway id="gw_manual_1" name="outcome of Change OCR Classification" default="flow_11"/>
+    <sequenceFlow id="flow_9" sourceRef="n_7487f896-6d0b-4f3b-886f-c8527a0cc4d0" targetRef="gw_manual_1"/>
+    <sequenceFlow id="flow_10" sourceRef="gw_manual_1" targetRef="n_7c7fdf9b-f956-48a1-8b93-c27a4c517df7">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaManualOutcome == &apos;7c7fdf9b-f956-48a1-8b93-c27a4c517df7&apos;}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_11" sourceRef="gw_manual_1" targetRef="n_e7d04493-2255-49a8-a6e0-dd17d43b178e"/>
+    <exclusiveGateway id="gw_manual_2" name="outcome of Damage Inspection" default="flow_15"/>
+    <sequenceFlow id="flow_12" sourceRef="n_fe5ae854-2fff-4629-ae17-a94b524cd717" targetRef="gw_manual_2"/>
+    <sequenceFlow id="flow_13" sourceRef="gw_manual_2" targetRef="n_801bba37-99c6-478c-98d6-4d97169662ac">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaManualOutcome == &apos;801bba37-99c6-478c-98d6-4d97169662ac&apos;}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_14" sourceRef="gw_manual_2" targetRef="n_bff819b7-d649-4fbf-b8fa-c94c03a6008e">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaManualOutcome == &apos;bff819b7-d649-4fbf-b8fa-c94c03a6008e&apos;}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_15" sourceRef="gw_manual_2" targetRef="n_c18767d3-2f42-405f-b30c-1a726070e77f"/>
+    <sequenceFlow id="flow_16" sourceRef="n_5778a045-b44e-49d7-a579-b3553f61c8d5" targetRef="n_4fcc43c4-bbfe-4436-836b-0b8d93301159"/>
+    <sequenceFlow id="flow_17" sourceRef="n_af953612-ae22-4915-b5be-1f619b30676b" targetRef="n_291070de-364f-4b9e-aad1-6ad8ba2dc9d0"/>
+    <sequenceFlow id="flow_18" sourceRef="n_31c0a076-59f5-4203-ac84-c2d6f90353f4" targetRef="n_dd699ff3-44ab-4239-ac24-6628a836b0b7"/>
+    <sequenceFlow id="flow_19" sourceRef="n_8c48efa9-8c2a-4b18-a3b2-8c9693faa4e6" targetRef="n_dd699ff3-44ab-4239-ac24-6628a836b0b7"/>
+    <sequenceFlow id="flow_20" sourceRef="n_2bd5e25d-bcae-4b57-bab3-d4ea01f1f4e8" targetRef="n_dd699ff3-44ab-4239-ac24-6628a836b0b7"/>
+    <sequenceFlow id="flow_21" sourceRef="n_4fcc43c4-bbfe-4436-836b-0b8d93301159" targetRef="n_fe5ae854-2fff-4629-ae17-a94b524cd717">
+      <extensionElements>
+        <orca:field var="v_workflow_dataset_plt_ocr_classification" selector="$.workflow.dataset.plt_ocr_classification"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orca:grp((orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_ocr_classification&apos;, null), &apos;One Container&apos;) or orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_ocr_classification&apos;, null), &apos;Two Containers&apos;)))}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_22" sourceRef="n_4fcc43c4-bbfe-4436-836b-0b8d93301159" targetRef="n_dd699ff3-44ab-4239-ac24-6628a836b0b7"/>
+    <sequenceFlow id="flow_23" sourceRef="n_0c870e08-15c5-4974-9588-b68b4a3b4a79" targetRef="n_7487f896-6d0b-4f3b-886f-c8527a0cc4d0">
+      <extensionElements>
+        <orca:field var="v_workflow_dataset_plt_ocr_container_confidence" selector="$.workflow.dataset.plt_ocr_container_confidence"/>
+        <orca:field var="v_workflow_dataset_plt_ocr_chassis_confidence" selector="$.workflow.dataset.plt_ocr_chassis_confidence"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orca:grp((orca:cmp(&apos;is lesser than&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_ocr_container_confidence&apos;, null), &apos;0.85&apos;) or orca:cmp(&apos;is lesser than&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_ocr_chassis_confidence&apos;, null), &apos;0.85&apos;)))}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_24" sourceRef="n_0c870e08-15c5-4974-9588-b68b4a3b4a79" targetRef="n_4fcc43c4-bbfe-4436-836b-0b8d93301159"/>
+  </process>
+</definitions>
