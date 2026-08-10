@@ -20,6 +20,39 @@ developers own those right now.
 Every command below was executed against this repository. Run them in order. **If
 any step does not produce what is described, stop and report it — do not continue.**
 
+### ⚠️ 0.0 · The one rule that governs this whole section
+
+**The integration suite and the running services use the SAME `runtime` schema on the
+SAME database. They must never run at the same time.**
+
+The suites migrate `runtime`, create visits and let the real engine advance them. A
+running `orca-runtime` has an active Flowable async executor that will pick up *the
+suite's* jobs, and a running `orca-edge` polls its buffer. The result is a failing
+test that looks like a real defect and is not — the 8-lane admission property is the
+one that fails first, with an unexplained `500`.
+
+**So:**
+
+| Doing this | Services must be |
+|---|---|
+| `./gradlew check integrationTest` (§0.9, §7.1) | **STOPPED** |
+| Live endpoint checks (§0.7, §0.8, §7.3) | **RUNNING** |
+
+Stop them with:
+
+```bash
+for p in 18081 18082 18083; do
+  PID=$(lsof -nP -iTCP:$p -sTCP:LISTEN -t 2>/dev/null | head -1)
+  [ -n "$PID" ] && kill $PID
+done
+```
+
+⚠️ **This bit the first run of this plan.** The baseline was executed with services
+left running from an earlier session and reported `failures=1` on a suite that is
+green. Check for stray listeners before you trust any red result:
+`lsof -nP -iTCP -sTCP:LISTEN | grep -E ":(1808[1-6]|9100)\b"` must be empty before
+you run the suite.
+
 ### 0.1 · Prerequisites
 
 - Docker running
@@ -179,6 +212,21 @@ q "UPDATE runtime.connector_route SET http_status = 200 WHERE connector_name = '
 ### 0.9 · Establish the baseline — before you change anything
 
 ⚠️ **You cannot claim you ended green unless you know you started green.**
+
+⚠️ **STOP THE SERVICES FIRST — see §0.0.** The suite and a running `orca-runtime`
+share the `runtime` schema, and a red result from a contaminated run is
+indistinguishable from a real defect:
+
+```bash
+for p in 18081 18082 18083; do
+  PID=$(lsof -nP -iTCP:$p -sTCP:LISTEN -t 2>/dev/null | head -1)
+  [ -n "$PID" ] && kill $PID
+done
+sleep 8
+lsof -nP -iTCP -sTCP:LISTEN | grep -E ":(1808[1-6]|9100)\b"   # must print NOTHING
+```
+
+Then:
 
 ```bash
 git checkout -b feature/lane-operations
@@ -913,6 +961,11 @@ clause. Test 2 must fail. Restore it.
     publishes. A repository test that migrates only `runtime` cannot resolve lane
     identifiers; test that at the service layer with a stub. `VisitReadPropertiesIT`'s
     `CountingLanes` shows how.
+11. **A running service poisons the integration suite.** They share the `runtime`
+    schema, and the running engine's async executor picks up the suite's jobs. The
+    symptom is the 8-lane admission property failing with an unexplained `500` —
+    which reads exactly like a real concurrency defect. **Stop the services before
+    any suite run.** §0.0.
 
 ---
 
@@ -920,8 +973,13 @@ clause. Test 2 must fail. Restore it.
 
 ### 7.1 Build and tests
 
+⚠️ **Stop the services before this section and restart them before §7.3** — §0.0. A
+suite run against running services fails on the 8-lane admission property for reasons
+that have nothing to do with your change.
+
 | # | Command | Expected |
 |---|---|---|
+| 0 | `lsof -nP -iTCP -sTCP:LISTEN \| grep -E ":(1808[1-6]\|9100)\b"` | Prints nothing. If it does not, stop them first |
 | 1 | `./gradlew build` | `BUILD SUCCESSFUL` from a clean tree |
 | 2 | `./gradlew check integrationTest --rerun-tasks` | `BUILD SUCCESSFUL`. **`--rerun-tasks` is not optional** (trap 9) |
 
