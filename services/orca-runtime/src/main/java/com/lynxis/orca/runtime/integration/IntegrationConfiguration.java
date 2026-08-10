@@ -5,11 +5,17 @@ import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.lynxis.orca.platform.scope.ScopeSeam;
+import com.lynxis.orca.platform.secrets.SecretBox;
 import com.lynxis.orca.runtime.integration.api.ConnectorPort;
+import com.lynxis.orca.runtime.integration.domain.ConnectorCredentialService;
+import com.lynxis.orca.runtime.integration.domain.CredentialRewrapService;
 import com.lynxis.orca.runtime.integration.domain.RestConnector;
 import com.lynxis.orca.runtime.integration.persistence.ConnectorConfigRepository;
+import com.lynxis.orca.runtime.integration.persistence.ConnectorCredentialRepository;
 
 import io.github.resilience4j.bulkhead.BulkheadConfig;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
@@ -33,6 +39,30 @@ public class IntegrationConfiguration {
 	@Bean
 	public ConnectorConfigRepository connectorConfigRepository(ScopeSeam seam) {
 		return new ConnectorConfigRepository(seam);
+	}
+
+	@Bean
+	public ConnectorCredentialRepository connectorCredentialRepository(ScopeSeam seam,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new ConnectorCredentialRepository(seam, siteExternalId);
+	}
+
+	@Bean
+	public ConnectorCredentialService connectorCredentialService(
+			ConnectorCredentialRepository repository, SecretBox secretBox,
+			PlatformTransactionManager transactionManager,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new ConnectorCredentialService(repository, secretBox,
+				new TransactionTemplate(transactionManager), siteExternalId);
+	}
+
+	@Bean
+	public CredentialRewrapService credentialRewrapService(
+			ConnectorCredentialRepository repository, SecretBox secretBox,
+			PlatformTransactionManager transactionManager,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new CredentialRewrapService(repository, secretBox,
+				new TransactionTemplate(transactionManager), siteExternalId);
 	}
 
 	/**
@@ -84,8 +114,10 @@ public class IntegrationConfiguration {
 
 	@Bean
 	public ConnectorPort connectorPort(ConnectorConfigRepository configuration,
+			ConnectorCredentialRepository credentials, SecretBox secretBox,
 			CircuitBreakerRegistry breakers, BulkheadRegistry bulkheads,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
-		return new RestConnector(configuration, breakers, bulkheads, siteExternalId);
+		return new RestConnector(configuration, credentials, secretBox,
+				breakers, bulkheads, siteExternalId);
 	}
 }
