@@ -272,7 +272,7 @@ Everything durable is in three places: this document (the map), the phase report
 
 1. **`./gradlew check integrationTest` without `--rerun-tasks` prints `BUILD SUCCESSFUL` from cache for a suite it never ran.** Then count the tests from the result XML — a filtered-out suite also passes.
 2. **Stop the services before any suite run.** They share the `runtime` schema. `docs/LOCAL_DEVELOPMENT.md` §6.1 is the authoritative copy.
-3. **Check which branch you are on immediately before `git add`.** When another agent works in the same checkout there is one `HEAD`, and it moves under you. Three commits landed on a feature branch this session because of that; `git push origin main` answering `Everything up-to-date` is what caught it.
+3. ⚠️ **Run `git rev-parse --abbrev-ref HEAD` in the same command as `git add`. Every time.** When another agent works in the same checkout there is one `HEAD`, and it moves under you the moment that agent runs `git checkout -b`. **This happened twice in one session — the second time within the hour of it being written down here**, so treat it as a mechanical step and not a thing to remember. The tell is `git push origin main` answering `Everything up-to-date` when you know you just committed.
 4. **A running service holds the old classes.** Restart it before verifying a change against it, or you are testing the previous build. This has now caught out two sessions.
 
 ⚠️ **This document has been wrong four times in one session** — finished work marked unstarted, two stale test counts, and stale frozen-contract markers, all corrected here. **It is the least-verified document in the repository and the first one every session reads.** When something here matters, check it against the code before acting on it.
