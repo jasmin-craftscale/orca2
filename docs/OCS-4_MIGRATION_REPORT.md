@@ -72,8 +72,16 @@ at the edge, and the write-behind guard.
   decision** — both are unbound ports that refuse by name until it is made.
 - **`SiteCatalog`'s configuration half**: lanes, devices, aliases belong to
   other schemas; the port refuses by name until the adapter lands.
-- **`EncryptedConnectorCredentials` stays UNWIRED** (ruling 5): ported verbatim,
-  constructed by nothing. `NoAuthCredentials` is the wired default.
+- **`EncryptedConnectorCredentials` was removed** (not ported forward): the
+  `develop` merge brought a `platform/secrets` primitive (`SecretBox` — versioned
+  AES-256-GCM seal/open on a managed, rotating key ring) that supersedes the
+  bespoke cipher this class carried, so wiring it as-is would reinvent a platform
+  boundary. `NoAuthCredentials` is the wired default; opening customer credentials
+  is deferred to `platform/secrets` when the auth path is wired. The one thing the
+  deleted class uniquely knew — reading **legacy 1.x Go ciphertext** (GCM + the
+  unauthenticated CFB fallback) — is preserved in git history should a one-time
+  import reader ever be needed; whether credentials are re-sealed into ORCA's
+  format on import, or read legacy in place, is the open decision that governs it.
 - **`sequence_counter`**: superseded by the platform's transactional outbox.
 - **OCS-4's JPA/RLS tests** (`EntityLifecycleTest`, tenancy canaries): the seam,
   not RLS, is this repository's isolation mechanism (ruling D1);
