@@ -7,9 +7,9 @@ import java.util.Map;
 
 /**
  * The one translation from an ORCA payload to the engine variables a compiled definition
- * reads: {@code outcome} becomes the routing key the manual-outcome gateway branches on
- * (D-2026-08-07-1), and every other entry is mirrored under the {@code v_*} name the
- * {@code orca:field} sidecar bound (I8).
+ * reads: {@code outcome} becomes the routing key the manual-outcome gateway branches on,
+ * and every other entry is mirrored under the {@code v_*} name the {@code orca:field}
+ * sidecar bound.
  *
  * <p>It lives on the public surface because more than one caller resumes a visit — the
  * mirror feeds device events through {@link ExecutionFacade}, a clerk finishes a work item

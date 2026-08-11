@@ -22,6 +22,16 @@ final class FlowableTestEngines {
      *     test into a pool-wait test that proves nothing
      */
     static ProcessEngine boot(String databasePrefix, String login, String password, int maxConnections) {
+        return bootWithDatabase(databasePrefix, login, password, maxConnections).engine();
+    }
+
+    /**
+     * Same boot, but the caller also gets the database — as the service login,
+     * default schema {@code runtime} — for the suites that put seam repositories
+     * beside the engine on the very tables the engine's listeners write.
+     */
+    static BootedEngine bootWithDatabase(String databasePrefix, String login, String password,
+            int maxConnections) {
         FreshMssql.ProvisionedDatabase db = FreshMssql.freshRuntimeDatabase(databasePrefix, true);
         FreshMssql.migrateRuntime(db);
 
@@ -53,7 +63,11 @@ final class FlowableTestEngines {
         impl.setDisableIdmEngine(true);
         impl.setDisableEventRegistry(true);
 
-        return configuration.buildProcessEngine();
+        return new BootedEngine(configuration.buildProcessEngine(), db);
+    }
+
+    /** The engine and the database it runs on, credentialed as the service login. */
+    record BootedEngine(ProcessEngine engine, FreshMssql.ProvisionedDatabase db) {
     }
 
     /** A one-process BPMN document around {@code body}. */

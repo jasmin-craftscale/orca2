@@ -179,6 +179,58 @@ public class ExecutionConfiguration {
 		return new VisitDataWriter(dataset, siteExternalId);
 	}
 
+	// --- The facade and the selector's live binding ---------------------------
+	//
+	// The engine seam's Flowable adapter, the registry the publish path fills,
+	// the facade that resumes and inspects visits (never starts them — admission
+	// owns the start), and the data provider that binds the ported selector
+	// evaluator to this runtime's tables.
+
+	/** The reversibility seam's adapter — the one bean that hands the engine out engine-free. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.engine.WorkflowEngine workflowEngine(
+			org.flowable.engine.ProcessEngine processEngine) {
+		return new com.lynxis.orca.runtime.execution.engine.flowable.FlowableWorkflowEngine(processEngine);
+	}
+
+	@Bean
+	public com.lynxis.orca.runtime.execution.internal.DefinitionRegistry definitionRegistry() {
+		return new com.lynxis.orca.runtime.execution.internal.DefinitionRegistry();
+	}
+
+	@Bean
+	public com.lynxis.orca.runtime.execution.api.ExecutionFacade executionFacade(
+			com.lynxis.orca.runtime.execution.engine.WorkflowEngine workflowEngine,
+			AdmissionRepository admissionRepository, VisitDataWriter visitDataWriter,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.runtime.execution.internal.RuntimeExecutionFacade(
+				workflowEngine, admissionRepository, visitDataWriter, siteExternalId);
+	}
+
+	@Bean
+	public com.lynxis.orca.runtime.execution.persistence.VisitTreeRepository visitTreeRepository(
+			ScopeSeam seam) {
+		return new com.lynxis.orca.runtime.execution.persistence.VisitTreeRepository(seam);
+	}
+
+	/**
+	 * The selector's live binding. The catalog is deliberately {@code UNBOUND}:
+	 * a configuration question a selector asks before the site-configuration
+	 * adapter lands (it comes with the connector phase) fails by the method's
+	 * name rather than resolving to an empty string that routes a truck.
+	 */
+	@Bean
+	public com.lynxis.orca.runtime.execution.selector.SelectorDataProvider selectorDataProvider(
+			com.lynxis.orca.runtime.execution.persistence.VisitTreeRepository visitTree,
+			NodeExecutionTraceRepository nodeExecutionTrace, VisitDatasetRepository visitDataset,
+			com.lynxis.orca.runtime.execution.internal.DefinitionRegistry definitionRegistry,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.runtime.execution.internal.selector.RuntimeSelectorDataProvider(
+				visitTree, nodeExecutionTrace, visitDataset, definitionRegistry,
+				com.lynxis.orca.runtime.execution.internal.selector.SiteCatalog.UNBOUND,
+				siteExternalId);
+	}
+
 	// --- the manual-input wait state ----------------------------------------
 
 	/**

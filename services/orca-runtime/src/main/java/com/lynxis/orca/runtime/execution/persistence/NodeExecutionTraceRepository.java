@@ -75,6 +75,23 @@ public class NodeExecutionTraceRepository {
 	}
 
 	/**
+	 * The newest step row for this node in this visit — key, payload and entry
+	 * time together, which is the shape the selector's step questions take. A
+	 * visit that re-enters a node answers with the latest pass.
+	 */
+	public Optional<StepRow> latestStep(long executionId, String nodeUuid) {
+		return seam.select(ScopedSelect.from("node_execution")
+						.columns("node_execution_id", "execution_payload", "entered_at")
+						.scopedBy(SCOPE_COLUMN)
+						.where("execution_id = ? AND node_uuid = ?", executionId, nodeUuid)
+						.orderByDescending("node_execution_id")
+						.limit(1),
+				(rs, row) -> new StepRow(rs.getLong("node_execution_id"),
+						rs.getString("execution_payload"), rs.getTimestamp("entered_at")))
+				.stream().findFirst();
+	}
+
+	/**
 	 * Records a step that the engine reports as completed — one row carrying both
 	 * timestamps and whatever payload the producing delegate left aside. The trace
 	 * is written on completion because that is the moment the engine's event is
@@ -140,5 +157,9 @@ public class NodeExecutionTraceRepository {
 
 	/** The visit's key and lane. */
 	public record VisitRef(long executionId, long laneId) {
+	}
+
+	/** A step's newest row, in the shape the selector's step questions take. */
+	public record StepRow(long nodeExecutionId, String executionPayload, Timestamp enteredAt) {
 	}
 }
