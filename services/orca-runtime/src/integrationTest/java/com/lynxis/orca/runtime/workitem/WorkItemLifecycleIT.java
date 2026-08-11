@@ -272,6 +272,67 @@ class WorkItemLifecycleIT {
 		};
 	}
 
+	@Test
+	@Timeout(value = 10, unit = TimeUnit.MINUTES)
+	@DisplayName("take-next on a lane claims its oldest queued item and writes the TAKE audit")
+	void takeNextOnLaneClaimsTheOldestQueuedItem() {
+		String visit = admitAndPark();
+		WorkItemRow queued = queuedItemOf(visit);
+
+		var claimed = controllerFor("op-clerk").takeNextOnLane(LANE).getBody().getData();
+
+		assertThat(claimed.getExternalId()).isEqualTo(queued.externalId());
+		assertThat(claimed.getStatus().getValue()).isEqualTo("IN_PROGRESS");
+		assertThat(claimed.getAssignee()).isEqualTo("op-clerk");
+		assertThat(jdbc.queryForList("SELECT action FROM work_item_audit wa JOIN work_item w "
+						+ "ON w.work_item_id = wa.work_item_id WHERE w.external_id = ? "
+						+ "ORDER BY wa.work_item_audit_id", String.class, queued.externalId()))
+				.containsExactly("TAKE");
+	}
+
+	@Test
+	@Timeout(value = 10, unit = TimeUnit.MINUTES)
+	@DisplayName("two operators taking next on the same lane have exactly one winner")
+	void takeNextOnLaneHasExactlyOneWinner() throws Exception {
+		String visit = admitAndPark();
+		WorkItemRow queued = queuedItemOf(visit);
+		ExecutorService racers = Executors.newFixedThreadPool(2);
+		try {
+			CyclicBarrier line = new CyclicBarrier(2);
+			Future<Boolean> a = racers.submit(claimNext(line, "op-a"));
+			Future<Boolean> b = racers.submit(claimNext(line, "op-b"));
+
+			int winners = (a.get() ? 1 : 0) + (b.get() ? 1 : 0);
+			assertThat(winners)
+					.as("the delegated conditional UPDATE admits exactly one lane claimant")
+					.isEqualTo(1);
+		}
+		finally {
+			racers.shutdownNow();
+		}
+
+		assertThat(itemStatus(queued.externalId())).isEqualTo("IN_PROGRESS");
+		assertThat(count("SELECT COUNT(*) FROM work_item_audit WHERE action = 'TAKE'"))
+				.as("the loser writes no audit row")
+				.isEqualTo(1);
+	}
+
+	private Callable<Boolean> claimNext(CyclicBarrier line, String operator) {
+		return () -> {
+			line.await(10, TimeUnit.SECONDS);
+			try {
+				controllerFor(operator).takeNextOnLane(LANE);
+				return true;
+			}
+			catch (ApiException lost) {
+				assertThat(lost.getErrorCode().code())
+						.as("the loser sees the existing typed claim conflict")
+						.isEqualTo(WorkItemErrorCode.WORK_ITEM_CONFLICT.code());
+				return false;
+			}
+		};
+	}
+
 	// ------------------------------------------------------------------------
 	// Inversions 2 and 3 — complete-and-advance, and the out-of-order refusal
 	// ------------------------------------------------------------------------
@@ -449,6 +510,67 @@ class WorkItemLifecycleIT {
 		inScope(() -> laneReset.reset(LANE, "op-supervisor"));
 	}
 
+	@Test
+	@Timeout(value = 10, unit = TimeUnit.MINUTES)
+	@DisplayName("aborting a visit fails it and its items, then frees the lane")
+	void abortFailsTheVisitAndItsItemsAndFreesTheLane() {
+		String visit = admitAndPark();
+		WorkItemRow item = queuedItemOf(visit);
+
+		LaneResetService.LaneReset aborted =
+				inScope(() -> laneReset.abort(visit, "op-supervisor"));
+
+		assertThat(aborted.visitExternalId()).isEqualTo(visit);
+		assertThat(aborted.failedWorkItems()).isEqualTo(1);
+		assertThat(statusOf(visit)).isEqualTo("FAILED");
+		assertThat(itemStatus(item.externalId())).isEqualTo("FAILED");
+
+		String next = admitAndPark();
+		assertThat(next)
+				.as("the aborted visit released the lane for the next truck")
+				.isNotEqualTo(visit);
+	}
+
+	@Test
+	@Timeout(value = 10, unit = TimeUnit.MINUTES)
+	@DisplayName("aborting a visit that is no longer running changes nothing")
+	void abortingAVisitThatIsNotRunningChangesNothing() {
+		String visit = admitAndPark();
+		WorkItemRow item = queuedItemOf(visit);
+
+		inScope(() -> laneReset.abort(visit, "op-supervisor"));
+		String itemStatusAfterFirstAbort = itemStatus(item.externalId());
+
+		assertThatThrownBy(() -> inScope(() -> laneReset.abort(visit, "op-supervisor")))
+				.isInstanceOf(LaneResetService.VisitNotAbortableException.class);
+		assertThat(itemStatus(item.externalId()))
+				.as("a refused second abort must not mutate the already failed item")
+				.isEqualTo(itemStatusAfterFirstAbort);
+	}
+
+	@Test
+	@Timeout(value = 10, unit = TimeUnit.MINUTES)
+	@DisplayName("aborting a superseded visit does not touch the visit that replaced it")
+	void abortingASupersededVisitDoesNotTouchTheVisitThatReplacedIt() {
+		String superseded = admitAndPark();
+		inScope(() -> laneReset.abort(superseded, "op-supervisor"));
+
+		String replacement = admitAndPark();
+		WorkItemRow replacementItem = queuedItemOf(replacement);
+
+		assertThatThrownBy(() -> inScope(() -> laneReset.abort(superseded, "op-supervisor")))
+				.isInstanceOf(LaneResetService.VisitNotAbortableException.class);
+		assertThat(statusOf(replacement))
+				.as("the replacement visit must still be running")
+				.isEqualTo("ACTIVE");
+		assertThat(itemStatus(replacementItem.externalId()))
+				.as("the replacement visit's work item must remain available")
+				.isEqualTo("QUEUED");
+		assertThat(activeVisitOnLane())
+				.as("the lane must remain bound to the replacement visit")
+				.isEqualTo(replacement);
+	}
+
 	// ------------------------------------------------------------------------
 
 	/** Admits one truck; the downed connector routes it into the wait state. */
@@ -511,6 +633,14 @@ class WorkItemLifecycleIT {
 	private String itemStatus(String itemExternalId) {
 		return jdbc.queryForObject("SELECT status FROM work_item WHERE external_id = ?",
 				String.class, itemExternalId);
+	}
+
+	private String activeVisitOnLane() {
+		return jdbc.queryForObject("SELECT e.external_id FROM execution e "
+				+ "JOIN lane_session ls ON ls.site_external_id = e.site_external_id "
+				+ "AND ls.lane_id = e.lane_id WHERE ls.lane_external_id = ? "
+				+ "AND e.status = 'ACTIVE' AND e.parent_execution_id IS NULL",
+				String.class, LANE);
 	}
 
 	private long count(String sql) {

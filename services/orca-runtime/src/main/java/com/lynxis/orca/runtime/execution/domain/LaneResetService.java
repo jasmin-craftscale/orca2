@@ -82,6 +82,60 @@ public class LaneResetService {
 		});
 	}
 
+	/**
+	 * Abort one named visit.
+	 *
+	 * <p>⚠️ The visit's identity is re-checked <em>under the lane lock</em>, not
+	 * before it. Resolving the lane outside the transaction and then resetting it
+	 * would abort whatever is active by then — and between the two, this visit can
+	 * finish and the next truck be admitted. The caller named a visit; anything else
+	 * being aborted in its place is the failure this guard exists to prevent.
+	 *
+	 * @throws VisitNotAbortableException when the visit is no longer the lane's
+	 *         active visit — including when it has already finished
+	 */
+	public LaneReset abort(String visitExternalId, String actor) {
+		AdmissionRepository.VisitRow visit = repository.visitByExternalId(visitExternalId)
+				.orElseThrow(() -> new VisitNotFoundException(visitExternalId));
+
+		return transactions.execute(status -> {
+			if (!repository.lockLane(visit.laneId())) {
+				throw new VisitNotAbortableException(visitExternalId, "its lane has no session row");
+			}
+
+			Optional<AdmissionRepository.ActiveVisit> active = repository.activeRootOn(visit.laneId());
+			if (active.isEmpty() || !active.get().externalId().equals(visitExternalId)) {
+				throw new VisitNotAbortableException(visitExternalId, "it is no longer running");
+			}
+
+			int failedItems = workItems.failOpenItemsFor(visit.executionId(), actor);
+			if (visit.processInstanceId() != null) {
+				engine.terminate(visit.processInstanceId(), "visit aborted by " + actor);
+			}
+			repository.completeVisit(visit.executionId(), Execution.FAILED);
+			repository.bindLane(visit.laneId(), null, false);
+
+			String laneExternalId = repository.laneExternalIdOf(visit.laneId()).orElse(null);
+			return new LaneReset(laneExternalId, visit.externalId(), failedItems);
+		});
+	}
+
+	/** No such visit under this installation's scope. */
+	public static class VisitNotFoundException extends RuntimeException {
+
+		public VisitNotFoundException(String visitExternalId) {
+			super("No visit '" + visitExternalId + "' exists under this installation's scope.");
+		}
+	}
+
+	/** The named visit is no longer the active visit on its lane. */
+	public static class VisitNotAbortableException extends RuntimeException {
+
+		public VisitNotAbortableException(String visitExternalId, String because) {
+			super("Visit '" + visitExternalId + "' cannot be aborted: " + because + ".");
+		}
+	}
+
 	/** @param visitExternalId the visit that was aborted, or null when the lane was already clear */
 	public record LaneReset(String laneExternalId, String visitExternalId, int failedWorkItems) {
 	}

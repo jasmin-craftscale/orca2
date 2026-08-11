@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.platform.scope.ScopedSelect;
+import com.lynxis.orca.runtime.persistence.Utc;
 
 import lombok.RequiredArgsConstructor;
 
@@ -52,7 +53,7 @@ public class VisitReadRepository {
 	public List<VisitRow> search(Long laneId, String status, String plate, Instant since, int limit) {
 		StringBuilder filter = new StringBuilder(ROOT_ONLY + " AND started_at >= ?");
 		List<Object> parameters = new ArrayList<>();
-		parameters.add(java.sql.Timestamp.from(since));
+		parameters.add(Utc.timestampOf(since));
 
 		// Every caller-supplied value is a parameter. The column names are this
 		// class's own constants, so nothing the caller sends becomes SQL text.
@@ -88,36 +89,39 @@ public class VisitReadRepository {
 				.stream().findFirst();
 	}
 
-	private static final String[] COLUMNS = { "external_id", "lane_id", "status", "plate",
+	/**
+	 * The running root visit on a lane, if there is one.
+	 *
+	 * <p>Root-only and {@code ACTIVE}: a child execution is a step inside a visit
+	 * rather than a visit of its own, and the filtered unique index that enforces one
+	 * active root per lane is what makes "the" visit a meaningful phrase here.
+	 */
+	public Optional<VisitRow> activeOnLane(long laneId) {
+		return seam.select(ScopedSelect.from("execution")
+								.columns(COLUMNS)
+								.scopedBy(SCOPE_COLUMN)
+								.where(ROOT_ONLY + " AND lane_id = ? AND status = 'ACTIVE'", laneId),
+						VisitReadRepository::map)
+				.stream().findFirst();
+	}
+
+	private static final String[] COLUMNS = { "execution_id", "external_id", "lane_id", "status", "plate",
 			"started_at", "completed_at", "process_instance_id" };
 
 	private static VisitRow map(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
 		return new VisitRow(
+				rs.getLong("execution_id"),
 				rs.getString("external_id"),
 				rs.getLong("lane_id"),
 				rs.getString("status"),
 				rs.getString("plate"),
-				instantOf(rs, "started_at"),
-				instantOf(rs, "completed_at"),
+				Utc.instantAt(rs, "started_at"),
+				Utc.instantAt(rs, "completed_at"),
 				rs.getString("process_instance_id"));
 	}
 
-	/**
-	 * Read as UTC explicitly.
-	 *
-	 * <p>{@code getTimestamp(column)} applies the JVM's default zone to a value the
-	 * database wrote in UTC — invisible on a machine already running UTC, and wrong by
-	 * the offset everywhere else. The shared primitives were corrected for exactly this
-	 * and the same rule applies to every timestamp read in the product.
-	 */
-	private static Instant instantOf(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
-		java.sql.Timestamp value = rs.getTimestamp(column,
-				java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")));
-		return value == null ? null : value.toInstant();
-	}
-
 	/** One stored visit, before the lane's external identifier and the live step are added. */
-	public record VisitRow(String externalId, long laneId, String status, String plate,
+	public record VisitRow(long executionId, String externalId, long laneId, String status, String plate,
 			Instant startedAt, Instant completedAt, String processInstanceId) {
 	}
 }

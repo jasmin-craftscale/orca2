@@ -20,10 +20,11 @@ two run independently, in different files.
    definition of done. Enforced, not advisory.
 2. **`docs/CODE_PATTERNS.md`** — the shape a change takes here. §2 (*never check, then
    act*) and §4 (*the shape of a migration*) are the two you will use every day.
-3. **`docs/MIGRATION_NUMBER_RANGES.md`** — **your band is `V118–V137` in the `runtime`
-   schema.** Read §3 as well as the table: another stream's lower-numbered migration
-   will land after yours, and the committed Flyway settings refuse it by default. That
-   is expected and the fix is written down.
+3. **`docs/MIGRATION_NUMBER_RANGES.md`** — Track A owns **V118–V127** and Track B
+   owns **V128–V137** in the `runtime` schema. `docs/connector-credentials-plan.md`
+   reserves V128 as Track B's first migration. Read §3 as well as the table: another
+   stream's lower-numbered migration can land after yours, and the committed Flyway
+   settings refuse it by default. The developer-machine remedy is written there.
 4. **This plan, in full.**
 5. **`docs/partner-event-api-from-1x.md`** — the DERIVED-FROM-1X reference. **Read its
    §0 first: the seven inversions.** They are this stream's acceptance criteria. The
@@ -33,10 +34,14 @@ two run independently, in different files.
    carries a Keycloak token), §B10 (the guarantees and how each is verified), §D2 (the
    four contracts fixed by the other side — **outbound connector semantics is one of
    them, and it is Track B's specification**).
-7. **`docs/ORCA_OPEN_QUESTIONS_REGISTER.md`** — **U2** (this surface is free to
+7. **`docs/decision-connector-credentials.md`** and
+   **`docs/connector-credentials-plan.md`** — the product owner approved Option A;
+   the second document is the prescriptive first slice of Track B. Do not duplicate
+   or replace its secret primitive.
+8. **`docs/ORCA_OPEN_QUESTIONS_REGISTER.md`** — **U2** (this surface is free to
    redesign, and how narrowly), **item 6** (the lost-race response), **U3** (the realm
    and client structure, which is where partner credentials live and is open).
-8. **`docs/BPMN_EXECUTION_PROFILE.md`** — only if you touch §3's `/callback` question.
+9. **`docs/BPMN_EXECUTION_PROFILE.md`** — only if you touch §3's `/callback` question.
 
 **Mirror the existing code — it is your template.** Do not invent shapes this codebase
 already has:
@@ -86,9 +91,9 @@ the other end is the customer's own system.
 | **1.x is the reference for the DATA; the architecture governs the BEHAVIOUR.** The sheet's §0 names seven places 2.0 deliberately inverts 1.x — build the inversion and prove it | Porting the 1.x flow reproduces the defects the extraction exists to name |
 | **Scope comes from configuration, never from the request.** A partner does not name a site. Read `DeviceEventController`'s class javadoc before you write your first controller | A site identifier on the wire is a value the caller chooses. On an on-site installation there is exactly one primary site, and it is the one the licence binds to |
 | **Every table lands with its feature surface in one work package**: migration + seam repository + endpoints + property tests | A table nothing reads is drift |
-| **Use your migration band, `V118–V137`** | `docs/MIGRATION_NUMBER_RANGES.md` |
+| **Track A uses V118–V127; Track B uses V128–V137. V128 is reserved by the approved credentials slice** | `docs/MIGRATION_NUMBER_RANGES.md` |
 | **Tests prove properties, not paths.** The load-bearing ones here are *one event, one admission* under concurrency, and *a claimed row is never stranded* | "The row is inserted" is not a test |
-| **Anything security-shaped is PROPOSE-and-report, never implement** | §5 |
+| **Implement a security choice only where a named product-owner ruling exists. Credentials at rest now have one; partner identity, connector-test SSRF, trust and mutation authorization do not** | §5 and `docs/decision-connector-credentials.md` |
 
 ## 3 · Work packages
 
@@ -278,8 +283,12 @@ request_path, deadline_ms, is_enabled`. Extend it, in your band.
 
 - **Protocol** — REST or SOAP, binary-collated CHECK.
 - **Four authentication modes.** 1.x holds an AES-encrypted blob decrypted at call time.
-  ⚠️ **How credentials are stored at rest is security-shaped — propose, do not
-  implement.** §5.
+  **The at-rest decision is closed:** Option A in
+  `docs/decision-connector-credentials.md`. Execute
+  `docs/connector-credentials-plan.md` first; it creates V128, the generic primitive,
+  the runtime record and `NONE`/`BASIC`. B1 then extends the supported modes without
+  inventing a second key lifecycle. The next Track B migration is V129 only after
+  rechecking the directory.
 - **Per-connector certificate trust** — a trust store for verifying the *server*. One-way.
   Name the four modes explicitly in your report; the sheet says four, and a reader
   should not have to count them in code.
@@ -291,12 +300,12 @@ request_path, deadline_ms, is_enabled`. Extend it, in your band.
 
 **Two properties to carry forward deliberately** (sheet §6):
 
-- **Pool clients; do not rebuild per call.** `RestConnector` already does — keyed
-  `name@baseUrl|deadlineMillis`. ⚠️ **Extend that key with the auth and trust
-  configuration.** If you do not, changing a credential is served by a cached client
-  holding the old one — the same class of bug the existing comment describes for
-  repointing a host, and harder to see. This is the strongest known performance finding
-  in 1.x; do not reintroduce it while fixing something else.
+- **Pool clients; do not rebuild per call.** `RestConnector` already does. The
+  credentials slice extends its identity with credential version and applies secret
+  headers per request—never as cached client defaults. Extend the cache identity again
+  with a non-secret trust-configuration version when B1 adds trust. This is the
+  strongest known performance finding in 1.x; do not reintroduce it while fixing
+  something else.
 - **The outbound call has no retry in 1.x while the inbound poller retries four times.**
   The sheet calls that asymmetry accidental. Make it deliberate: state what you chose
   and why. ⚠️ A retry on a **non-idempotent** customer operation is not a free
@@ -312,6 +321,12 @@ the connection.
 `GET · POST /connectors`, `PATCH /connectors/{id}`, `GET · PUT
 /connectors/{id}/response-routing`, `POST /connectors/{id}/test`, `GET
 /connectors/{id}/health` (circuit-breaker state). Contract-first, `/api/v1/**`.
+
+The credential sub-resource is deliberately absent from the credentials slice: the
+shared security chain authenticates but does not yet enforce `EditConnector` or any
+other per-route entitlement. Do not hide that mutation under `/internal/**` or ship it
+as authenticated-only. Build it only after the authorization seam is ruled. The same
+review must assess B3's other mutation routes; this plan does not invent that policy.
 
 **Why this is in scope even though the console is not:** `docs/deployment.md` step 10
 says a site is configured *through the application*. Today connectors exist only
@@ -331,6 +346,7 @@ runtime and edge wait for. **Keep the output of every command; the report needs 
 
 | # | Item |
 |---|---|
+| 0 | **Stop the services and Gradle daemons first** — `docs/LOCAL_DEVELOPMENT.md` §6.1. The suite and a running service share the `runtime` schema, so a running service makes this fail for reasons that are not your code |
 | 1 | `./gradlew build` green from a clean tree |
 | 2 | `./gradlew check integrationTest --rerun-tasks` — **`--rerun-tasks` is not optional.** Without it Gradle answers from cache in under a second and reports a success it did not run |
 | 3 | **The Phase 1 demo still runs end to end** — `./gradlew sendPlate`, visit `COMPLETED`, barrier commanded, `visit.completed` in the outbox. The standing regression canary |
@@ -353,7 +369,7 @@ failure mode this programme guards hardest against.**
 |---|---|---|
 | **Q1** | **`/callback` has nothing to answer.** *"An external system answers a workflow that is already waiting"* — but `gate-visit.bpmn20.xml` contains **zero** receive tasks, message or signal events, and `ProcessEngineGateway` exposes only `startVisit`, `isRunning`, `currentActivity`, `terminate`. There is no wait state for a partner to answer and no engine method to answer it with. The only wait state in the shipped process is the human `manualInput` | **Do not author a process, and do not add a correlation method on a guess.** This lands on the BPMN execution profile, which the builder-developer owns and has not reviewed. Options: (a) defer `/callback` and do not publish the route; (b) build the engine-side correlation with a test-only process definition proving it, and leave the production process alone. **Recommend (b)** — the capability is provable without committing a process design, and `wp0-admission.bpmn20.xml` already uses a `receiveTask` as a wait state, so the fixture shape exists. **Product owner and builder-developer decide** |
 | **Q2** | **How a partner obtains a credential is not designed.** §B6 settles the *mechanism* — a partner carries a Keycloak token, validated locally by signature. The *client structure* is register **U3**, explicitly open, and it records that the six service-account clients in the dev realm are "a local development convenience only" carrying no weight in the target design | Build against a Keycloak token and nothing else. ⚠️ **Do not invent an API-key mechanism.** 1.x's published specification advertised one that does not exist in its code, so a partner integrating from that document gets `401` on every call — inventing one here would make that document accidentally true and add an unreviewed credential path. **Security-shaped: propose, report, wait** |
-| **Q3** | **Where connector credentials live at rest.** 1.x uses an AES-encrypted blob decrypted at call time. 2.0 has no established secret-at-rest mechanism, and `docs/deployment.md` step 6 lists secrets provisioning as owed to the product owner | **Security-shaped.** Propose in the report with the trade; do not implement a scheme on your own authority |
+| **Q3 — CLOSED 10 Aug** | **Where connector credentials live at rest.** | **Option A and all seven conditions were approved.** Implement only through `docs/connector-credentials-plan.md`; installer provisioning and mutation authorization remain named follow-ons, not permission to invent them |
 | **Q4** | **The retention class for your queue table.** `@RetentionClass` takes a free-form String and the check only requires it non-blank, so you are not blocked. But the closed 18-value list is unreconciled — nine provisional values exist in code | Name one, follow the existing naming, and **mark it provisional in your report**. Stream 4 reconciles the list; it must be able to find yours |
 | **Q5** | **Priority ordering must match the queue that already exists.** 1.x: lower is more urgent, unset sorts last. `work_item` reads use `COALESCE(priority,-1)`, set-before-unset, then FIFO. Two orderings that disagree is what 1.x shipped | Pick one, make it the same as `work_item`'s unless you have a reason, and state it |
 | **Q6** | **Synchronous admission versus a queued `202`.** 1.x has both modes; the architecture prescribes neither. **Recommend synchronous** — it is what `/internal/events/v1` does, it is what lets `201` carry a visit identifier (A3), and it is what makes A4's self-closing row natural. The cost is that a slow admission occupies the partner's call | Implement synchronous, **state the decision and its cost in the report** |

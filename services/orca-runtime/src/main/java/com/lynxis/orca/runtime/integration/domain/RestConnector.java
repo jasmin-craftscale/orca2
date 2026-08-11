@@ -1,6 +1,7 @@
 package com.lynxis.orca.runtime.integration.domain;
 
 import java.time.Duration;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,9 +12,12 @@ import org.springframework.web.client.RestClient;
 
 import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
+import com.lynxis.orca.platform.secrets.SecretBox;
+import com.lynxis.orca.platform.secrets.SecretOpenException;
 import com.lynxis.orca.runtime.integration.api.ConnectorPort;
 import com.lynxis.orca.runtime.integration.domain.ConnectorTables.ConnectorConfig;
 import com.lynxis.orca.runtime.integration.persistence.ConnectorConfigRepository;
+import com.lynxis.orca.runtime.integration.persistence.ConnectorCredentialRepository;
 
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
@@ -61,6 +65,8 @@ import lombok.extern.slf4j.Slf4j;
 public class RestConnector implements ConnectorPort {
 
 	private final ConnectorConfigRepository configuration;
+	private final ConnectorCredentialRepository credentials;
+	private final SecretBox secretBox;
 	private final CircuitBreakerRegistry breakers;
 	private final BulkheadRegistry bulkheads;
 	private final String siteExternalId;
@@ -75,10 +81,14 @@ public class RestConnector implements ConnectorPort {
 	 * administrator's change.
 	 */
 	private final Map<String, RestClient> clients = new ConcurrentHashMap<>();
+	private final Map<String, Long> newestCredentialVersions = new ConcurrentHashMap<>();
 
-	public RestConnector(ConnectorConfigRepository configuration, CircuitBreakerRegistry breakers,
-			BulkheadRegistry bulkheads, String siteExternalId) {
+	public RestConnector(ConnectorConfigRepository configuration,
+			ConnectorCredentialRepository credentials, SecretBox secretBox,
+			CircuitBreakerRegistry breakers, BulkheadRegistry bulkheads, String siteExternalId) {
 		this.configuration = configuration;
+		this.credentials = credentials;
+		this.secretBox = secretBox;
 		this.breakers = breakers;
 		this.bulkheads = bulkheads;
 		this.siteExternalId = siteExternalId;
@@ -99,13 +109,14 @@ public class RestConnector implements ConnectorPort {
 						"Connector '" + call.connectorName() + "' is not configured, or is disabled, at "
 								+ "this installation. That is a configuration gap, not a customer system "
 								+ "that said no."));
+		RequestCredential credential = resolveCredential(config.connectorName());
 
 		CircuitBreaker breaker = breakers.circuitBreaker(call.connectorName());
 		Bulkhead bulkhead = bulkheads.bulkhead(call.connectorName());
 
 		int status;
 		try {
-			status = breaker.executeSupplier(() -> bulkhead.executeSupplier(() -> send(config, call)));
+			status = breaker.executeSupplier(() -> bulkhead.executeSupplier(() -> send(config, call, credential)));
 		}
 		catch (CallNotPermittedException breakerOpen) {
 			// Not a failure of THIS call. The connector has been failing, and the
@@ -127,7 +138,7 @@ public class RestConnector implements ConnectorPort {
 				throw already;
 			}
 			throw new ConnectorUnavailableException("Connector '" + call.connectorName()
-					+ "' could not be reached: " + notReached, notReached);
+					+ "' could not be reached.", notReached);
 		}
 
 		String outcome = configuration.outcomeFor(call.connectorName(), status)
@@ -145,20 +156,100 @@ public class RestConnector implements ConnectorPort {
 	 * that says 409 has told us something the site's own routing may well have a
 	 * branch for, and turning it into an exception would discard it.
 	 */
-	private int send(ConnectorConfig config, ConnectorCall call) {
-		RestClient client = clients.computeIfAbsent(
-				config.connectorName() + "@" + config.baseUrl() + "|" + config.deadlineMillis(),
-				key -> build(config));
+	private int send(ConnectorConfig config, ConnectorCall call, RequestCredential credential) {
+		RestClient client = client(config, credential.version());
 
-		return client.post()
+		RestClient.RequestBodySpec request = client.post()
 				.uri(config.requestPath())
-				.contentType(MediaType.APPLICATION_JSON)
+				.contentType(MediaType.APPLICATION_JSON);
+		if (credential.basic()) {
+			request.headers(headers -> headers.setBasicAuth(
+					credential.principal(), credential.password(), StandardCharsets.UTF_8));
+		}
+		return request
 				// Correlation keys only. What the customer system needs to look this
 				// truck up is the visit and the lane; anything else it needs, it asks
 				// us for through the partner API.
 				.body(Map.of("visitExternalId", call.visitExternalId(),
 						"laneExternalId", call.laneExternalId()))
-				.exchange((request, response) -> response.getStatusCode().value());
+				.exchange((outboundRequest, response) -> response.getStatusCode().value());
+	}
+
+	private RequestCredential resolveCredential(String connectorName) {
+		ConnectorCredential credential = credentials.byName(connectorName).orElse(null);
+		if (credential == null) {
+			return RequestCredential.none(0);
+		}
+		if (credential.mode() == CredentialMode.NONE) {
+			return RequestCredential.none(credential.version());
+		}
+		try {
+			String password = secretBox.open(credential.sealedSecret(),
+					ConnectorCredential.purpose(
+							credential.siteExternalId(), credential.connectorName()));
+			return RequestCredential.basic(credential.principal(), password, credential.version());
+		}
+		catch (SecretOpenException invalidCredential) {
+			// This happens before the breaker and bulkhead: key custody or tamper is
+			// ORCA configuration failure, not evidence that the customer system failed.
+			throw new ConnectorUnavailableException("Connector '" + connectorName
+					+ "' credential could not be resolved.", invalidCredential);
+		}
+	}
+
+	private RestClient client(ConnectorConfig config, long credentialVersion) {
+		String prefix = config.connectorName() + "@";
+		String key = prefix + config.baseUrl() + "|" + config.deadlineMillis()
+				+ "|cv" + credentialVersion;
+		RestClient client = clients.computeIfAbsent(key, ignored -> build(config));
+		long newest = newestCredentialVersions.merge(config.connectorName(), credentialVersion, Math::max);
+		if (credentialVersion < newest) {
+			clients.remove(key, client);
+		}
+		else {
+			clients.keySet().removeIf(existing -> existing.startsWith(prefix) && !existing.equals(key));
+		}
+		return client;
+	}
+
+	int cachedClientCount() {
+		return clients.size();
+	}
+
+	private static final class RequestCredential {
+		private final String principal;
+		private final String password;
+		private final long version;
+
+		private RequestCredential(String principal, String password, long version) {
+			this.principal = principal;
+			this.password = password;
+			this.version = version;
+		}
+
+		static RequestCredential none(long version) {
+			return new RequestCredential(null, null, version);
+		}
+
+		static RequestCredential basic(String principal, String password, long version) {
+			return new RequestCredential(principal, password, version);
+		}
+
+		boolean basic() {
+			return principal != null;
+		}
+
+		String principal() {
+			return principal;
+		}
+
+		String password() {
+			return password;
+		}
+
+		long version() {
+			return version;
+		}
 	}
 
 	/**

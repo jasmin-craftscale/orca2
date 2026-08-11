@@ -84,25 +84,32 @@ channel that tells them.
 
 ## 3 · Work packages, in order
 
-### WP0 · Let the modules stop being empty · *first commit, with WP1*
+### WP0 · Let the modules stop being empty · *begins with WP1, completes with WP3*
 
 A build check asserts `notify` and `readmodel` contain **zero** classes
 (`ImportedSetGuard.whatIsStillEmptyIsStated`). Your first class fails the build, by
 design — so nobody fills these modules by accident.
 
-Its failure message tells you what to do: remove the module from the list. **Do the
-second half too.** `ModuleWallRule` carries `allowEmptyShould(true)` because some
-modules were empty; **once you populate both of these, all five are populated**, and
-that exemption should come out. **This stream is the one that finally makes the module
-wall unconditional** — that is worth doing deliberately rather than leaving for
-whoever notices.
+Its failure message tells you what to do: remove the newly populated module from the
+list. **There are two real triggers, not permission to add a marker class.** WP1 adds
+the first legitimate `readmodel` classes: watch the guard fail, remove `readmodel`
+from the empty list, and leave `notify` plus `allowEmptyShould(true)` in place. WP3
+adds the first legitimate `notify` classes: watch the guard fail again, remove the
+last empty entry, and only then remove `allowEmptyShould(true)` from `ModuleWallRule`.
+
+Do not populate `notify` early with an empty marker, speculative port or placeholder
+solely to make the check disappear. **Once WP3 legitimately populates the second
+module, all five are populated and the module wall becomes unconditional.** This
+stream is the one that closes that exemption; the two-stage sequence is what keeps
+the guard honest while WP1 and WP3 remain separate work packages.
 
 ⚠️ **Watch it fail before you fix it.** Add a class, see the build stop and name the
 module, then update the guard. A check nobody has watched fail may not be wired in —
 this repository has shipped exactly that.
 
-**Done when** the guard asserts the populated set, `allowEmptyShould(true)` is gone
-from `ModuleWallRule`, and both were watched to fail first.
+**Done in two stages:** the WP1 commit leaves only `notify` recorded empty and keeps
+the exemption; the WP3 commit removes the final empty entry and
+`allowEmptyShould(true)`. Each transition was watched to fail before its correction.
 
 ### WP1 · The lane-monitor projection · *the core of the stream*
 
@@ -225,6 +232,7 @@ the port-offset incantation. **Keep the output of every command; the report need
 
 | # | Item |
 |---|---|
+| 0 | **Stop the services and Gradle daemons first** — `docs/LOCAL_DEVELOPMENT.md` §6.1. The suite and a running service share the `runtime` schema, so a running service makes this fail for reasons that are not your code |
 | 1 | `./gradlew build` green from a clean tree |
 | 2 | `./gradlew check integrationTest --rerun-tasks` — **`--rerun-tasks` is not optional.** Without it Gradle answers from cache in under a second and reports a success it did not run |
 | 3 | **The Phase 1 demo still runs end to end** — the standing regression canary |
@@ -232,7 +240,7 @@ the port-offset incantation. **Keep the output of every command; the report need
 | 5 | **The projection and the truth cannot disagree** — including after a fault that rolls back the underlying write |
 | 6 | A board read under one site's scope never returns another site's lane |
 | 7 | **A WebSocket cannot be opened without a valid ticket**, and a ticket cannot be replayed |
-| 8 | **WP0 watched to fail**: the guard stopped the build and named the module before you updated it; `allowEmptyShould(true)` is gone from `ModuleWallRule` |
+| 8 | **WP0 watched to fail twice**: WP1 named `readmodel` before the list narrowed to `notify`; WP3 named `notify` before the final entry and `allowEmptyShould(true)` were removed. No placeholder class was added merely to close the check |
 | 9 | Break each of: a new traffic-growing table with no retention class · a projection table whose index leads wrong · a `readmodel` class reaching into `workitem.persistence`. **Each must fail the build, then revert.** The third is the one that matters most for this stream |
 | 10 | `docker compose run --rm verify-isolation` — 36 checks still green |
 | 11 | **All six services boot.** A green suite does not prove a service starts |
@@ -256,7 +264,8 @@ unspecified in both:** report the gap. A gap reported is worth more than a gap f
 - **What was built, per work package** — and what was not, named.
 - **The §4 verification table with real results**, including command output.
 - **Each of the sheet's six inversions, with the property test that proves it.**
-- **What you did about WP0** — and confirmation you watched the guard fail first.
+- **What you did about WP0** — both transitions, and confirmation each guard failure
+  was observed before its correction.
 - **Every decision this plan did not dictate**, with the reasoning — Q2, Q3 and Q4 at
   minimum, plus what triggers a projection update in WP1 and whether a reader can
   observe a stale board.
@@ -265,5 +274,6 @@ unspecified in both:** report the gap. A gap reported is worth more than a gap f
 
 ---
 
-*Start at WP0 + WP1 together. If Q1 is still open when you reach WP4, build the ticket
-and stop there — that is the plan working, not the plan failing.*
+*Start with WP0's readmodel transition + WP1. Complete WP0 when WP3 legitimately
+populates notify. If Q1 is still open when you reach WP4, build the ticket and stop
+there — that is the plan working, not the plan failing.*

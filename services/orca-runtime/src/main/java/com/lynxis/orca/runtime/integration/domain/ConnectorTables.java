@@ -2,14 +2,14 @@ package com.lynxis.orca.runtime.integration.domain;
 
 import com.lynxis.orca.platform.scope.table.Growth;
 import com.lynxis.orca.platform.scope.table.PersistentTable;
+import com.lynxis.orca.platform.scope.table.RetentionClass;
 
 /**
- * The tables {@code V102__connectors.sql} creates, declared where the build check
- * can read them.
+ * Runtime's connector tables, declared where the build check can read them.
  *
- * <p>Both are {@link Growth#BOUNDED} and therefore carry no retention class: a row
- * appears when somebody configures a connector, not when a truck arrives. That is
- * the distinction the growth question is asking about.
+ * <p>Configuration, routes and current credentials are {@link Growth#BOUNDED}:
+ * rows appear when somebody configures a connector, not when a truck arrives. The
+ * append-only credential audit is the deliberately unbounded exception.
  */
 public final class ConnectorTables {
 
@@ -50,5 +50,16 @@ public final class ConnectorTables {
 			String connectorName,
 			int httpStatus,
 			String outcome) {
+	}
+
+	/** One bounded, encrypted current credential record per configured connector. */
+	@PersistentTable(name = "connector_credential", growth = Growth.BOUNDED)
+	public record ConnectorCredentialTable() {
+	}
+
+	/** Append-only redacted history of credential administration and rewrap. */
+	@PersistentTable(name = "connector_credential_audit", growth = Growth.TRAFFIC_GROWING)
+	@RetentionClass("audit")
+	public record ConnectorCredentialAuditTable() {
 	}
 }

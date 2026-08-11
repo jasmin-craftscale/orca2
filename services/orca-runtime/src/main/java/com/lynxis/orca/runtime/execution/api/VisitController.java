@@ -2,6 +2,7 @@ package com.lynxis.orca.runtime.execution.api;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.http.ResponseEntity;
@@ -15,10 +16,16 @@ import com.lynxis.orca.platform.web.ApiStatus;
 import com.lynxis.orca.platform.web.RequestId;
 import com.lynxis.orca.runtime.api.generated.VisitsApi;
 import com.lynxis.orca.runtime.api.generated.model.Visit;
+import com.lynxis.orca.runtime.api.generated.model.LaneResetEnvelope;
+import com.lynxis.orca.runtime.api.generated.model.LaneResetResult;
 import com.lynxis.orca.runtime.api.generated.model.VisitEnvelope;
 import com.lynxis.orca.runtime.api.generated.model.VisitListEnvelope;
+import com.lynxis.orca.runtime.execution.domain.AdmissionService;
+import com.lynxis.orca.runtime.execution.domain.LaneResetService;
 import com.lynxis.orca.runtime.execution.domain.VisitQueryService;
 import com.lynxis.orca.runtime.execution.domain.VisitView;
+import com.lynxis.orca.runtime.workitem.api.OperatorIdentity;
+import com.lynxis.orca.runtime.workitem.api.WorkItemErrorCode;
 
 /**
  * Reading visits back.
@@ -35,10 +42,15 @@ import com.lynxis.orca.runtime.execution.domain.VisitView;
 public class VisitController implements VisitsApi {
 
 	private final VisitQueryService visits;
+	private final LaneResetService laneReset;
+	private final OperatorIdentity operatorIdentity;
 	private final String siteExternalId;
 
-	public VisitController(VisitQueryService visits, String siteExternalId) {
+	public VisitController(VisitQueryService visits, LaneResetService laneReset,
+			OperatorIdentity operatorIdentity, String siteExternalId) {
 		this.visits = visits;
+		this.laneReset = laneReset;
+		this.operatorIdentity = operatorIdentity;
 		this.siteExternalId = siteExternalId;
 	}
 
@@ -69,6 +81,52 @@ public class VisitController implements VisitsApi {
 				.code(ApiResponse.OK)
 				.requestId(RequestId.current())
 				.data(toModel(visit)));
+	}
+
+	@Override
+	public ResponseEntity<VisitEnvelope> getLaneVisit(String laneExternalId) {
+		Optional<VisitView> visit;
+		try {
+			visit = inScope(() -> visits.onLane(laneExternalId));
+		}
+		catch (AdmissionService.LaneNotAtThisInstallationException unknownLane) {
+			throw new ApiException(ExecutionErrorCode.LANE_NOT_AT_THIS_INSTALLATION,
+					unknownLane.getMessage());
+		}
+
+		return ResponseEntity.ok(new VisitEnvelope()
+				.status(ApiStatus.SUCCESS)
+				.code(ApiResponse.OK)
+				.requestId(RequestId.current())
+				.data(visit.map(VisitController::toModel).orElse(null)));
+	}
+
+	@Override
+	public ResponseEntity<LaneResetEnvelope> abortVisit(String visitExternalId) {
+		String actor = operatorIdentity.operator().orElseThrow(() -> new ApiException(
+				WorkItemErrorCode.OPERATOR_UNRESOLVED,
+				"Aborting a visit needs an actor: it fails the visit and its work items, and "
+						+ "the audit trail records who did that."));
+
+		LaneResetService.LaneReset reset;
+		try {
+			reset = inScope(() -> laneReset.abort(visitExternalId, actor));
+		}
+		catch (LaneResetService.VisitNotFoundException notFound) {
+			throw new ApiException(ExecutionErrorCode.VISIT_NOT_FOUND, notFound.getMessage());
+		}
+		catch (LaneResetService.VisitNotAbortableException conflict) {
+			throw new ApiException(ExecutionErrorCode.VISIT_NOT_ABORTABLE, conflict.getMessage());
+		}
+
+		return ResponseEntity.ok(new LaneResetEnvelope()
+				.status(ApiStatus.SUCCESS)
+				.code(ApiResponse.OK)
+				.requestId(RequestId.current())
+				.data(new LaneResetResult()
+						.laneExternalId(reset.laneExternalId())
+						.visitExternalId(reset.visitExternalId())
+						.failedWorkItems(reset.failedWorkItems())));
 	}
 
 	/**

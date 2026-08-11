@@ -261,6 +261,159 @@ paths:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 
+  /api/v1/visits/{visitExternalId}/abort:
+    post:
+      tags: [visits]
+      operationId: abortVisit
+      summary: Abort this visit — terminate its process, fail its work items, free its lane
+      description: |
+        One transaction, and the same one lane reset performs: the process instance
+        is terminated, the visit's open work items are failed, and the lane is
+        released for the next truck.
+
+        Addressed by visit rather than by lane, and the visit's identity is
+        re-checked under the lane lock — so a visit that finished while the request
+        was in flight is refused rather than having the next truck aborted in its
+        place.
+
+        Aborting a visit that is no longer running answers `409`. Unlike resetting an
+        already-clear lane, which is an ordinary outcome, naming a specific visit and
+        being wrong about its state is a mistake worth reporting.
+      parameters:
+        - name: visitExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: What was aborted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LaneResetEnvelope"
+        "401":
+          description: No credential, or no resolvable operator behind it
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such visit under this installation's scope
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: The visit is no longer running
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/lanes/{laneExternalId}/visit:
+    get:
+      tags: [visits]
+      operationId: getLaneVisit
+      summary: The visit running on this lane right now, if any
+      description: |
+        The lane's current visit, with the step the engine is parked at.
+
+        **An empty lane answers `200` with a null `data`, not `404`.** A lane with
+        no truck at it is the normal state of a gate, and reporting it as "not
+        found" would make an ordinary condition indistinguishable from a
+        misconfigured lane identifier.
+
+        A lane this installation does not publish answers `422` — that IS a
+        configuration fault and must not read as "no truck here".
+      parameters:
+        - name: laneExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: The running visit, or null when the lane is clear
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisitEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: The lane is not published for this installation
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/lanes/{laneExternalId}/take-next:
+    post:
+      tags: [workItems]
+      operationId: takeNextOnLane
+      summary: Claim the oldest queued item on this lane's running visit
+      description: |
+        Take-by-lane, for an operator working a lane monitor rather than the queue.
+
+        A convenience over `POST /work-items/{id}/take` and nothing more: the same
+        eligibility check, the same conditional UPDATE as the only race guard, the
+        same typed `409` for the loser, the same `TAKE` audit row.
+
+        **Oldest queued first, not the queue grid's priority order.** The grid ranks
+        work across lanes; this answers "the next thing at this lane", where one
+        visit's items are a sequence.
+      parameters:
+        - name: laneExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: The item, now held by the caller
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkItemEnvelope"
+        "401":
+          description: No credential, or no resolvable operator behind it
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "403":
+          description: The operator is outside the item's eligible teams
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: Nothing is running on this lane, or it has no queued item
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: Somebody else claimed it first
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: The lane is not published for this installation
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
   /api/v1/work-items:
     get:
       tags: [workItems]

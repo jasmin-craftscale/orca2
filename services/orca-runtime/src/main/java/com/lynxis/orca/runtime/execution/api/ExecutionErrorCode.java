@@ -39,6 +39,9 @@ public enum ExecutionErrorCode implements ErrorCode {
 	 */
 	VISIT_NOT_FOUND("VISIT_NOT_FOUND", 404),
 
+	/** The named visit is no longer the active visit on its lane. */
+	VISIT_NOT_ABORTABLE("VISIT_NOT_ABORTABLE", 409),
+
 	/**
 	 * The {@code status} filter names something this platform does not have.
 	 *

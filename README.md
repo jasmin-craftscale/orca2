@@ -77,8 +77,9 @@ The current programme is **on-site first** — `orca-portal`, `orca-sync` and
   per-installation shared credential verified locally — no identity provider on the
   gate path.
 - **Contract-first.** Controllers implement OpenAPI-generated interfaces, so a
-  contract change breaks the build. Five shared primitives — outbox, lease, scope,
-  idempotency, web envelope — were built once, before any service.
+  contract change breaks the build. Six shared primitives — outbox, lease, scope,
+  idempotency, web envelope, and purpose-bound secrets — are built once rather than
+  reimplemented by each service.
 
 ## Technology
 
@@ -89,8 +90,8 @@ ArchUnit (the build checks). The Java toolchain auto-provisions; you don't insta
 ## Repository layout
 
 ```
-platform/         the five primitives — no domain types live here
-  outbox/ lease/ scope/ idempotency/ web/
+platform/         the six primitives — no domain types live here
+  outbox/ lease/ scope/ idempotency/ web/ secrets/
 services/         six bootable applications, each owning its schema, migrations,
   orca-core/        DB login and OpenAPI contract
   orca-runtime/     (the only service decomposed into modules)
