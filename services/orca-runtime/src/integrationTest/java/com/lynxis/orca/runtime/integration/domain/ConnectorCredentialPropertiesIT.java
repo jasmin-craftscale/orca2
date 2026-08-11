@@ -212,7 +212,9 @@ class ConnectorCredentialPropertiesIT {
 	@Test
 	@DisplayName("SQL nonblank backstops reject spaces and control whitespace but permit internal spaces")
 	void databaseNonblankChecksMatchTheApplicationBoundary() {
-		for (String blank : List.of(" ", "\t", "\r", "\n", "\u000B", "\f")) {
+		for (String blank : List.of(
+				" ", "\t", "\r", "\n", "\u000B", "\f",
+				"\u001C", "\u001D", "\u001E", "\u001F")) {
 			assertDbRejects("BASIC", blank, "cipher", "nonce", "old-v1", 1, "actor", "tos");
 			assertDbRejects("BASIC", "user", "cipher", "nonce", "old-v1", 1, blank, "tos");
 			assertAuditDbRejects("BASIC", "SET", 1, blank);

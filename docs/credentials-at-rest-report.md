@@ -123,8 +123,9 @@ mode, core credential consumer or SFTP behavior was invented.
 The composite primary key leads with site. The composite foreign key references the
 runtime-owned connector configuration. Database checks enforce the exact mode/state,
 positive version, actor, and principal constraints. Principal and actor checks reject
-space and the ASCII control-whitespace range `CHAR(9)`–`CHAR(13)`, matching the Java
-boundary while continuing to allow legitimate internal spaces.
+space, `CHAR(9)`–`CHAR(13)`, and the Java whitespace separators
+`CHAR(28)`–`CHAR(31)`, matching the `String.isBlank()` boundary for these ASCII
+values while continuing to allow legitimate internal spaces.
 
 ### `runtime.connector_credential_audit`
 
@@ -244,7 +245,7 @@ and this command was run unpiped:
 ./gradlew check integrationTest --rerun-tasks
 ```
 
-The latest pre-push review rerun completed in 6m46s with all 73 tasks executed:
+The latest pre-push review rerun completed in 6m25s with all 73 tasks executed:
 
 | Run | Integration suites | Tests | Failures/errors |
 |---|---:|---:|---:|
@@ -416,8 +417,8 @@ plaintext to the customer system; this implementation does not claim otherwise.
   rewrap and convergence counts share that contract.
 - **Database blank backstop:** SQL `LEN(LTRIM(RTRIM(...)))` ignores ordinary spaces
   but not control whitespace. The actor/principal checks now require a character
-  outside space and `CHAR(9)`–`CHAR(13)`; real SQL tests cover each form and internal
-  spaces.
+  outside space, `CHAR(9)`–`CHAR(13)`, and `CHAR(28)`–`CHAR(31)`; real SQL tests cover
+  each form and internal spaces.
 - **Separate edge reliability signal:** an independent review saw one timeout in
   unchanged `EdgeIngestPropertiesIT.aCaptureWithNoDedupKeyIsRefused`; its individual
   property, class and a second full-tree run passed. This credentials branch makes
