@@ -240,7 +240,7 @@ command; the report needs it.**
 
 | # | The question | What to do |
 |---|---|---|
-| **Q1** | **The DDL executor's design is the product owner's, not yours.** It is the one component permitted to change the schema at runtime, and the roadmap says so explicitly: *"Its design is surfaced to the product owner, not settled by whoever implements it."* | **Write the design down and stop.** What DDL verbs are permitted; what happens to data on a narrowing change; whether a drop is ever allowed and who can ask for one; what the recorded migration looks like; what the allow-list is derived from. **Then wait.** Build WP1, WP3, WP4 and WP5 while you wait — none of them is blocked on the answer |
+| **Q1** | **The DDL executor's design is the product owner's, not yours.** It is the one component permitted to change the schema at runtime, and the roadmap says so explicitly: *"Its design is surfaced to the product owner, not settled by whoever implements it."* | **Fill the proposal in `docs/decision-custom-entity-ddl-executor.md` and stop WP2.** Cover what DDL verbs are permitted; what happens to data on a narrowing change; whether a drop is ever allowed and who can ask for one; what the recorded migration looks like; what the allow-list is derived from. Do not write the decision record. **Then wait.** Build WP1, WP3, WP4 and WP5 while you wait — none of them is blocked on the answer |
 | **Q2 — CLOSED 10 Aug** | **Where an SFTP credential lives at rest.** | **Option A and all seven conditions were approved once for both streams.** Consume `platform/secrets` after the credentials feature merges; use a core-owned record and core-specific production key material. SFTP host trust and credential-mutation authorization remain open and must not be inferred from this ruling |
 | **Q3** | **The retention class for any traffic-growing table you add.** `@RetentionClass` takes a free-form string and the check only requires it non-blank, so you are not blocked — but the closed eighteen-value list is unreconciled and nine provisional values exist in code | Name one, follow the existing naming, **mark it provisional in your report**. Stream 4 reconciles and must be able to find yours |
 | **Q4** | **What a failed row does mid-import** (WP3). 1.x's behaviour is per-call-site and stated nowhere | This one **is** yours — decide it, state it, prove it. Recorded here so it is not decided silently |
@@ -254,8 +254,9 @@ unspecified in both:** report the gap. A gap reported is worth more than a gap f
 - **What was built, per work package** — and what was not, named.
 - **The §4 verification table with real results**, including command output.
 - **Each of the sheet's six inversions, with the property test that proves it.**
-- **The DDL executor design you proposed** (Q1), written so the product owner can rule
-  on it without reading your code.
+- **The DDL executor proposal** (Q1), linked to
+  `docs/decision-custom-entity-ddl-executor.md` and summarised so the product owner can
+  rule without reading your code.
 - **Every decision this plan did not dictate**, with the reasoning — Q3 and Q4 at
   minimum, plus the prefix choice in WP1.
 - **Anything found wrong** in this plan, the reference sheet, the architecture, or

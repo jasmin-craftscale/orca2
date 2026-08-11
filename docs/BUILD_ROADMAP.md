@@ -88,6 +88,12 @@ that streams 1 and 2 create, which is the second reason it goes last.
 
 Three mechanisms. Without them, "parallel" means "merge conflicts".
 
+The executable launch gates, first work-package branches, shared-database rule,
+review cadence and copy/paste agent prompts are maintained in
+`docs/PARALLEL_STREAM_LAUNCH.md` and
+`docs/DEVELOPER_KICKOFF_PROMPTS.md`. They coordinate the work; the stream plans remain
+the specification.
+
 - **Each stream owns whole modules.** Streams 1 and 2 both work inside
   `orca-runtime`, but on different modules — and the module walls are already
   enforced by a build check, so the check polices the boundary for you.
