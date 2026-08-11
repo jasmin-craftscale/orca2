@@ -231,6 +231,23 @@ public class ExecutionConfiguration {
 				siteExternalId);
 	}
 
+	// --- the designer's validation surface ------------------------------------
+
+	/** The compiler, as the module's compilation facade — pure, so construction is free. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.api.CompilationFacade compilationFacade() {
+		return new com.lynxis.orca.runtime.execution.compiler.DesignerJsonCompiler();
+	}
+
+	@Bean
+	public com.lynxis.orca.runtime.execution.internal.selector.NamespaceService namespaceService(
+			VisitDatasetRepository visitDataset,
+			com.lynxis.orca.runtime.execution.internal.DefinitionRegistry definitionRegistry,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.runtime.execution.internal.selector.NamespaceService(
+				visitDataset, definitionRegistry, siteExternalId);
+	}
+
 	// --- the manual-input wait state ----------------------------------------
 
 	/**

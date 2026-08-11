@@ -81,6 +81,36 @@ public class VisitDatasetRepository {
 				.where("execution_id = ? AND data_key = ?", executionId, key));
 	}
 
+	/**
+	 * The dataset vocabulary this workflow has been OBSERVED to produce — the keys
+	 * its newest {@code visitLimit} visits wrote, deduplicated and sorted.
+	 *
+	 * <p>Bounded by construction, and that is a deliberate change from the system
+	 * this was translated from, which answered with a DISTINCT over the whole
+	 * history through a join. The seam offers neither, on purpose — and for an
+	 * autocomplete the newest visits ARE the answer: a key nothing current writes
+	 * is a stale suggestion, not vocabulary.
+	 */
+	public java.util.SortedSet<String> observedKeysOfNewestVisits(long workflowId, int visitLimit) {
+		List<Long> newest = seam.select(ScopedSelect.from("execution")
+						.columns("execution_id")
+						.scopedBy(SCOPE_COLUMN)
+						.where("workflow_id = ?", workflowId)
+						.orderByDescending("execution_id")
+						.limit(visitLimit),
+				(rs, row) -> rs.getLong("execution_id"));
+		java.util.SortedSet<String> keys = new java.util.TreeSet<>();
+		for (Long executionId : newest) {
+			seam.select(ScopedSelect.from("visit_dataset")
+							.columns("data_key")
+							.scopedBy(SCOPE_COLUMN)
+							.where("execution_id = ?", executionId),
+					(rs, row) -> rs.getString("data_key"))
+					.forEach(keys::add);
+		}
+		return keys;
+	}
+
 	/** The visit's key for an engine instance, or empty when none correlates. */
 	public Optional<Long> visitIdByEngineInstance(String processInstanceId) {
 		return seam.select(ScopedSelect.from("execution")

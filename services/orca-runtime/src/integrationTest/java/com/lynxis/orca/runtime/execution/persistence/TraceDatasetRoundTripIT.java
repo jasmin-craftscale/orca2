@@ -101,6 +101,30 @@ class TraceDatasetRoundTripIT {
 	}
 
 	@Test
+	void theObservedVocabularyComesFromTheNewestVisitsOfAWorkflow() {
+		scoped(() -> {
+			jdbc.update("INSERT INTO execution (external_id, site_external_id, lane_id, status, workflow_id) "
+					+ "VALUES (?, ?, 43, 'COMPLETED', 880001)", "visit-obs-1", SITE);
+			long older = jdbc.queryForObject(
+					"SELECT execution_id FROM execution WHERE external_id = 'visit-obs-1'", Long.class);
+			jdbc.update("INSERT INTO execution (external_id, site_external_id, lane_id, status, workflow_id) "
+					+ "VALUES (?, ?, 43, 'COMPLETED', 880001)", "visit-obs-2", SITE);
+			long newer = jdbc.queryForObject(
+					"SELECT execution_id FROM execution WHERE external_id = 'visit-obs-2'", Long.class);
+			dataset.write(SITE, older, "plate", "A");
+			dataset.write(SITE, newer, "rfid", "B");
+
+			assertThat(dataset.observedKeysOfNewestVisits(880001L, 100))
+					.containsExactly("plate", "rfid");
+			// Bounded by construction: a sample of one sees only the newest visit's keys.
+			assertThat(dataset.observedKeysOfNewestVisits(880001L, 1)).containsExactly("rfid");
+			// A workflow that has never run here answers empty — honest, not a guess.
+			assertThat(dataset.observedKeysOfNewestVisits(999_999L, 100)).isEmpty();
+			return null;
+		});
+	}
+
+	@Test
 	void anotherSiteSeesNothingAndWritesNothing() {
 		ScopeContext.runIn(Scope.of("site_external_id", Set.of(OTHER_SITE)), () -> {
 			assertThat(trace.visitByEngineInstance("engine-trace-it")).isEmpty();

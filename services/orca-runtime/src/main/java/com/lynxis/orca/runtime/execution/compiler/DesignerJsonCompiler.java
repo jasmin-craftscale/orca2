@@ -5,10 +5,10 @@ import com.lynxis.orca.runtime.execution.api.dto.CompiledDefinition;
 import com.lynxis.orca.runtime.execution.api.dto.ValidationReport;
 
 /**
- * The compiler (D2, W3): designer JSON in, canonical BPMN out. Pure — no Spring, no
- * datasource, no clock, no randomness (ArchUnit rule 7) — because same input must mean
- * same bytes forever (T2). Every failure is a {@link CompileException} carrying its named
- * invariant; there are no warnings and no partial output.
+ * The compiler: designer JSON in, canonical BPMN out. Pure — no Spring, no
+ * datasource, no clock, no randomness, enforced by a build check — because same input
+ * must mean same bytes forever. Every failure is a {@link CompileException} carrying its
+ * named invariant; there are no warnings and no partial output.
  */
 public final class DesignerJsonCompiler implements CompilationFacade {
 
