@@ -1,6 +1,7 @@
 package com.lynxis.orca.runtime.execution.api;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -54,7 +55,7 @@ public class DesignerValidationController implements DesignerApi {
 	}
 
 	@Override
-	public ResponseEntity<ValidationReportEnvelope> validateDraft(Object designerDraft) {
+	public ResponseEntity<ValidationReportEnvelope> validateDraft(Map<String, Object> designerDraft) {
 		com.lynxis.orca.runtime.execution.api.dto.ValidationReport report;
 		try {
 			report = compiler.validate(JSON.writeValueAsString(designerDraft));
@@ -75,7 +76,7 @@ public class DesignerValidationController implements DesignerApi {
 	}
 
 	@Override
-	public ResponseEntity<SelectorNamespaceEnvelope> draftNamespace(Object designerDraft,
+	public ResponseEntity<SelectorNamespaceEnvelope> draftNamespace(Map<String, Object> designerDraft,
 			String nodeUuid) {
 		com.lynxis.orca.runtime.execution.api.dto.SelectorNamespace found;
 		try {
