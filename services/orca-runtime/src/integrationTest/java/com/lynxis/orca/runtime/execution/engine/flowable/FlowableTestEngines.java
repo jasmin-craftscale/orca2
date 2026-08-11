@@ -32,6 +32,19 @@ final class FlowableTestEngines {
      */
     static BootedEngine bootWithDatabase(String databasePrefix, String login, String password,
             int maxConnections) {
+        return bootWithDatabase(databasePrefix, login, password, maxConnections,
+                new java.util.HashMap<>());
+    }
+
+    /**
+     * @param beans the expression-resolution beans — what production wiring exposes as
+     *     Spring beans (the {@code ${orcaConnectorDelegate}}-style delegate references a
+     *     compiled definition carries). The SAME map instance is handed to the engine, so
+     *     a suite may boot first and put delegates in afterwards — several of them need
+     *     the engine's own services to construct.
+     */
+    static BootedEngine bootWithDatabase(String databasePrefix, String login, String password,
+            int maxConnections, java.util.Map<Object, Object> beans) {
         FreshMssql.ProvisionedDatabase db = FreshMssql.freshRuntimeDatabase(databasePrefix, true);
         FreshMssql.migrateRuntime(db);
 
@@ -62,6 +75,7 @@ final class FlowableTestEngines {
         // schema as a 5.x relic and refuses to start — exactly how this line got here).
         impl.setDisableIdmEngine(true);
         impl.setDisableEventRegistry(true);
+        impl.setBeans(beans);
 
         return new BootedEngine(configuration.buildProcessEngine(), db);
     }

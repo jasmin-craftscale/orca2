@@ -231,6 +231,91 @@ public class ExecutionConfiguration {
 				siteExternalId);
 	}
 
+	// --- the compiled definitions' delegates -----------------------------------
+	//
+	// Bean names are load-bearing here exactly as they are for the two gate-process
+	// delegates above: the compiler emits ${orcaConnectorDelegate} and friends into
+	// every definition it produces. The SPI defaults refuse loudly — a runtime
+	// booted without an adapter fails the step by name, never quietly no-ops and
+	// never quietly acts.
+
+	/** Trades the engine's instance id for the identifiers selectors resolve against. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.delegate.spi.VisitIdentity visitIdentity(
+			AdmissionRepository admissionRepository,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.runtime.execution.internal.RuntimeVisitIdentity(
+				admissionRepository, siteExternalId);
+	}
+
+	/** Bean name = the compiler's link target. Do not rename. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.delegate.OrcaConnectorDelegate orcaConnectorDelegate(
+			ObjectProvider<com.lynxis.orca.runtime.execution.delegate.spi.ConnectorGateway> gateway,
+			RuntimeService runtimeService, VisitDataWriter visitDataWriter,
+			com.lynxis.orca.runtime.execution.delegate.spi.VisitIdentity visitIdentity) {
+		return new com.lynxis.orca.runtime.execution.delegate.OrcaConnectorDelegate(
+				gateway.getIfAvailable(ExecutionConfiguration::unconfiguredConnectorGateway),
+				runtimeService, visitDataWriter, visitIdentity);
+	}
+
+	/** Bean name = the compiler's link target. Do not rename. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.delegate.OrcaDeviceEffectDelegate orcaDeviceEffectDelegate(
+			ObjectProvider<com.lynxis.orca.runtime.execution.delegate.spi.EdgeClient> edgeClient) {
+		return new com.lynxis.orca.runtime.execution.delegate.OrcaDeviceEffectDelegate(
+				edgeClient.getIfAvailable(ExecutionConfiguration::unconfiguredEdgeClient));
+	}
+
+	/** Bean name = the compiler's link target. Do not rename. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.delegate.OrcaDisplayDelegate orcaDisplayDelegate(
+			ObjectProvider<com.lynxis.orca.runtime.execution.delegate.spi.EdgeClient> edgeClient) {
+		return new com.lynxis.orca.runtime.execution.delegate.OrcaDisplayDelegate(
+				edgeClient.getIfAvailable(ExecutionConfiguration::unconfiguredEdgeClient));
+	}
+
+	/** Bean name = the compiler's link target. Do not rename. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.delegate.OrcaNotificationDelegate orcaNotificationDelegate(
+			ObjectProvider<com.lynxis.orca.runtime.execution.delegate.spi.NotificationSender> sender) {
+		return new com.lynxis.orca.runtime.execution.delegate.OrcaNotificationDelegate(
+				sender.getIfAvailable(ExecutionConfiguration::unconfiguredNotificationSender));
+	}
+
+	/**
+	 * The connector gateway an installation has not configured. A connector cannot
+	 * no-op — routing needs its response — so this fails the step by name, never
+	 * with a fabricated status a compiled branch would route on.
+	 */
+	static com.lynxis.orca.runtime.execution.delegate.spi.ConnectorGateway unconfiguredConnectorGateway() {
+		return request -> {
+			throw new IllegalStateException("No ConnectorGateway adapter is configured in this "
+					+ "installation, so connector node '" + request.nodeUuid() + "' ('"
+					+ request.name() + "') cannot be called. This is a deployment gap, not a "
+					+ "customer system that said no.");
+		};
+	}
+
+	/** The edge an installation has not configured: the effect fails by name. */
+	static com.lynxis.orca.runtime.execution.delegate.spi.EdgeClient unconfiguredEdgeClient() {
+		return command -> {
+			throw new IllegalStateException("No EdgeClient adapter is configured in this "
+					+ "installation, so the " + command.kind() + " effect '" + command.name()
+					+ "' (" + command.nodeUuid() + ") cannot be performed. This is a deployment "
+					+ "fault, not a device fault.");
+		};
+	}
+
+	/** The notify seam an installation has not configured: the alert fails by name. */
+	static com.lynxis.orca.runtime.execution.delegate.spi.NotificationSender unconfiguredNotificationSender() {
+		return (idempotencyKey, siteExternalId, nodeUuid, name) -> {
+			throw new IllegalStateException("No NotificationSender adapter is configured in this "
+					+ "installation, so notification '" + name + "' (" + nodeUuid
+					+ ") cannot be sent.");
+		};
+	}
+
 	// --- the designer's validation surface ------------------------------------
 
 	/** The compiler, as the module's compilation facade — pure, so construction is free. */

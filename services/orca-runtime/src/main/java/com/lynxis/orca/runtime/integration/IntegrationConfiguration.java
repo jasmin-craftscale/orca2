@@ -88,4 +88,61 @@ public class IntegrationConfiguration {
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
 		return new RestConnector(configuration, breakers, bulkheads, siteExternalId);
 	}
+
+	// --- the designer-authored connector, off unless somebody turns it on ------
+
+	/**
+	 * The live outbound gateway for compiled CONNECTOR nodes, off unless
+	 * {@code orca.connectors.live} says otherwise. Distinct from {@link ConnectorPort}
+	 * above on purpose: that is the gate process's hand-configured way out, this is
+	 * the designer-authored one — different thing, configured by different people.
+	 *
+	 * <p>Two of its collaborators are deliberately conservative until their rulings
+	 * land: the catalog is {@code UNBOUND} (where designer-authored connector
+	 * configuration is stored is an open decision — a call refuses by name), and the
+	 * credentials default to {@link com.lynxis.orca.runtime.integration.connector.NoAuthCredentials}
+	 * — the decrypting implementation exists but stays unwired until a person has
+	 * read it. Swapping either in is a one-line change made on purpose.
+	 */
+	@Bean
+	@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+			name = "orca.connectors.live", havingValue = "true")
+	public com.lynxis.orca.runtime.execution.delegate.spi.ConnectorGateway httpConnectorGateway(
+			org.springframework.beans.factory.ObjectProvider<
+					com.lynxis.orca.runtime.integration.connector.ConnectorCredentials> credentials,
+			com.lynxis.orca.runtime.execution.selector.SelectorDataProvider selectorDataProvider) {
+		java.net.http.HttpClient http = java.net.http.HttpClient.newBuilder()
+				.connectTimeout(Duration.ofSeconds(10))
+				.followRedirects(java.net.http.HttpClient.Redirect.NORMAL)
+				.build();
+		return new com.lynxis.orca.runtime.integration.connector.HttpConnectorGateway(
+				com.lynxis.orca.runtime.integration.connector.ConnectorCatalog.UNBOUND,
+				credentials.getIfAvailable(
+						com.lynxis.orca.runtime.integration.connector.NoAuthCredentials::new),
+				http, binderFor(selectorDataProvider));
+	}
+
+	/**
+	 * One evaluator per call, bound to the visit making it. Sharing a single evaluator
+	 * across job threads would share its request-scoped state, and connectors run
+	 * concurrently on every lane in the site. A selector the evaluator cannot resolve
+	 * answers null, which drops the field — the same outcome the reference
+	 * implementation reaches by logging and skipping.
+	 */
+	private static com.lynxis.orca.runtime.integration.connector.HttpConnectorGateway.SelectorBinder binderFor(
+			com.lynxis.orca.runtime.execution.selector.SelectorDataProvider provider) {
+		return executionId -> {
+			var evaluator = new com.lynxis.orca.runtime.execution.selector.SelectorEvaluator(
+					provider, java.time.Clock.systemUTC(), "connector");
+			return (value, selectorId, visitUuid) -> {
+				try {
+					return evaluator.resolveSelectors(
+							value, selectorId, visitUuid, (int) executionId, "", 0);
+				}
+				catch (Exception unresolved) {
+					return null;
+				}
+			};
+		};
+	}
 }
