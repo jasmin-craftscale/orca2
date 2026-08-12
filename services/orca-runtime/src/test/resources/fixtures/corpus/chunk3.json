@@ -1,0 +1,841 @@
+[
+  {
+    "source": "TestSelectorService_HandleString_Float64ToString",
+    "kind": "handleString",
+    "args": {
+      "types": "string",
+      "value": 2.71
+    },
+    "expected": {
+      "value": "2.710000",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_NumberFromFloat64",
+    "kind": "handleString",
+    "args": {
+      "types": "number",
+      "value": 42.0
+    },
+    "source_expected": 42,
+    "expected": {
+      "value": 42,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_NumberFromString",
+    "kind": "handleString",
+    "args": {
+      "types": "number",
+      "value": "123"
+    },
+    "source_expected": 123,
+    "expected": {
+      "value": 123,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_Float32Type",
+    "kind": "handleString",
+    "args": {
+      "types": "float32",
+      "value": 1.5
+    },
+    "source_expected": 1.5,
+    "expected": {
+      "value": 1.5,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_Float32FromString",
+    "kind": "handleString",
+    "args": {
+      "types": "float32",
+      "value": "1.5"
+    },
+    "source_expected": 1.5,
+    "expected": {
+      "value": 1.5,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_Float64Type",
+    "kind": "handleString",
+    "args": {
+      "types": "float64",
+      "value": 2.5
+    },
+    "source_expected": 2.5,
+    "expected": {
+      "value": 2.5,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_Float64FromString",
+    "kind": "handleString",
+    "args": {
+      "types": "float64",
+      "value": "2.5"
+    },
+    "source_expected": 2.5,
+    "expected": {
+      "value": 2.5,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_BoolType",
+    "kind": "handleString",
+    "args": {
+      "types": "bool",
+      "value": true
+    },
+    "source_expected": true,
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_BoolFromString",
+    "kind": "handleString",
+    "args": {
+      "types": "bool",
+      "value": "true"
+    },
+    "source_expected": true,
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestExtractKeyAndIndex_WithKeyAndIndex",
+    "kind": "extractKeyAndIndex",
+    "args": {
+      "input": "items[2]"
+    },
+    "source_expected": {
+      "key": "items",
+      "index": 2
+    },
+    "expected": {
+      "value": {
+        "index": 2,
+        "key": "items"
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestExtractKeyAndIndex_IndexOnly",
+    "kind": "extractKeyAndIndex",
+    "args": {
+      "input": "[5]"
+    },
+    "source_expected": {
+      "key": "",
+      "index": 5
+    },
+    "expected": {
+      "value": {
+        "index": 5,
+        "key": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestExtractKeyAndIndex_NoIndex",
+    "kind": "extractKeyAndIndex",
+    "args": {
+      "input": "simple_key"
+    },
+    "source_expected": {
+      "key": "simple_key",
+      "index": -1
+    },
+    "expected": {
+      "value": {
+        "index": -1,
+        "key": "simple_key"
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestRemoveExtraSpaces",
+    "kind": "skip",
+    "args": {},
+    "skip": "tests nodes.RemoveExtraSpaces, a method not in the kind table (also asserts three independent inputs in one test)"
+  },
+  {
+    "source": "TestCountHelperFunction_SliceInterface",
+    "kind": "countHelperFunction",
+    "args": {
+      "selectorID": "sel",
+      "value": [
+        "a",
+        "b",
+        "c"
+      ]
+    },
+    "source_expected": 3,
+    "expected": {
+      "value": 3,
+      "error": null
+    }
+  },
+  {
+    "source": "TestCountHelperFunction_SliceMap",
+    "kind": "countHelperFunction",
+    "args": {
+      "selectorID": "sel",
+      "value": [
+        {
+          "a": 1
+        },
+        {
+          "b": 2
+        }
+      ]
+    },
+    "source_expected": 2,
+    "expected": {
+      "value": 2,
+      "error": null
+    }
+  },
+  {
+    "source": "TestCountHelperFunction_IncompatibleType",
+    "kind": "countHelperFunction",
+    "args": {
+      "selectorID": "sel",
+      "value": "string_value"
+    },
+    "expected": {
+      "value": 0,
+      "error": {
+        "go": "Incompatible data type to fetch count"
+      }
+    }
+  },
+  {
+    "source": "TestGetValueByIndexNotation_Valid",
+    "kind": "getValueByIndexNotation",
+    "args": {
+      "indexNotation": "[1]",
+      "values": [
+        "a",
+        "b",
+        "c"
+      ]
+    },
+    "source_expected": "b",
+    "expected": {
+      "value": "b",
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetValueByIndexNotation_InvalidFormat",
+    "kind": "getValueByIndexNotation",
+    "args": {
+      "indexNotation": "1",
+      "values": [
+        "a"
+      ]
+    },
+    "expected": {
+      "value": null,
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetValueByIndexNotation_InvalidNumber",
+    "kind": "getValueByIndexNotation",
+    "args": {
+      "indexNotation": "[abc]",
+      "values": [
+        "a"
+      ]
+    },
+    "expected": {
+      "value": null,
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetValueByIndexNotation_OutOfBounds",
+    "kind": "getValueByIndexNotation",
+    "args": {
+      "indexNotation": "[10]",
+      "values": [
+        "a"
+      ]
+    },
+    "expected": {
+      "value": null,
+      "error": null
+    }
+  },
+  {
+    "source": "TestProcessRegexInput_IsMatch",
+    "kind": "processRegexInput",
+    "args": {
+      "input": "$.helper.regex.ismatch(\"^[0-9]+$\",\"12345\")"
+    },
+    "expected": {
+      "value": {
+        "matched": true,
+        "matches": null
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestProcessRegexInput_GetMatches",
+    "kind": "processRegexInput",
+    "args": {
+      "input": "$.helper.regex.getmatches(\"[0-9]+\",\"abc123def456\")"
+    },
+    "source_expected": {
+      "matched": false,
+      "matches": [
+        "123",
+        "456"
+      ]
+    },
+    "expected": {
+      "value": {
+        "matched": false,
+        "matches": [
+          "123",
+          "456"
+        ]
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestProcessRegexInput_NoParenthesis",
+    "kind": "processRegexInput",
+    "args": {
+      "input": "invalid"
+    },
+    "expected": {
+      "value": {
+        "matched": false,
+        "matches": null
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestProcessRegexInput_InvalidFunctionParts",
+    "kind": "processRegexInput",
+    "args": {
+      "input": "a.b(x,y)"
+    },
+    "expected": {
+      "value": {
+        "matched": false,
+        "matches": null
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestProcessRegexInput_TooFewParams",
+    "kind": "processRegexInput",
+    "args": {
+      "input": "$.helper.regex.ismatch(\"pattern\")"
+    },
+    "expected": {
+      "value": {
+        "matched": false,
+        "matches": null
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestRemoveSpacesFunction_SimpleString",
+    "kind": "removeSpacesFunction",
+    "args": {
+      "selector": "removespaces(hello world)",
+      "selectorParts": null
+    },
+    "source_expected": "helloworld",
+    "expected": {
+      "value": "helloworld",
+      "error": null
+    }
+  },
+  {
+    "source": "TestRemoveSpacesFunction_QuotedString",
+    "kind": "removeSpacesFunction",
+    "args": {
+      "selector": "removespaces(\"hello world\")",
+      "selectorParts": null
+    },
+    "source_expected": "helloworld",
+    "expected": {
+      "value": "helloworld",
+      "error": null
+    }
+  },
+  {
+    "source": "TestRemoveSpacesFunction_NoCall",
+    "kind": "removeSpacesFunction",
+    "args": {
+      "selector": "nope()",
+      "selectorParts": null
+    },
+    "expected": {
+      "value": "",
+      "error": {
+        "go": "No removespaces call found"
+      }
+    }
+  },
+  {
+    "source": "TestRemoveSpacesFunction_ArrayOfStrings",
+    "kind": "removeSpacesFunction",
+    "args": {
+      "selector": "removespaces([\"a b\", \"c d\"])",
+      "selectorParts": null
+    },
+    "source_expected": [
+      "ab",
+      "cd"
+    ],
+    "expected": {
+      "value": [
+        "ab",
+        "cd"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestToUpperCaseFunction_SimpleString",
+    "kind": "toUpperCaseFunction",
+    "args": {
+      "selector": "toUpper(hello)",
+      "selectorParts": null
+    },
+    "source_expected": "HELLO",
+    "expected": {
+      "value": "HELLO",
+      "error": null
+    }
+  },
+  {
+    "source": "TestToUpperCaseFunction_QuotedString",
+    "kind": "toUpperCaseFunction",
+    "args": {
+      "selector": "toUpper(\"hello\")",
+      "selectorParts": null
+    },
+    "source_expected": "HELLO",
+    "expected": {
+      "value": "HELLO",
+      "error": null
+    }
+  },
+  {
+    "source": "TestToUpperCaseFunction_NoCall",
+    "kind": "toUpperCaseFunction",
+    "args": {
+      "selector": "nope()",
+      "selectorParts": null
+    },
+    "expected": {
+      "value": "",
+      "error": {
+        "go": "No uppercase call found"
+      }
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertArrayToObject_MapData",
+    "kind": "convertArrayToObject",
+    "args": {
+      "data": {
+        "items": [
+          [
+            {
+              "key": "name",
+              "value": "test"
+            }
+          ]
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "items": {}
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertArrayToObject_StringData",
+    "kind": "convertArrayToObject",
+    "args": {
+      "data": "string_data"
+    },
+    "source_expected": "string_data",
+    "expected": {
+      "value": "string_data",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_StringValue",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel-id",
+      "value": "hello",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_EmptyString",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel-id",
+      "value": "",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "expected": {
+      "value": false,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_NonEmptySlice",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel-id",
+      "value": [
+        "a"
+      ],
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_EmptySlice",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel-id",
+      "value": [],
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "expected": {
+      "value": false,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_MapSlice",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel-id",
+      "value": [
+        {
+          "k": "v"
+        }
+      ],
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_BoolTrue",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel-id",
+      "value": true,
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_BoolFalse",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel-id",
+      "value": false,
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "expected": {
+      "value": false,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_IntNonZero",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel-id",
+      "value": 42,
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_IntZero",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel-id",
+      "value": 0,
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "expected": {
+      "value": false,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_Float64NonZero",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel-id",
+      "value": 1.5,
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessArrayItems_WithSelectorField",
+    "kind": "processArrayItems",
+    "args": {
+      "fields": [
+        {
+          "key": "name",
+          "value": "test",
+          "selector_id": ""
+        },
+        {
+          "key": "age",
+          "value": "25",
+          "selector_id": ""
+        }
+      ],
+      "items": {
+        "name": "test",
+        "age": "25"
+      }
+    },
+    "expected": {
+      "value": [],
+      "error": null
+    }
+  },
+  {
+    "source": "TestRemoveSpacesFunction_TwoArgs",
+    "kind": "removeSpacesFunction",
+    "args": {
+      "selector": "removespaces([{\"name\":\"hello world\",\"age\":\"25\"}],[\"name\"])",
+      "selectorParts": null
+    },
+    "expected": {
+      "value": [
+        {
+          "age": "25",
+          "name": "helloworld"
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestRemoveSpacesFunction_ThreeArgs",
+    "kind": "removeSpacesFunction",
+    "args": {
+      "selector": "removespaces(a,b,c)",
+      "selectorParts": null
+    },
+    "expected": {
+      "value": "",
+      "error": {
+        "go": "Unsupported number of arguments"
+      }
+    }
+  },
+  {
+    "source": "TestRemoveSpacesFunction_EmptyArgs",
+    "kind": "removeSpacesFunction",
+    "args": {
+      "selector": "removespaces()",
+      "selectorParts": null
+    },
+    "expected": {
+      "value": "",
+      "error": {
+        "go": "No arguments found"
+      }
+    }
+  },
+  {
+    "source": "TestToUpperCaseFunction_TwoArgs",
+    "kind": "toUpperCaseFunction",
+    "args": {
+      "selector": "toUpper([{\"name\":\"hello\",\"age\":\"25\"}],[\"name\"])",
+      "selectorParts": null
+    },
+    "expected": {
+      "value": [
+        {
+          "age": "25",
+          "name": "HELLO"
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestToUpperCaseFunction_ThreeArgs",
+    "kind": "toUpperCaseFunction",
+    "args": {
+      "selector": "toUpper(a,b,c)",
+      "selectorParts": null
+    },
+    "expected": {
+      "value": "",
+      "error": {
+        "go": "Unsupported number of arguments"
+      }
+    }
+  },
+  {
+    "source": "TestToUpperCaseFunction_ArrayOfStrings",
+    "kind": "toUpperCaseFunction",
+    "args": {
+      "selector": "toUpper([\"hello\",\"world\"])",
+      "selectorParts": null
+    },
+    "source_expected": [
+      "HELLO",
+      "WORLD"
+    ],
+    "expected": {
+      "value": [
+        "HELLO",
+        "WORLD"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestRemoveSpacesFunction_UnquotedArray",
+    "kind": "removeSpacesFunction",
+    "args": {
+      "selector": "removespaces([hello world, foo bar])",
+      "selectorParts": null
+    },
+    "expected": {
+      "value": [
+        "helloworld",
+        "foobar"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_MapNonEmpty",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel",
+      "value": {
+        "k": "v"
+      },
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf"
+    },
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_MapEmpty",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel",
+      "value": {},
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf"
+    },
+    "expected": {
+      "value": false,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_Float64Zero",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel",
+      "value": 0.0,
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf"
+    },
+    "expected": {
+      "value": false,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_EmptyMapSlice",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel",
+      "value": [],
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf"
+    },
+    "expected": {
+      "value": false,
+      "error": null
+    }
+  }
+]

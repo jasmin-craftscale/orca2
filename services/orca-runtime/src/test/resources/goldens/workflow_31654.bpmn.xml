@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:orca="http://lynxis.com/orca"
+             targetNamespace="http://lynxis.com/orca">
+  <process id="proc_31654" name="PLT Dispatch" isExecutable="true">
+    <startEvent id="n_0e9c26b2-c3c5-49dc-8069-e236ff51a4eb" name="START"/>
+    <receiveTask id="n_c63d426c-18b6-4289-80be-e29148c08f74" name="Dispatch RFID Read" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_e1af7b91-7505-4921-8c7c-a43a5e4c8aa4" name="Settled Scale Weight" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_66e369bb-ef21-445c-afb3-6afdbfb660a4" name="Sealink Card Read" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_eaec2e52-4b76-4a59-983a-413e7e9178dd" name="Manual Sealink Done" orca:kind="wait" orca:topic="orca-device-input"/>
+    <serviceTask id="n_ca43f109-8919-419b-b772-0462ec641445" name="Raise Dispatch Gate Arm" flowable:delegateExpression="${orcaDeviceEffectDelegate}" orca:kind="effect" orca:topic="orca-device-io"/>
+    <receiveTask id="n_5c93960f-3eb7-4a85-ac09-59036a04d902" name="Truck Exit" orca:kind="wait" orca:topic="orca-device-input"/>
+    <userTask id="n_acbf95bf-8621-4019-ba29-79a374c9abd1" name="Manual Sealink" flowable:candidateGroups="gate-clerk"/>
+    <serviceTask id="n_e25b254f-3748-4fcf-b44d-9ab1ad78781c" name="Processing Has Begun" flowable:delegateExpression="${orcaDisplayDelegate}" orca:kind="effect"/>
+    <serviceTask id="n_24cd9ff9-1641-4bda-8e89-7101bda38108" name="Please Proceed to In-Gate" flowable:delegateExpression="${orcaDisplayDelegate}" orca:kind="effect"/>
+    <serviceTask id="n_f7d4b624-d17b-452b-91e8-a0655de77cf2" name="Insert Sealink Card" flowable:delegateExpression="${orcaDisplayDelegate}" orca:kind="effect"/>
+    <task id="n_d95d54a5-f6c6-42f4-b988-46c7801ec899" name="Close Manual Sealink (Done)"/>
+    <endEvent id="n_4be4317d-aa3b-44b5-9117-26c973d0081b" name="Dispatch Complete"/>
+    <serviceTask id="n_4eacf6a6-2654-4c95-86db-adf3a9946272" name="PTP Status Check" flowable:delegateExpression="${orcaConnectorDelegate}" orca:kind="effect"/>
+    <serviceTask id="n_19471e43-d4c0-4abf-839c-e10ed0d0e770" name="Lookup Portal Passage by RFID" flowable:delegateExpression="${orcaConnectorDelegate}" orca:kind="effect"/>
+    <sequenceFlow id="flow_1" sourceRef="n_0e9c26b2-c3c5-49dc-8069-e236ff51a4eb" targetRef="n_c63d426c-18b6-4289-80be-e29148c08f74"/>
+    <sequenceFlow id="flow_2" sourceRef="n_c63d426c-18b6-4289-80be-e29148c08f74" targetRef="n_e25b254f-3748-4fcf-b44d-9ab1ad78781c"/>
+    <sequenceFlow id="flow_3" sourceRef="n_e1af7b91-7505-4921-8c7c-a43a5e4c8aa4" targetRef="n_4eacf6a6-2654-4c95-86db-adf3a9946272"/>
+    <sequenceFlow id="flow_4" sourceRef="n_66e369bb-ef21-445c-afb3-6afdbfb660a4" targetRef="n_acbf95bf-8621-4019-ba29-79a374c9abd1"/>
+    <sequenceFlow id="flow_5" sourceRef="n_eaec2e52-4b76-4a59-983a-413e7e9178dd" targetRef="n_d95d54a5-f6c6-42f4-b988-46c7801ec899"/>
+    <sequenceFlow id="flow_6" sourceRef="n_ca43f109-8919-419b-b772-0462ec641445" targetRef="n_5c93960f-3eb7-4a85-ac09-59036a04d902"/>
+    <sequenceFlow id="flow_7" sourceRef="n_5c93960f-3eb7-4a85-ac09-59036a04d902" targetRef="n_4be4317d-aa3b-44b5-9117-26c973d0081b"/>
+    <sequenceFlow id="flow_8" sourceRef="n_acbf95bf-8621-4019-ba29-79a374c9abd1" targetRef="n_eaec2e52-4b76-4a59-983a-413e7e9178dd"/>
+    <sequenceFlow id="flow_9" sourceRef="n_e25b254f-3748-4fcf-b44d-9ab1ad78781c" targetRef="n_e1af7b91-7505-4921-8c7c-a43a5e4c8aa4"/>
+    <sequenceFlow id="flow_10" sourceRef="n_24cd9ff9-1641-4bda-8e89-7101bda38108" targetRef="n_ca43f109-8919-419b-b772-0462ec641445"/>
+    <sequenceFlow id="flow_11" sourceRef="n_f7d4b624-d17b-452b-91e8-a0655de77cf2" targetRef="n_66e369bb-ef21-445c-afb3-6afdbfb660a4"/>
+    <sequenceFlow id="flow_12" sourceRef="n_d95d54a5-f6c6-42f4-b988-46c7801ec899" targetRef="n_24cd9ff9-1641-4bda-8e89-7101bda38108"/>
+    <exclusiveGateway id="gw_resp_1" name="status of PTP Status Check" default="flow_16"/>
+    <sequenceFlow id="flow_13" sourceRef="n_4eacf6a6-2654-4c95-86db-adf3a9946272" targetRef="gw_resp_1"/>
+    <sequenceFlow id="flow_14" sourceRef="gw_resp_1" targetRef="n_19471e43-d4c0-4abf-839c-e10ed0d0e770">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 200}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_15" sourceRef="gw_resp_1" targetRef="n_19471e43-d4c0-4abf-839c-e10ed0d0e770">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 404}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_16" sourceRef="gw_resp_1" targetRef="n_19471e43-d4c0-4abf-839c-e10ed0d0e770"/>
+    <exclusiveGateway id="gw_resp_2" name="status of Lookup Portal Passage by RFID" default="flow_20"/>
+    <sequenceFlow id="flow_17" sourceRef="n_19471e43-d4c0-4abf-839c-e10ed0d0e770" targetRef="gw_resp_2"/>
+    <sequenceFlow id="flow_18" sourceRef="gw_resp_2" targetRef="n_24cd9ff9-1641-4bda-8e89-7101bda38108">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 200}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_19" sourceRef="gw_resp_2" targetRef="n_f7d4b624-d17b-452b-91e8-a0655de77cf2">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 404}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_20" sourceRef="gw_resp_2" targetRef="n_f7d4b624-d17b-452b-91e8-a0655de77cf2"/>
+  </process>
+</definitions>

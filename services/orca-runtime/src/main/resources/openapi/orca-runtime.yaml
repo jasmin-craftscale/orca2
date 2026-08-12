@@ -64,6 +64,16 @@ tags:
       Operator presence (§C2). The open activity row is the current status —
       there is no status column on any user. IDLE and WORKING are assignable;
       the Push routing path selects from them.
+  - name: designer
+    description: |
+      What the builder calls while somebody is editing a workflow.
+
+      The compiler is the definition of valid, and these routes are the only way
+      to ask it — the alternative, reimplementing the invariants in the frontend,
+      drifts within a release, and a drifted validator blesses a workflow the
+      deploy then rejects. Nothing is stored and nothing is deployed: a draft is
+      compiled in memory and thrown away, which makes these safe to call on every
+      debounce.
 
 paths:
   /api/v1/health:
@@ -818,6 +828,95 @@ paths:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 
+  /api/v1/designer/validate:
+    post:
+      tags: [designer]
+      operationId: validateDraft
+      summary: Validate a draft workflow by really compiling it
+      description: |
+        The verdict — `compiles` — comes from actually compiling the draft, so
+        validation and deployment cannot disagree about whether a workflow is
+        publishable. The findings list every problem at once, addressed to the
+        person editing, each carrying the SAME invariant name the deploy failure
+        would carry.
+
+        The body is the draft publish payload exactly as the designer would send
+        it to publish — the same bytes, so what is validated is what would deploy.
+        A payload that cannot even be read is still an answer the builder can
+        draw: not publishable, and here is why — never an internal detail.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DesignerDraft"
+      responses:
+        "200":
+          description: The verdict, with every finding at once
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationReportEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/designer/namespace:
+    post:
+      tags: [designer]
+      operationId: draftNamespace
+      summary: What a selector may name at a point in a draft
+      description: |
+        The data behind the builder's autocomplete. A selector typed by hand that
+        names something no upstream step produces resolves to empty, the condition
+        compares against empty, and a truck takes the wrong branch with nothing
+        logged — offering the right thing first is how that class dies at the
+        keyboard rather than at 3am.
+
+        It helps, it does not police: every step in the draft comes back, each
+        marked with whether it runs before the editing point — ranking, not
+        filtering. POST because a draft is not saved anywhere; the payload being
+        edited is the input, exactly as `/validate` takes it.
+      parameters:
+        - name: nodeUuid
+          in: query
+          required: false
+          description: |
+            The step being edited. Given one, steps are marked with whether they
+            run before it; without one there is no editing point to be upstream
+            of, and the ranking is simply flat.
+          schema:
+            type: string
+            maxLength: 64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DesignerDraft"
+      responses:
+        "200":
+          description: The namespace, ranked for the editing point
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SelectorNamespaceEnvelope"
+        "400":
+          description: The draft could not be read as a publish payload
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
 components:
   parameters:
     WorkItemExternalId:
@@ -1156,3 +1255,125 @@ components:
           properties:
             data:
               $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ServiceHealth"
+
+    DesignerDraft:
+      type: object
+      description: |
+        A draft publish payload, passed through to the compiler as-is. Free-form
+        on purpose: the payload's shape belongs to the compiler, which refuses a
+        malformed one by name — a schema here would be a second, drifting copy of
+        that judgement.
+      additionalProperties: true
+
+    ValidationFinding:
+      type: object
+      properties:
+        invariant:
+          type: string
+          description: |
+            The compiler invariant that would refuse this — the SAME name the
+            compile failure carries, so a builder message and a deploy failure
+            are traceably one thing.
+        subjectId:
+          type: string
+          description: The node, link, branch or response uuid the author should look at. Absent when the finding is about the workflow as a whole.
+        subjectName:
+          type: string
+          description: The authored name of that subject, because a uuid means nothing on a canvas.
+        message:
+          type: string
+          description: Plain language, addressed to an author rather than to a compiler engineer.
+
+    ValidationReport:
+      type: object
+      properties:
+        compiles:
+          type: boolean
+          description: Would this deploy — answered by really compiling, so the verdict and the deploy cannot disagree.
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationFinding"
+
+    ValidationReportEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/ValidationReport"
+
+    NamespaceNode:
+      type: object
+      properties:
+        uuid:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        selector:
+          type: string
+          description: The selector text an author would write to name this step's data.
+        runsBefore:
+          type: boolean
+          description: |
+            This step's data already exists at the editing point — a ranking
+            hint for the builder, never a restriction.
+
+    NamespaceDatasetKey:
+      type: object
+      properties:
+        key:
+          type: string
+        selector:
+          type: string
+        provenance:
+          type: string
+          description: |
+            `AUTHORED` — some condition in this draft already reads it, so it is
+            part of the vocabulary by construction. `OBSERVED` — visits of this
+            workflow have actually written it, the stronger evidence. A key may
+            be both.
+
+    NamespaceWorkflow:
+      type: object
+      properties:
+        workflowUuid:
+          type: string
+        workflowId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        selector:
+          type: string
+
+    SelectorNamespace:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/NamespaceNode"
+        datasetKeys:
+          type: array
+          items:
+            $ref: "#/components/schemas/NamespaceDatasetKey"
+        workflows:
+          type: array
+          items:
+            $ref: "#/components/schemas/NamespaceWorkflow"
+        helpers:
+          type: array
+          items:
+            type: string
+          description: The evaluator's helper functions, as an author writes them.
+
+    SelectorNamespaceEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SelectorNamespace"

@@ -219,6 +219,20 @@ dependencies {
 	"integrationTestImplementation"(libs.spring.boot.starter.webmvc.test)
 }
 
+// --- Engine-seam contract tests across two tiers ------------------------------
+//
+// The engine seam has ONE contract test and two implementations: the in-memory
+// fake runs it in the fast tier (src/test, no Docker), and the Flowable adapter
+// re-runs the same contract in integrationTest against a real engine on a real
+// SQL Server. The abstract contract classes live in src/test; integrationTest
+// must therefore see the test output — this is the one module where the two
+// tiers deliberately share code, and it shares test classes only, never fixtures
+// of state.
+sourceSets["integrationTest"].apply {
+	compileClasspath += sourceSets["test"].output
+	runtimeClasspath += sourceSets["test"].output
+}
+
 // Runtime refuses to start without a valid secret key ring. Give the real-context
 // integration suite a fresh key for each task execution instead of committing a
 // second production-acceptable fixture.

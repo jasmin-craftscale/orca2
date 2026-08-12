@@ -27,6 +27,10 @@ import com.lynxis.orca.runtime.execution.domain.ProcessEngineGateway;
 import com.lynxis.orca.runtime.execution.domain.VisitCompletion;
 import com.lynxis.orca.runtime.execution.domain.VisitCompletionListener;
 import com.lynxis.orca.runtime.execution.domain.WorkItemCreationListener;
+import com.lynxis.orca.runtime.execution.engine.flowable.NodeExecutionRecorder;
+import com.lynxis.orca.runtime.execution.internal.VisitDataWriter;
+import com.lynxis.orca.runtime.execution.persistence.NodeExecutionTraceRepository;
+import com.lynxis.orca.runtime.execution.persistence.VisitDatasetRepository;
 import com.lynxis.orca.runtime.execution.persistence.AdmissionRepository;
 import com.lynxis.orca.runtime.execution.persistence.EdgeDeviceCommandClient;
 import com.lynxis.orca.runtime.execution.persistence.FlowableManualSteps;
@@ -151,10 +155,189 @@ public class ExecutionConfiguration {
 	public EngineConfigurationConfigurer<SpringProcessEngineConfiguration> engineListenerRegistrar(
 			VisitCompletion completion, WorkItemIntake workItemIntake,
 			AdmissionRepository admissionRepository,
+			NodeExecutionTraceRepository nodeExecutionTrace,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
 		return configuration -> configuration.setEventListeners(List.of(
 				new VisitCompletionListener(completion),
-				new WorkItemCreationListener(workItemIntake, admissionRepository, siteExternalId)));
+				new WorkItemCreationListener(workItemIntake, admissionRepository, siteExternalId),
+				new NodeExecutionRecorder(nodeExecutionTrace, siteExternalId)));
+	}
+
+	// --- The step trace and the visit dataset --------------------------------
+	//
+	// What a visit's process actually did, and what it knows: written in the
+	// engine's own transaction by the recorder above and by the delegates through
+	// the data sink, read back by the selector data provider when a connector
+	// body or a condition asks.
+
+	@Bean
+	public NodeExecutionTraceRepository nodeExecutionTraceRepository(ScopeSeam seam) {
+		return new NodeExecutionTraceRepository(seam);
+	}
+
+	@Bean
+	public VisitDatasetRepository visitDatasetRepository(ScopeSeam seam) {
+		return new VisitDatasetRepository(seam);
+	}
+
+	@Bean
+	public VisitDataWriter visitDataWriter(VisitDatasetRepository dataset,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new VisitDataWriter(dataset, siteExternalId);
+	}
+
+	// --- The facade and the selector's live binding ---------------------------
+	//
+	// The engine seam's Flowable adapter, the registry the publish path fills,
+	// the facade that resumes and inspects visits (never starts them — admission
+	// owns the start), and the data provider that binds the ported selector
+	// evaluator to this runtime's tables.
+
+	/** The reversibility seam's adapter — the one bean that hands the engine out engine-free. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.engine.WorkflowEngine workflowEngine(
+			org.flowable.engine.ProcessEngine processEngine) {
+		return new com.lynxis.orca.runtime.execution.engine.flowable.FlowableWorkflowEngine(processEngine);
+	}
+
+	@Bean
+	public com.lynxis.orca.runtime.execution.internal.DefinitionRegistry definitionRegistry() {
+		return new com.lynxis.orca.runtime.execution.internal.DefinitionRegistry();
+	}
+
+	@Bean
+	public com.lynxis.orca.runtime.execution.api.ExecutionFacade executionFacade(
+			com.lynxis.orca.runtime.execution.engine.WorkflowEngine workflowEngine,
+			AdmissionRepository admissionRepository, VisitDataWriter visitDataWriter,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.runtime.execution.internal.RuntimeExecutionFacade(
+				workflowEngine, admissionRepository, visitDataWriter, siteExternalId);
+	}
+
+	@Bean
+	public com.lynxis.orca.runtime.execution.persistence.VisitTreeRepository visitTreeRepository(
+			ScopeSeam seam) {
+		return new com.lynxis.orca.runtime.execution.persistence.VisitTreeRepository(seam);
+	}
+
+	/**
+	 * The selector's live binding. The catalog is deliberately {@code UNBOUND}:
+	 * a configuration question a selector asks before the site-configuration
+	 * adapter lands (it comes with the connector phase) fails by the method's
+	 * name rather than resolving to an empty string that routes a truck.
+	 */
+	@Bean
+	public com.lynxis.orca.runtime.execution.selector.SelectorDataProvider selectorDataProvider(
+			com.lynxis.orca.runtime.execution.persistence.VisitTreeRepository visitTree,
+			NodeExecutionTraceRepository nodeExecutionTrace, VisitDatasetRepository visitDataset,
+			com.lynxis.orca.runtime.execution.internal.DefinitionRegistry definitionRegistry,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.runtime.execution.internal.selector.RuntimeSelectorDataProvider(
+				visitTree, nodeExecutionTrace, visitDataset, definitionRegistry,
+				com.lynxis.orca.runtime.execution.internal.selector.SiteCatalog.UNBOUND,
+				siteExternalId);
+	}
+
+	// --- the compiled definitions' delegates -----------------------------------
+	//
+	// Bean names are load-bearing here exactly as they are for the two gate-process
+	// delegates above: the compiler emits ${orcaConnectorDelegate} and friends into
+	// every definition it produces. The SPI defaults refuse loudly — a runtime
+	// booted without an adapter fails the step by name, never quietly no-ops and
+	// never quietly acts.
+
+	/** Trades the engine's instance id for the identifiers selectors resolve against. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.delegate.spi.VisitIdentity visitIdentity(
+			AdmissionRepository admissionRepository,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.runtime.execution.internal.RuntimeVisitIdentity(
+				admissionRepository, siteExternalId);
+	}
+
+	/** Bean name = the compiler's link target. Do not rename. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.delegate.OrcaConnectorDelegate orcaConnectorDelegate(
+			ObjectProvider<com.lynxis.orca.runtime.execution.delegate.spi.ConnectorGateway> gateway,
+			RuntimeService runtimeService, VisitDataWriter visitDataWriter,
+			com.lynxis.orca.runtime.execution.delegate.spi.VisitIdentity visitIdentity) {
+		return new com.lynxis.orca.runtime.execution.delegate.OrcaConnectorDelegate(
+				gateway.getIfAvailable(ExecutionConfiguration::unconfiguredConnectorGateway),
+				runtimeService, visitDataWriter, visitIdentity);
+	}
+
+	/** Bean name = the compiler's link target. Do not rename. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.delegate.OrcaDeviceEffectDelegate orcaDeviceEffectDelegate(
+			ObjectProvider<com.lynxis.orca.runtime.execution.delegate.spi.EdgeClient> edgeClient) {
+		return new com.lynxis.orca.runtime.execution.delegate.OrcaDeviceEffectDelegate(
+				edgeClient.getIfAvailable(ExecutionConfiguration::unconfiguredEdgeClient));
+	}
+
+	/** Bean name = the compiler's link target. Do not rename. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.delegate.OrcaDisplayDelegate orcaDisplayDelegate(
+			ObjectProvider<com.lynxis.orca.runtime.execution.delegate.spi.EdgeClient> edgeClient) {
+		return new com.lynxis.orca.runtime.execution.delegate.OrcaDisplayDelegate(
+				edgeClient.getIfAvailable(ExecutionConfiguration::unconfiguredEdgeClient));
+	}
+
+	/** Bean name = the compiler's link target. Do not rename. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.delegate.OrcaNotificationDelegate orcaNotificationDelegate(
+			ObjectProvider<com.lynxis.orca.runtime.execution.delegate.spi.NotificationSender> sender) {
+		return new com.lynxis.orca.runtime.execution.delegate.OrcaNotificationDelegate(
+				sender.getIfAvailable(ExecutionConfiguration::unconfiguredNotificationSender));
+	}
+
+	/**
+	 * The connector gateway an installation has not configured. A connector cannot
+	 * no-op — routing needs its response — so this fails the step by name, never
+	 * with a fabricated status a compiled branch would route on.
+	 */
+	static com.lynxis.orca.runtime.execution.delegate.spi.ConnectorGateway unconfiguredConnectorGateway() {
+		return request -> {
+			throw new IllegalStateException("No ConnectorGateway adapter is configured in this "
+					+ "installation, so connector node '" + request.nodeUuid() + "' ('"
+					+ request.name() + "') cannot be called. This is a deployment gap, not a "
+					+ "customer system that said no.");
+		};
+	}
+
+	/** The edge an installation has not configured: the effect fails by name. */
+	static com.lynxis.orca.runtime.execution.delegate.spi.EdgeClient unconfiguredEdgeClient() {
+		return command -> {
+			throw new IllegalStateException("No EdgeClient adapter is configured in this "
+					+ "installation, so the " + command.kind() + " effect '" + command.name()
+					+ "' (" + command.nodeUuid() + ") cannot be performed. This is a deployment "
+					+ "fault, not a device fault.");
+		};
+	}
+
+	/** The notify seam an installation has not configured: the alert fails by name. */
+	static com.lynxis.orca.runtime.execution.delegate.spi.NotificationSender unconfiguredNotificationSender() {
+		return (idempotencyKey, siteExternalId, nodeUuid, name) -> {
+			throw new IllegalStateException("No NotificationSender adapter is configured in this "
+					+ "installation, so notification '" + name + "' (" + nodeUuid
+					+ ") cannot be sent.");
+		};
+	}
+
+	// --- the designer's validation surface ------------------------------------
+
+	/** The compiler, as the module's compilation facade — pure, so construction is free. */
+	@Bean
+	public com.lynxis.orca.runtime.execution.api.CompilationFacade compilationFacade() {
+		return new com.lynxis.orca.runtime.execution.compiler.DesignerJsonCompiler();
+	}
+
+	@Bean
+	public com.lynxis.orca.runtime.execution.internal.selector.NamespaceService namespaceService(
+			VisitDatasetRepository visitDataset,
+			com.lynxis.orca.runtime.execution.internal.DefinitionRegistry definitionRegistry,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new com.lynxis.orca.runtime.execution.internal.selector.NamespaceService(
+				visitDataset, definitionRegistry, siteExternalId);
 	}
 
 	// --- the manual-input wait state ----------------------------------------

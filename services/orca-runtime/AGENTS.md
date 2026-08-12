@@ -4,7 +4,7 @@ The one decomposed service. Five modules, named by `ORCA_ARCHITECTURE.md` §C2 a
 depended on by name in `build-checks`' `OrcaClasses.RUNTIME_MODULES`:
 
 | Module | Owns |
-|---|---|
+| --- | --- |
 | `execution` | Executions, visits, node executions, payload storage |
 | `workitem` | Work items, routing, the audit trail |
 | `integration` | Connector configuration, event dispatch, the partner API |

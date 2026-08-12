@@ -1,0 +1,177 @@
+{
+  "workflow_id" : 31654,
+  "workflow_uuid" : "9f120e11-c7fe-4697-a709-bea2c1ceebf3",
+  "name" : "PLT Dispatch",
+  "nodes" : [ {
+    "uuid" : "0e9c26b2-c3c5-49dc-8069-e236ff51a4eb",
+    "type" : "START",
+    "name" : "START"
+  }, {
+    "uuid" : "c63d426c-18b6-4289-80be-e29148c08f74",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Dispatch RFID Read",
+    "mode" : "INPUT",
+    "topic" : "orca-device-input"
+  }, {
+    "uuid" : "e1af7b91-7505-4921-8c7c-a43a5e4c8aa4",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Settled Scale Weight",
+    "mode" : "INPUT",
+    "topic" : "orca-device-input"
+  }, {
+    "uuid" : "66e369bb-ef21-445c-afb3-6afdbfb660a4",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Sealink Card Read",
+    "mode" : "INPUT",
+    "topic" : "orca-device-input"
+  }, {
+    "uuid" : "eaec2e52-4b76-4a59-983a-413e7e9178dd",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Manual Sealink Done",
+    "mode" : "INPUT",
+    "topic" : "orca-device-input"
+  }, {
+    "uuid" : "ca43f109-8919-419b-b772-0462ec641445",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Raise Dispatch Gate Arm",
+    "mode" : "OUTPUT",
+    "topic" : "orca-device-io"
+  }, {
+    "uuid" : "5c93960f-3eb7-4a85-ac09-59036a04d902",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Truck Exit",
+    "mode" : "INPUT",
+    "topic" : "orca-device-input"
+  }, {
+    "uuid" : "acbf95bf-8621-4019-ba29-79a374c9abd1",
+    "type" : "MANUAL_INPUT",
+    "name" : "Manual Sealink"
+  }, {
+    "uuid" : "e25b254f-3748-4fcf-b44d-9ab1ad78781c",
+    "type" : "DISPLAY",
+    "name" : "Processing Has Begun"
+  }, {
+    "uuid" : "24cd9ff9-1641-4bda-8e89-7101bda38108",
+    "type" : "DISPLAY",
+    "name" : "Please Proceed to In-Gate"
+  }, {
+    "uuid" : "f7d4b624-d17b-452b-91e8-a0655de77cf2",
+    "type" : "DISPLAY",
+    "name" : "Insert Sealink Card"
+  }, {
+    "uuid" : "d95d54a5-f6c6-42f4-b988-46c7801ec899",
+    "type" : "TERMINATOR",
+    "name" : "Close Manual Sealink (Done)"
+  }, {
+    "uuid" : "4be4317d-aa3b-44b5-9117-26c973d0081b",
+    "type" : "TERMINATOR",
+    "name" : "Dispatch Complete"
+  }, {
+    "uuid" : "4eacf6a6-2654-4c95-86db-adf3a9946272",
+    "type" : "CONNECTOR",
+    "name" : "PTP Status Check"
+  }, {
+    "uuid" : "19471e43-d4c0-4abf-839c-e10ed0d0e770",
+    "type" : "CONNECTOR",
+    "name" : "Lookup Portal Passage by RFID"
+  } ],
+  "branches" : [ ],
+  "responses" : [ {
+    "uuid" : "8382bdc6-3635-4b4a-95e3-2357c5fc3b97",
+    "connector_uuid" : "4eacf6a6-2654-4c95-86db-adf3a9946272",
+    "status_code" : 200
+  }, {
+    "uuid" : "448e8ab0-2982-4114-b730-526a3a01dbc4",
+    "connector_uuid" : "4eacf6a6-2654-4c95-86db-adf3a9946272",
+    "status_code" : 404
+  }, {
+    "uuid" : "f531888d-8f62-42c1-ad2d-1fcbfadee212",
+    "connector_uuid" : "4eacf6a6-2654-4c95-86db-adf3a9946272",
+    "status_code" : 0
+  }, {
+    "uuid" : "6b7ecb95-6c3d-492e-a3bf-6ef461a8379f",
+    "connector_uuid" : "19471e43-d4c0-4abf-839c-e10ed0d0e770",
+    "status_code" : 200
+  }, {
+    "uuid" : "af957e6c-9bbb-4d0c-93b5-70dc981b30be",
+    "connector_uuid" : "19471e43-d4c0-4abf-839c-e10ed0d0e770",
+    "status_code" : 404
+  }, {
+    "uuid" : "8743c79c-8056-4c44-bef6-9d45324f5f70",
+    "connector_uuid" : "19471e43-d4c0-4abf-839c-e10ed0d0e770",
+    "status_code" : 0
+  } ],
+  "node_links" : [ {
+    "from" : "0e9c26b2-c3c5-49dc-8069-e236ff51a4eb",
+    "to" : "c63d426c-18b6-4289-80be-e29148c08f74",
+    "position" : 0
+  }, {
+    "from" : "c63d426c-18b6-4289-80be-e29148c08f74",
+    "to" : "e25b254f-3748-4fcf-b44d-9ab1ad78781c",
+    "position" : 1
+  }, {
+    "from" : "e25b254f-3748-4fcf-b44d-9ab1ad78781c",
+    "to" : "e1af7b91-7505-4921-8c7c-a43a5e4c8aa4",
+    "position" : 2
+  }, {
+    "from" : "e1af7b91-7505-4921-8c7c-a43a5e4c8aa4",
+    "to" : "4eacf6a6-2654-4c95-86db-adf3a9946272",
+    "position" : 3
+  }, {
+    "from" : "8382bdc6-3635-4b4a-95e3-2357c5fc3b97",
+    "to" : "19471e43-d4c0-4abf-839c-e10ed0d0e770",
+    "position" : 4
+  }, {
+    "from" : "448e8ab0-2982-4114-b730-526a3a01dbc4",
+    "to" : "19471e43-d4c0-4abf-839c-e10ed0d0e770",
+    "position" : 5
+  }, {
+    "from" : "f531888d-8f62-42c1-ad2d-1fcbfadee212",
+    "to" : "19471e43-d4c0-4abf-839c-e10ed0d0e770",
+    "position" : 6
+  }, {
+    "from" : "6b7ecb95-6c3d-492e-a3bf-6ef461a8379f",
+    "to" : "24cd9ff9-1641-4bda-8e89-7101bda38108",
+    "position" : 7
+  }, {
+    "from" : "af957e6c-9bbb-4d0c-93b5-70dc981b30be",
+    "to" : "f7d4b624-d17b-452b-91e8-a0655de77cf2",
+    "position" : 8
+  }, {
+    "from" : "8743c79c-8056-4c44-bef6-9d45324f5f70",
+    "to" : "f7d4b624-d17b-452b-91e8-a0655de77cf2",
+    "position" : 9
+  }, {
+    "from" : "f7d4b624-d17b-452b-91e8-a0655de77cf2",
+    "to" : "66e369bb-ef21-445c-afb3-6afdbfb660a4",
+    "position" : 10
+  }, {
+    "from" : "66e369bb-ef21-445c-afb3-6afdbfb660a4",
+    "to" : "acbf95bf-8621-4019-ba29-79a374c9abd1",
+    "position" : 11
+  }, {
+    "from" : "acbf95bf-8621-4019-ba29-79a374c9abd1",
+    "to" : "eaec2e52-4b76-4a59-983a-413e7e9178dd",
+    "position" : 12
+  }, {
+    "from" : "eaec2e52-4b76-4a59-983a-413e7e9178dd",
+    "to" : "d95d54a5-f6c6-42f4-b988-46c7801ec899",
+    "position" : 13
+  }, {
+    "from" : "d95d54a5-f6c6-42f4-b988-46c7801ec899",
+    "to" : "24cd9ff9-1641-4bda-8e89-7101bda38108",
+    "position" : 14
+  }, {
+    "from" : "24cd9ff9-1641-4bda-8e89-7101bda38108",
+    "to" : "ca43f109-8919-419b-b772-0462ec641445",
+    "position" : 15
+  }, {
+    "from" : "ca43f109-8919-419b-b772-0462ec641445",
+    "to" : "5c93960f-3eb7-4a85-ac09-59036a04d902",
+    "position" : 16
+  }, {
+    "from" : "5c93960f-3eb7-4a85-ac09-59036a04d902",
+    "to" : "4be4317d-aa3b-44b5-9117-26c973d0081b",
+    "position" : 17
+  } ]
+}
