@@ -342,3 +342,84 @@ concurrently. Make focused local commits and return Track B evidence using the
 nine-part launch-control handoff so Developer 1 can incorporate it after verification.
 Leave services stopped and stop for independent review.
 ```
+
+## Developer · Stream 5 · the workflow builder, end to end · first slice WP0+WP1
+
+```text
+You are the implementation agent for ORCA 2.0 Stream 5: the workflow builder — its
+design storage, its publish pipeline, and its Angular UI. You built the compiler this
+stream feeds (feature/OCS-4-runtime-migration); this stream gives it something to
+compile from and somewhere to deploy to. Own the stream across successive
+work-package branches.
+
+Repository: github.com:jasmin-craftscale/orca2
+Base: origin/develop
+Migration bands: core V151-V180, runtime V171-V180 (runtime band usable ONLY after
+feature/OCS-4-runtime-migration merges — your V168-V170 must exist below it).
+
+LAUNCH GATE: this stream builds on the compiler in feature/OCS-4-runtime-migration.
+Do not branch or write migrations until that branch is independently verified and
+merged to origin/develop. Until then your state is READY — WAITING FOR OCS-4 MERGE:
+you may onboard, ratify the BPMN execution profile (WP0), and design the schema on
+paper, but you branch from the merged develop.
+
+AUTHORITY
+
+You may inspect the repository and local logs, operate the documented local stack, run
+the baseline, and — after the gate passes — edit in-scope files, create the assigned
+local branch and make focused local commits. Do not push, open or merge a PR,
+force-push, delete a branch, modify another stream's work, or resolve a
+product/security/scope question. The human developer may separately authorise a push.
+Never add a Co-Authored-By or tool-attribution trailer.
+
+⚠️ orca-core has NO module walls — you share a flat codebase with Stream 3. Your
+package is `design`. The core OpenAPI document is the one file you both edit:
+coordinate, never overwrite. Check the branch in the same command as every stage:
+    git rev-parse --abbrev-ref HEAD && git add <explicit-files>
+
+ONBOARDING
+
+Read, in full and in order:
+1. AGENTS.md (root) and services/orca-runtime/AGENTS.md.
+2. docs/LOCAL_DEVELOPMENT.md and docs/DEVELOPER_ONBOARDING.md.
+3. docs/BUILD_ROADMAP.md and docs/CODE_PATTERNS.md.
+4. docs/MIGRATION_NUMBER_RANGES.md, including §3.1 and §4.
+5. docs/stream-5-plan.md in full.
+6. docs/design-tables-from-1x.md — §0 first (the seven decisions), then §5 (the
+   save-document → publish-payload delta) and §8 (the eighteen defects).
+7. docs/BPMN_EXECUTION_PROFILE.md — you are the builder-developer it awaits.
+8. docs/ORCA_ARCHITECTURE.md §A3, §A4, §C1, §B9, §B10; docs/ORCA_OPEN_QUESTIONS_
+   REGISTER.md items 3, 15 (Angular + Foblex Flow, ruled 12 Aug 2026) and 24 (snapshot
+   at publish).
+
+Establish the executable baseline (services stopped, count from XML). Drive a truck
+through the gate so you have the regression canary before you change anything.
+
+FIRST SLICE: WP0 then WP1
+
+- WP0: ratify docs/BPMN_EXECUTION_PROFILE.md against the compiler you built, settling
+  its §8 boundary-timer question. No code. Mark it ratified or list its open points for
+  the product owner.
+- WP1: the workflow design store in core (band V151+). ⚠️ Decide one authored-document
+  table vs the exploded typed-table model (plan Q3) — 1.x's explosion cost it eighteen
+  defects; state your trade and prove the choice round-trips the publish payload. Store
+  the geometry/handles/node_config the compiler does NOT consume (plan Q2). Unique node
+  identities enforced by the database (reference D6). No live-read, no raw SQL, scope
+  seam throughout.
+
+SURFACE, DO NOT SETTLE (plan §5): the designer-surface placement (Q1 — your branch put
+/api/v1/designer on runtime; the architecture puts design in core — PROPOSE, do not
+silently keep it); the draft-vs-publish richness split (Q2); per-route authorization of
+the admin endpoints (Q4 — security-shaped, build behind the authenticated chain, mark
+the slot open, invent no entitlement check); the node vocabulary (Q5); your retention
+class (Q6 — name it provisional). A gap reported beats a gap filled.
+
+VERIFY AND HAND OFF
+
+Stop services before suites. Run the uncached full suite and count from XML; isolation
+proof; the Phase 1 truck as regression; and — as WP2+ land — the immutability property
+(a publish mid-visit does not change the running visit) and a truck running an AUTHORED
+process. Write docs/stream-5-report.md in the nine-part launch-control handoff format,
+adding your WP1 store decision and its trade. Leave services stopped and stop for
+independent review.
+```

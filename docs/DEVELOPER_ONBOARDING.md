@@ -171,6 +171,7 @@ is rule 2: ask for an extraction before you rely on what you read.
 | `read-models-notify-from-1x.md` | The operator grids and the notification hub — **six inversions** |
 | `custom-entities-from-1x.md` | Customer-declared entities and runtime schema changes — **six inversions**, and the old system calls these *reference data* |
 | `work-items-schema-from-1x.md` | The clerk workflow — **three inversions**, built in Phase 3 |
+| `design-tables-from-1x.md` | Workflow & screen design storage and the publish path — **§0's seven decisions**, the save-document → publish-payload delta, and eighteen defects not carried forward (stream 5) |
 | `core-config-schema-from-1x.md` | The configuration tables — **§0's eleven translation rules govern every further port** |
 | `lpr-wire-format-from-1x.md` | What the camera puts on the wire, and three behaviours 2.0 refuses to copy |
 | `device-host-outbound-from-1x.md` | Barrier, print and IO commands — **§3 is an open question, not a design** |

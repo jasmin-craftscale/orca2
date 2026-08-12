@@ -72,15 +72,16 @@ The gate path runs end to end today. You can drive it yourself in a minute;
 
 ## 4 · What is being built now
 
-**Four streams. They are not a queue — three of them run at the same time.**
+**Five streams. They are not a queue — four of them run at the same time.**
 
 ```
 Stream 1 · Partner event API        ──┐
 Stream 2 · Read models & notify     ──┼──→  Stream 4 · Retention & purge
-Stream 3 · Core remainder  (independent)    (last — it touches every schema)
+Stream 3 · Core remainder           ──┤     (last — it touches every schema)
+Stream 5 · Workflow builder         ──┘
 ```
 
-Streams 1, 2 and 3 are concurrent. **Stream 4 is not concurrent with anything**:
+Streams 1, 2, 3 and 5 are concurrent. **Stream 4 is not concurrent with anything**:
 it touches every schema, so it would collide with all three. It also purges tables
 that streams 1 and 2 create, which is the second reason it goes last.
 
@@ -184,6 +185,28 @@ actually being bounded.
   today, all marked provisional. **Settle the list before this stream starts**, or
   it will encode the wrong one.
 
+### Stream 5 · The workflow builder — end to end
+
+The property the product is named for, made real: design storage, the publish
+pipeline (validate → compile → freeze → deploy), lane/area assignment, and the
+builder UI. Assigned 12 Aug 2026 to the developer who ported the compiler.
+
+- **Owns:** `orca-core`'s design module (storage, publish, assignment — core
+  V151–V180), the runtime deployment-receiving half (`POST
+  /internal/deployments/v1`, definition binding — runtime V171–V180), and the
+  builder UI (**Angular + Foblex Flow** — register items 3 and 15, re-ruled
+  12 Aug 2026)
+- **Reference:** `docs/design-tables-from-1x.md` — in preparation
+- **Plan:** `docs/stream-5-plan.md` — in preparation
+- **Launch gate:** `feature/OCS-4-runtime-migration` independently verified and
+  merged — the stream builds directly on the compiler it carries
+- ⚠️ **Two seams to respect.** `orca-core` has **no module walls** (only runtime
+  is decomposed), so streams 3 and 5 share a flat codebase: disjoint packages,
+  disjoint migration bands, and the core OpenAPI document is the one file both
+  touch. And the `n_`-prefixed start-node trace gap the compiler port flagged
+  becomes real the day the first compiled process is admitted — its fix touches
+  `AdmissionService`, which stream 1 Track A also modifies; coordinate the order.
+
 ## 5 · After those four — and an honest statement about the word "complete"
 
 When streams 1–4 land, a site can **run its gate end to end, configure itself,
@@ -198,24 +221,24 @@ are built on this sentence.
 
 | Missing | Consequence |
 |---|---|
-| **The workflow compiler and publish pipeline** | Administrators cannot design a process. The platform runs exactly one hand-written process definition. `POST /internal/deployments/v1` — the endpoint core pushes a published version to — appears in **zero** contracts today |
-| **The frontend** | Two React applications, the kiosk, and both visual builders. Nothing can be shown to a customer |
+| **The publish pipeline and the builder** | The compiler itself was ported on `feature/OCS-4-runtime-migration` (awaiting independent verification and merge). Design storage, the publish pipeline, `POST /internal/deployments/v1` — still in **zero** contracts — and the builder UI are **stream 5**, assigned 12 Aug 2026. Until it lands, administrators cannot design a process and the platform runs exactly one hand-written definition |
+| **The frontend** | Two Angular applications (re-ruled 12 Aug 2026 — was React; register item 3), the kiosk, and both visual builders. The workflow builder is now stream 5; the console and kiosk remain unowned. Nothing can be shown to a customer without the console |
 | **The operator surfaces** | `/screens/submit`, take-by-lane, the grids and exports are named in the architecture and deliberately unbuilt — they wait on a console to consume them |
 | **The deployment story** | Release images, a registry, secrets provisioning, a reverse proxy, licensing at install. `docs/deployment.md` Part 2 is the backlog, with an honest per-step status |
 | **The cloud tier** | `orca-portal`, `orca-sync` and `orca-fleet` stay skeletons until cloud scope opens |
 | **The verify-device-state branch** | The architecture guarantees that an unknown command outcome is resolved *by looking at the device*, never by retrying or assuming. Today that branch exists only as a comment — `device.state.unknown` is not routed anywhere in the shipped process, so in practice "resolve by looking" means "a person looks". A gate-path gap, and small |
 
-**The frontend is the biggest of these by volume; the compiler is the one most
-easily overlooked, and it is the one that changes what the product can claim.** One of
-the two properties this platform exists for is *the site's processes belong to the
-site* — administrators design them visually, without code. Until the compiler
-exists, that property is unimplemented. It is not in any of the four streams
-because it needs the developer building the visual builder, working from
-`docs/BPMN_EXECUTION_PROFILE.md` — which is still marked *proposed* and has never
-been reviewed by them.
+**The frontend is the biggest of these by volume; the publish pipeline is the one
+that changes what the product can claim.** One of the two properties this platform
+exists for is *the site's processes belong to the site* — administrators design
+them visually, without code. Until the pipeline exists, that property is
+unimplemented. **As of 12 Aug 2026 it has an owner: stream 5, the developer who
+ported the compiler** — and ratifying `docs/BPMN_EXECUTION_PROFILE.md` (still
+marked *proposed*) is that stream's first work package rather than an orphaned
+question.
 
-None of this is a reason to delay the four streams. All of it is a reason not to
-let "backend complete" be read as "product complete" in any plan or estimate.
+None of this is a reason to delay the streams. All of it is a reason not to let
+"backend complete" be read as "product complete" in any plan or estimate.
 
 ## 6 · What is deliberately not being started, and why
 

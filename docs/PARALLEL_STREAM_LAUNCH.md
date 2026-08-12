@@ -61,11 +61,14 @@ Do not invent an undocumented multi-stack port/database arrangement. Use
 | **1** | Stream 1 Track A | `feature/stream-1-a1` | A1 admission seam only | Credentials gate passes |
 | **2** | Stream 2 | `feature/stream-2-wp0-wp1` | WP0's readmodel transition + WP1 | Credentials gate passes |
 | **3** | Stream 3 | `feature/stream-3-wp1` | WP1 declared model + WP2 decision proposal | Credentials gate passes |
-| **4** | Stream 1 Track B | `feature/stream-1-b1` | B1 connector configuration | Credentials gate passes **and A1 is merged** |
+| **4 · Selvedin** | **Stream 5 · workflow builder** — reassigned 12 Aug 2026, was Stream 1 Track B | per `docs/stream-5-plan.md` | design storage + publish pipeline, then the builder UI | `feature/OCS-4-runtime-migration` independently verified **and merged** |
 
-Developer 4 may onboard, establish the baseline and study B1 while A1 is in review.
-They do not branch or implement B1 from a pre-A1 baseline. Their correct interim
-state is `READY — WAITING FOR A1`.
+⚠️ **Stream 1 Track B is unstaffed since the 12 Aug reassignment.** Two honest
+options, and the choice is the product owner's: staff a fifth developer onto Track B
+(its gate is unchanged: credentials pass **and** A1 merged), or Developer 1 runs
+Track A then Track B sequentially — the plan already sequences the tracks to share
+exactly one work package, so sequential execution needs no replanning, only more
+calendar.
 
 Use one work package per branch and review, except where the plan explicitly makes
 two inseparable (`Stream 2 WP0's readmodel transition + WP1`). WP0 completes later
