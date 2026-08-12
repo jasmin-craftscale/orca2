@@ -383,3 +383,111 @@ report) — never only into chat.
 
 Everything durable is in three places: `orca/docs/` (the map and the detail), the two private
 docs in `Lynxis-Gate/docs/`, and git history. Onboard, go deep, then advise.
+
+---
+
+## 11 · THE FIRST ASSIGNMENT — how services read core's world model
+
+**The tech lead has named this the next thing to settle, because it is foundational: it is
+mechanism 2 of the five the architecture permits between services (§B4), and every stream
+depends on it.** Do not start it before you have onboarded and reported (§10). Do not settle
+it yourself — the deliverable is a decision brief; the tech lead rules.
+
+### The question
+
+`orca-core` owns the world model — customers, sites, areas, lanes, devices. Other services
+need small parts of it constantly. Today they read it through **two read-only SQL views that
+core publishes**, and the tech lead is not comfortable with the coupling that implies:
+*one service reading another service's database.* The instinct is sound — that is the classic
+**Shared Database anti-pattern** — and the question is whether ORCA's variant is a legitimate
+exception or a foundation that should change now, before more consumers exist.
+
+### What is actually there (verified 12 Aug 2026 — re-verify)
+
+- **The views:** `services/orca-core/src/main/resources/db/migration/V102__topology_views.sql`
+  creates `topology_lane` (a pre-joined `lane → area → site`) and `topology_device`
+  (`device → lane → area → site`), both filtering retired rows, both living **inside the
+  `core` schema with a `topology_` prefix** (a product-owner ruling of 7 Aug 2026 — no extra
+  schema, no extra login). It grants `SELECT` to `orca_runtime` and `orca_edge` **and nothing
+  else**, and it deliberately `THROW`s if those logins do not exist.
+- **The hot path:** every truck triggers a read. A camera names its lane as a *string*;
+  `AdmissionService` needs the *numeric* `lane_id` to take the lane lock, so
+  `AdmissionRepository.laneIdOf()` reads `core.topology_lane` inside runtime's own
+  transaction. Edge reads the same view to elect one owning instance per lane.
+- **The blast radius is small and that matters:** **13 production query sites, all inside four
+  repository classes** — `AdmissionRepository` and `RoutingReadRepository` (runtime),
+  `LaneOwnership` and `CommandLogRepository` (edge). **No domain-layer code touches a view.**
+  Confirm this yourself; it is the number that decides how expensive any change is.
+- **The data:** configuration, not transactional. Small (tens of lanes, low hundreds of
+  devices per site), slow-changing (a lane is created when a yard is built or reconfigured),
+  and read on every truck. *That combination — small, slow-changing, read-hot — is what makes
+  the alternatives viable at all.*
+
+### Why the current design is not simply the anti-pattern
+
+Three properties the anti-pattern lacks: **exactly one writing service per table** (enforced
+by database credentials); **read-only access**, enforced by `GRANT SELECT` on a view alone;
+and a **published contract** core can refactor behind. It is closer to the *Materialized
+View* / published-data pattern than to shared-database integration. **But it is still a
+shared database**, it assumes one physical database indefinitely, and core's view definitions
+become an API it cannot casually change.
+
+### The three options, and their real costs
+
+| | Gate path if core is down | Cross-schema access | Consistency | DB-per-service later | Cost |
+|---|---|---|---|---|---|
+| **A · Synchronous REST** (`GET /internal/topology/lanes/{id}`) | ❌ **stops** — core becomes a live dependency for every truck | none | strong | ✅ | low, but forces a cache |
+| **A′ · REST + local cache** | ✅ warm / ❌ **cold start with core down** | none | stale; invalidation becomes your problem | ✅ | medium, subtle bugs |
+| **B · Local read models fed by the outbox** | ✅ fully independent | **none** | eventual (sub-second) | ✅ | medium — **but the outbox already exists** |
+| **C · Views (today)** | ✅ | read-only, contracted | strong | ❌ | already built |
+
+**Option A alone is the weakest for this data**, and the reason is §A1: a network hop plus a
+live dependency on core means a rolling upgrade of core stops gates. Fixing that with a cache
+rebuilds event-driven replication badly, and the cold-start case (runtime restarts while core
+is down) has no answer.
+
+**Option B is the industry-standard answer for slow-changing reference data crossing a service
+boundary** — CQRS read models / data pump / materialized-view-per-service. Core publishes
+`lane.upserted` / `lane.retired` facts to its outbox; each consumer maintains its **own**
+projection table in its **own** schema and reads only that. It removes cross-schema access
+entirely, keeps the gate path free of network hops, works when core is completely down, and
+is the only option that makes database-per-service possible later. ⚠️ **Its real costs must be
+in the brief, not glossed:** eventual consistency where today's read is instant; a
+**backfill/bootstrap problem** (how does a fresh runtime learn the 40 lanes that already
+exist — snapshot, or replay from zero?); and projection code, tables and tests in every
+consumer.
+
+### The question that actually decides it
+
+**Will ORCA ever run these services against separate databases?** If no — one appliance, one
+box, one customer, all services released together — the coupling is largely theoretical and
+Option C is defensible engineering. If yes or maybe (a hosted tier, independent scaling), the
+coupling is a real future cost that grows with every new consumer. Note that *independent
+deployability*, the usual headline argument, is already weak here: ORCA ships as one appliance
+released as a unit, so Option B buys **optionality and clean ownership**, not deployment
+freedom anyone would use tomorrow.
+
+### Cheap insurance, whichever way it goes
+
+Put the topology reads behind an explicit **port** — a `TopologyReader` interface per consumer
+with today's view-backed implementation behind it. The seam is nearly there already (13 sites,
+four repository classes), so formalising it is roughly a day and turns any future change from
+a re-architecture into a swap. Worth proposing regardless of the ruling.
+
+### Your deliverable
+
+**`orca/docs/decision-topology-access.md`**, in the established decision-brief shape (see
+`docs/decision-connector-credentials.md` and `docs/decision-notification-fanout.md` as the
+worked examples): what has been *verified* (re-count the read sites, re-read the view, confirm
+the outbox's guarantees and whether a snapshot/backfill mechanism exists today), the options
+with their costs, what each ruling commits the programme to, a recommendation, and the
+conditions that would flip it. **Then stop and wait for the ruling.**
+
+⚠️ If the ruling changes anything, **§B4's mechanism table in `ORCA_ARCHITECTURE.md` is part of
+the change** — mechanism 2 is exactly what is under discussion. Amend it as part of executing
+the ruling, not before.
+
+*A provisional lean from the session that raised this, offered as input rather than an answer:
+keep the views, add the port now as cheap insurance, and revisit properly when cloud-tier
+scope opens — that is the moment the answer genuinely changes, and it is already when
+portal/sync/fleet come off the shelf.*
