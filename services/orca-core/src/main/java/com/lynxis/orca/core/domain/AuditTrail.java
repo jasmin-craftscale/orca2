@@ -19,9 +19,9 @@ import lombok.RequiredArgsConstructor;
  * verbatim), or the explicit system identity for work no user invoked. There is
  * no anonymous production branch to reach: every entry point has an identity.
  *
- * <p>Settings and branding mutations call this writer. Identity, team/template
- * and device-registry mutations do not yet do so; that instrumentation remains
- * explicit follow-up and must not be assumed complete.
+ * <p>Settings, branding, routing and custom-entity mutations call this writer.
+ * Identity, team/template and device-registry mutations do not yet do so; that
+ * instrumentation remains explicit follow-up and must not be assumed complete.
  */
 @RequiredArgsConstructor
 public class AuditTrail {
