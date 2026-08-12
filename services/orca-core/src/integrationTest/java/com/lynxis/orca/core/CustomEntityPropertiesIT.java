@@ -298,6 +298,23 @@ class CustomEntityPropertiesIT {
 	}
 
 	@Test
+	@DisplayName("the composite field FK refuses an entity-A child claiming site B")
+	void fieldScopeMustMatchItsEntityScope() {
+		long entityId = directEntity("ce-scoped", "Scoped",
+				"ce_11111111111111111111111111111111");
+
+		assertThatThrownBy(() -> core.update("INSERT INTO custom_entity_field "
+				+ "(external_id, custom_entity_id, site_external_id, identifier, display_name, "
+				+ "field_type, max_length, is_nullable, is_business_key, ordinal) "
+				+ "VALUES ('cef-wrong-site', ?, ?, 'code', 'Code', 'TEXT', 32, 0, 1, 1)",
+				entityId, SITE_B))
+				.as("a child cannot copy a different site than its referenced entity")
+				.isInstanceOf(DataIntegrityViolationException.class);
+		assertThat(core.queryForObject("SELECT COUNT(*) FROM custom_entity_field", Long.class))
+				.isZero();
+	}
+
+	@Test
 	@DisplayName("runtime reads the declaration view but cannot read tables or write the view")
 	void runtimeGetsOnlyThePublishedReadOnlyView() {
 		CustomEntitySummary declared = apiA.declareCustomEntity(declaration("Runtime model", "code"))

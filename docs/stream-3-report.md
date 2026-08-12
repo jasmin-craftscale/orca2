@@ -32,14 +32,17 @@ table. WP2–WP5 remain absent.
   and no access to the underlying metadata tables.
 - All reads and writes go through `platform/scope`. Creation and evolution are
   Spring transactions and append `CREATED`/`UPDATED` audit facts atomically with
-  the declaration. The controller implements the generated interface and maps
-  declaration faults to `CUSTOM_ENTITY_DECLARATION_INVALID` (422), conflicts to
-  `CONFLICT`, and cross-scope/unknown entities to `NOT_FOUND`.
-- Four unit tests state identifier, display-name, business-key and field-shape
-  validation. Eight real-SQL-Server properties cover create/list/evolution, SQL
-  constraints, cross-site isolation, view permissions, the serialized typed error
-  envelope, absence of a generated table, and rollback after deliberately injected
-  mid-write and audit-write failures.
+  the declaration. The generated interface rejects request-schema faults as
+  `VALIDATION_FAILED` (400); the controller maps schema-valid domain faults to
+  `CUSTOM_ENTITY_DECLARATION_INVALID` (422), conflicts to `CONFLICT`, and
+  cross-scope/unknown entities to `NOT_FOUND`.
+- Seven focused unit tests state identifier, display-name, business-key and
+  field-shape validation, exercise the real Spring MVC validation boundary, and
+  pin declaration assembly to one scoped select. Nine real-SQL-Server properties
+  cover create/list/evolution, SQL constraints—including the composite field/entity
+  scope FK—cross-site isolation, view permissions, the typed domain error envelope,
+  absence of a generated table, and rollback after deliberately injected mid-write
+  and audit-write failures.
 
 ### WP2 · decision proposal only
 
@@ -87,17 +90,18 @@ authorises no implementation.
   `vis-86e76838-...` completed; `RAISE_GATE` executed; `visit.completed` was
   recorded. The three gate services were stopped before implementation suites.
 
-### Final commands on hardened implementation commit `10cea97`
+### Final commands after the orchestrator follow-up
 
 | Evidence | Result |
 |---|---|
-| `./gradlew build` | **BUILD SUCCESSFUL in 4s**; 75 actionable tasks, 2 executed, 73 up-to-date |
-| `./gradlew check --rerun-tasks` | **BUILD SUCCESSFUL in 11s**; 60/60 tasks executed |
-| `./gradlew check integrationTest --rerun-tasks` | **BUILD SUCCESSFUL in 7m**; 75/75 tasks executed |
-| XML count — unit | 20 suites, **84 tests**, 0 failures, 0 errors, 0 skipped |
-| XML count — integration | 34 suites, **274 tests**, 0 failures, 0 errors, 0 skipped |
-| Focused `CustomEntityServiceTest` + `CustomEntityPropertiesIT` with `--rerun-tasks` | 1 unit suite / 4 tests and 1 integration suite / 8 tests; all green; 22/22 tasks executed |
+| `./gradlew check integrationTest --rerun-tasks` | **BUILD SUCCESSFUL in 7m17s**; 75/75 tasks executed |
+| XML count — unit | 22 suites, **87 tests**, 0 failures, 0 errors, 0 skipped |
+| XML count — integration | 34 suites, **275 tests**, 0 failures, 0 errors, 0 skipped |
+| Focused custom-entity tests | 3 unit suites / 7 tests and 1 integration suite / 9 tests; all green |
+| HTTP validation boundary | MockMvc dispatched through Spring MVC for both POST and PATCH: uppercase identifiers returned `400 / VALIDATION_FAILED` before any domain call; schema-valid `row_id`/`site_external_id` reached domain validation and returned `422 / CUSTOM_ENTITY_DECLARATION_INVALID` |
+| Declaration assembly | One aggregate row is assembled while the test verifies exactly one `ScopeSeam.select`; returning to separate parent/field selects fails the test |
 | Duplicate constraints | Real SQL Server refused duplicate entity external id, site/kind/name, table identifier, field external id, per-entity identifier, display name, ordinal and second business key |
+| Composite scope FK | Real SQL Server refused a field referencing a site-A entity while copying site B; no child row remained |
 | Cross-site isolation | Site A and B list only their declarations; A's PATCH of B returns typed `NOT_FOUND`; B's stored name is unchanged |
 | Failed multi-write | A test-only CHECK rejects the second field after parent and first field writes; the transaction leaves zero parent, field and audit rows. A separately poisoned audit write rolls the declaration back too |
 | View boundary | `orca_runtime` reads `core.topology_custom_entity`, cannot read `core.custom_entity`, cannot update the view, and sees no rows after site retirement. Core's owner read uses the same flattened result in one statement |
@@ -154,6 +158,7 @@ with a clean diff before continuing.
 
 - `docker compose run --rm verify-isolation` → **PASS — 36 checks**: six own-schema
   writes/reads and all thirty cross-schema reads refused.
+- The orchestrator follow-up reran the same proof with the same **36/36 PASS**.
 - Because the unpublished V111 migration was hardened after an earlier local boot,
   Flyway correctly rejected the stale checksum in the disposable validation
   database. The local ORCA Docker volumes were rebuilt using the documented
@@ -161,7 +166,10 @@ with a clean diff before continuing.
   14 migrations to the fresh schema and reached health 200. Runtime, edge, portal,
   sync and fleet also booted, and all six health checks returned 200 on ports
   18081–18086.
-- Current-hash gate proof:
+- After the follow-up, `orca-core` independently booted again, validated all 14
+  migrations at schema version 111, and returned health 200 on port 18081 before
+  being stopped.
+- Hardened-production gate proof before the contract/test-only follow-up:
   - plate `S3-WP1-10CEA97`, event
     `evt-26569476-b45d-4a02-832f-2afdd60c132e` → camera ACK;
   - edge buffer → `ACKED`, attempts `0`;
@@ -289,6 +297,11 @@ not a ruling.
 8. Direct inspection of 1.x confirmed it refuses duplicate `FieldName` and
    `FieldMapping` values. WP1 initially constrained only the stable identifier. The
    per-entity display-name rule is now also validated and enforced by SQL Server.
+9. The first WP1 OpenAPI responses treated every identifier refusal as 422, but the
+   generated Bean Validation pattern rejects an uppercase identifier in Spring MVC
+   before the controller runs. POST and PATCH now document and prove the real split:
+   request-schema faults are `400 / VALIDATION_FAILED`; schema-valid reserved names
+   are domain faults returning `422 / CUSTOM_ENTITY_DECLARATION_INVALID`.
 
 ## Next slice — proposed only
 

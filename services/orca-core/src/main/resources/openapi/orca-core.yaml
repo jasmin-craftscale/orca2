@@ -1523,6 +1523,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CustomEntityEnvelope"
+        "400":
+          description: The request fails generated schema validation (`VALIDATION_FAILED`)
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "401":
           description: No credential, or one that did not verify
           content:
@@ -1536,7 +1542,7 @@ paths:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "422":
-          description: An identifier, field shape or declaration invariant is invalid
+          description: A schema-valid request violates a declaration invariant (`CUSTOM_ENTITY_DECLARATION_INVALID`)
           content:
             application/json:
               schema:
@@ -1572,6 +1578,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CustomEntityEnvelope"
+        "400":
+          description: The request fails generated schema validation (`VALIDATION_FAILED`)
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "401":
           description: No credential, or one that did not verify
           content:
@@ -1591,7 +1603,7 @@ paths:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
         "422":
-          description: The requested additive declaration change is invalid
+          description: A schema-valid additive change violates a declaration invariant (`CUSTOM_ENTITY_DECLARATION_INVALID`)
           content:
             application/json:
               schema:
