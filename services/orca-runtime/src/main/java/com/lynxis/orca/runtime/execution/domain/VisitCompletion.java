@@ -7,6 +7,7 @@ import com.lynxis.orca.platform.scope.Scope;
 import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.runtime.execution.persistence.AdmissionRepository;
 import com.lynxis.orca.runtime.execution.domain.ExecutionTables.Execution;
+import com.lynxis.orca.runtime.readmodel.api.LaneMonitorProjectionPort;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -54,11 +55,14 @@ public class VisitCompletion {
 
 	private final AdmissionRepository repository;
 	private final OutboxWriter outbox;
+	private final LaneMonitorProjectionPort laneMonitor;
 	private final String siteExternalId;
 
-	public VisitCompletion(AdmissionRepository repository, OutboxWriter outbox, String siteExternalId) {
+	public VisitCompletion(AdmissionRepository repository, OutboxWriter outbox,
+			LaneMonitorProjectionPort laneMonitor, String siteExternalId) {
 		this.repository = repository;
 		this.outbox = outbox;
+		this.laneMonitor = laneMonitor;
 		this.siteExternalId = siteExternalId;
 	}
 
@@ -99,11 +103,13 @@ public class VisitCompletion {
 		log.info("visit {} on lane {} reached '{}' -> {}", visit.externalId(), visit.laneId(),
 				endEventId, status);
 
+		String laneExternalId = repository.laneExternalIdOf(visit.laneId()).orElse(String.valueOf(visit.laneId()));
+		laneMonitor.recordVisitClosed(new LaneMonitorProjectionPort.VisitClosed(siteExternalId,
+				visit.laneId(), laneExternalId, visit.externalId(), status));
+
 		if (!released) {
 			return;
 		}
-
-		String laneExternalId = repository.laneExternalIdOf(visit.laneId()).orElse(String.valueOf(visit.laneId()));
 
 		// In the caller's transaction. There is no flush, no send and no callback,
 		// deliberately: anything a caller could do AFTER the commit is the failure

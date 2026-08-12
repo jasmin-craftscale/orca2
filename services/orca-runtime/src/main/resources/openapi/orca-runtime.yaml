@@ -64,6 +64,17 @@ tags:
       Operator presence (§C2). The open activity row is the current status —
       there is no status column on any user. IDLE and WORKING are assignable;
       the Push routing path selects from them.
+  - name: grids
+    description: |
+      Console grids served from pre-built read models. These routes do not fan
+      out across runtime modules at request time; the projection is maintained
+      when the owning modules change something.
+  - name: notifications
+    description: |
+      Operator notifications: the durable in-app list and the short-lived ticket
+      a console uses to open the live WebSocket. Cross-instance live fan-out,
+      email and push are deliberately outside this contract until their open
+      questions are settled.
 
 paths:
   /api/v1/health:
@@ -781,6 +792,281 @@ paths:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 
+  /api/v1/grids/lane-monitors:
+    post:
+      tags: [grids]
+      operationId: laneMonitorsGrid
+      summary: The lane-monitor board
+      description: |
+        One projected row per lane, ordered by the lane priority core publishes.
+        The row is updated when visits, work items or device observations change;
+        it is not rebuilt by joining execution and work-item tables when the
+        console asks for it.
+
+        Scope is the installation's own site, taken from configuration and never
+        from the request.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LaneMonitorGridRequest"
+      responses:
+        "200":
+          description: The board rows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LaneMonitorListEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/grids/queue:
+    post:
+      tags: [grids]
+      operationId: queueGrid
+      summary: The open work-item queue grid
+      description: |
+        The queue grid uses workitem's public grid seam and its routing-priority
+        ordering. Readmodel owns the console route, but it does not read
+        workitem's table and does not build a second queue.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkItemGridRequest"
+      responses:
+        "200":
+          description: The open queue, ordered by routing priority and queued time
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkItemListEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/grids/alerts:
+    post:
+      tags: [grids]
+      operationId: alertsGrid
+      summary: The lane alert grid
+      description: |
+        One alerts route, not the three route names 1.x mapped to one handler.
+        A lane appears here when the maintained lane-monitor row already says
+        something operationally visible: manual, failed, SLA-breached queued
+        work, or an out-of-service lane when the caller asks to include those.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LaneAlertsGridRequest"
+      responses:
+        "200":
+          description: Alert rows ordered by lane priority
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LaneAlertListEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/grids/completed-work:
+    post:
+      tags: [grids]
+      operationId: completedWorkGrid
+      summary: Completed or failed work over a time window
+      description: |
+        Terminal work-item history, newest completed first. The read is still
+        owned by workitem through its public grid seam; readmodel does not query
+        the work-item table.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompletedWorkGridRequest"
+      responses:
+        "200":
+          description: Terminal work items in the requested completion window
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkItemListEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/grids/export:
+    post:
+      tags: [grids]
+      operationId: startGridExport
+      summary: Start a bounded grid export
+      description: |
+        The first export slice completes the job in the request transaction and
+        stores the CSV under readmodel's own scoped job table. Rows are capped by
+        the same limits as the source grid, so this route does not become an
+        unbounded history read.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GridExportRequest"
+      responses:
+        "200":
+          description: The completed export job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GridExportEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/exports/{exportExternalId}:
+    get:
+      tags: [grids]
+      operationId: getGridExport
+      summary: Get a completed grid export
+      parameters:
+        - name: exportExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: Export metadata and body when complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GridExportEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such export under this installation's scope
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/notifications:
+    get:
+      tags: [notifications]
+      operationId: listNotifications
+      summary: The calling operator's durable notifications
+      parameters:
+        - name: unreadOnly
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 100
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: Notifications for the calling operator, newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListEnvelope"
+        "401":
+          description: No credential, or no resolvable operator behind it
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/notifications/{notificationExternalId}/read:
+    post:
+      tags: [notifications]
+      operationId: markNotificationRead
+      summary: Mark one notification read
+      parameters:
+        - name: notificationExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: The notification with readAt set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationEnvelope"
+        "401":
+          description: No credential, or no resolvable operator behind it
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such notification for the calling operator under this installation's scope
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/notifications/ws-ticket:
+    post:
+      tags: [notifications]
+      operationId: issueNotificationWebSocketTicket
+      summary: Issue a short-lived single-use ticket for the notification WebSocket
+      responses:
+        "200":
+          description: The ticket. It is returned once and stored only by hash.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationWebSocketTicketEnvelope"
+        "401":
+          description: No credential, or no resolvable operator behind it
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
   /api/v1/lanes/{laneExternalId}/reset:
     post:
       tags: [lanes]
@@ -1007,6 +1293,280 @@ components:
               items:
                 $ref: "#/components/schemas/PresenceActivity"
 
+    LaneMonitorGridRequest:
+      type: object
+      properties:
+        laneExternalId:
+          type: string
+          maxLength: 64
+        limit:
+          type: integer
+          format: int32
+          default: 100
+          minimum: 1
+          maximum: 500
+
+    WorkItemGridRequest:
+      type: object
+      properties:
+        laneExternalId:
+          type: string
+          maxLength: 64
+        assignee:
+          type: string
+          maxLength: 64
+        teamExternalId:
+          type: string
+          maxLength: 64
+        limit:
+          type: integer
+          format: int32
+          default: 100
+          minimum: 1
+          maximum: 500
+
+    CompletedWorkGridRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [COMPLETED, FAILED]
+          default: COMPLETED
+        laneExternalId:
+          type: string
+          maxLength: 64
+        assignee:
+          type: string
+          maxLength: 64
+        completedFrom:
+          type: string
+          format: date-time
+        completedUntil:
+          type: string
+          format: date-time
+        limit:
+          type: integer
+          format: int32
+          default: 100
+          minimum: 1
+          maximum: 500
+
+    LaneAlertsGridRequest:
+      type: object
+      properties:
+        laneExternalId:
+          type: string
+          maxLength: 64
+        includeOutOfService:
+          type: boolean
+          default: false
+        limit:
+          type: integer
+          format: int32
+          default: 100
+          minimum: 1
+          maximum: 500
+
+    GridName:
+      type: string
+      enum: [LANE_MONITORS, QUEUE, ALERTS, COMPLETED_WORK]
+
+    GridExportRequest:
+      type: object
+      required: [grid]
+      properties:
+        grid:
+          $ref: "#/components/schemas/GridName"
+        laneExternalId:
+          type: string
+          maxLength: 64
+        assignee:
+          type: string
+          maxLength: 64
+        teamExternalId:
+          type: string
+          maxLength: 64
+        status:
+          type: string
+          enum: [COMPLETED, FAILED]
+          default: COMPLETED
+        completedFrom:
+          type: string
+          format: date-time
+        completedUntil:
+          type: string
+          format: date-time
+        includeOutOfService:
+          type: boolean
+          default: false
+        limit:
+          type: integer
+          format: int32
+          default: 100
+          minimum: 1
+          maximum: 500
+
+    LaneAlertReason:
+      type: string
+      enum: [MANUAL, FAILED, SLA_BREACH, OUT_OF_SERVICE]
+
+    LaneAlert:
+      type: object
+      properties:
+        laneExternalId:
+          type: string
+        laneCode:
+          type: string
+        laneName:
+          type: string
+        lanePriority:
+          type: integer
+          format: int32
+        trafficStatus:
+          type: string
+          enum: [CLEAR, ACTIVE, COMPLETED, MANUAL, FAILED]
+        trafficColor:
+          type: string
+          enum: [NEUTRAL, BLUE, GREEN, AMBER, RED]
+        visitExternalId:
+          type: string
+        plate:
+          type: string
+        queuedWorkItemExternalId:
+          type: string
+        queuedWorkItemQueuedAt:
+          type: string
+          format: date-time
+        queuedWorkItemSlaBreachedAt:
+          type: string
+          format: date-time
+        outOfService:
+          type: boolean
+        alertReasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/LaneAlertReason"
+
+    LaneMonitor:
+      type: object
+      properties:
+        siteExternalId:
+          type: string
+        siteCode:
+          type: string
+        sitePrimary:
+          type: boolean
+        areaExternalId:
+          type: string
+        areaCode:
+          type: string
+        laneExternalId:
+          type: string
+        laneCode:
+          type: string
+        laneName:
+          type: string
+        lanePriority:
+          type: integer
+          format: int32
+        outOfService:
+          type: boolean
+        trafficStatus:
+          type: string
+          enum: [CLEAR, ACTIVE, COMPLETED, MANUAL, FAILED]
+        trafficColor:
+          type: string
+          enum: [NEUTRAL, BLUE, GREEN, AMBER, RED]
+        visitExternalId:
+          type: string
+        plate:
+          type: string
+        queuedWorkItemExternalId:
+          type: string
+        queuedWorkItemQueuedAt:
+          type: string
+          format: date-time
+        queuedWorkItemAssignee:
+          type: string
+        queuedWorkItemSlaBreachedAt:
+          type: string
+          format: date-time
+        gateArm:
+          type: string
+        redLamp:
+          type: string
+        orangeLamp:
+          type: string
+        greenLamp:
+          type: string
+        loopInputs:
+          type: string
+          description: JSON object of loop inputs last observed for the lane.
+        lastDeviceEventUuid:
+          type: string
+        lastDeviceEventType:
+          type: string
+        lastDeviceObservedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    LaneMonitorListEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/LaneMonitor"
+
+    LaneAlertListEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/LaneAlert"
+
+    GridExport:
+      type: object
+      properties:
+        exportExternalId:
+          type: string
+        grid:
+          $ref: "#/components/schemas/GridName"
+        status:
+          type: string
+          enum: [COMPLETED, FAILED]
+        contentType:
+          type: string
+        fileName:
+          type: string
+        rowCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        body:
+          type: string
+
+    GridExportEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/GridExport"
+
     LaneResetResult:
       type: object
       properties:
@@ -1054,6 +1614,65 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/LaneResetResult"
+
+    Notification:
+      type: object
+      properties:
+        externalId:
+          type: string
+        recipientUserExternalId:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        payloadJson:
+          type: string
+        readAt:
+          type: string
+          format: date-time
+          description: Null means unread; no boolean read flag is stored.
+        createdAt:
+          type: string
+          format: date-time
+
+    NotificationEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Notification"
+
+    NotificationListEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Notification"
+
+    NotificationWebSocketTicket:
+      type: object
+      properties:
+        ticket:
+          type: string
+          description: The bearer ticket to present when opening the WebSocket.
+        expiresAt:
+          type: string
+          format: date-time
+
+    NotificationWebSocketTicketEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/NotificationWebSocketTicket"
 
     DeviceEventBatch:
       type: object

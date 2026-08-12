@@ -32,6 +32,7 @@ import com.lynxis.orca.runtime.execution.persistence.EdgeDeviceCommandClient;
 import com.lynxis.orca.runtime.execution.persistence.FlowableManualSteps;
 import com.lynxis.orca.runtime.execution.persistence.FlowableProcessEngineGateway;
 import com.lynxis.orca.runtime.integration.api.ConnectorPort;
+import com.lynxis.orca.runtime.readmodel.api.LaneMonitorProjectionPort;
 import com.lynxis.orca.runtime.workitem.api.WorkItemIntake;
 
 /**
@@ -98,6 +99,7 @@ public class ExecutionConfiguration {
 	@Bean
 	public AdmissionService admissionService(AdmissionRepository repository, ProcessEngineGateway engine,
 			IdempotencyStore idempotency, PlatformTransactionManager transactionManager,
+			LaneMonitorProjectionPort laneMonitor,
 			@Value("${orca.installation.site-external-id}") String siteExternalId,
 			@Value("${orca.runtime.holder-id:${HOSTNAME:runtime-local}}") String holderId,
 			@Value("${orca.runtime.gate-visit.connector-name}") String connectorName,
@@ -108,7 +110,7 @@ public class ExecutionConfiguration {
 		return new AdmissionService(repository, engine, idempotency,
 				new TransactionTemplate(transactionManager), siteExternalId, holderId,
 				new AdmissionService.ProcessStartVariables(connectorName, commandAction,
-						commandDeviceExternalId, commandDeadlineMillis));
+						commandDeviceExternalId, commandDeadlineMillis), laneMonitor);
 	}
 
 	@Bean
@@ -135,8 +137,9 @@ public class ExecutionConfiguration {
 
 	@Bean
 	public VisitCompletion visitCompletion(AdmissionRepository repository, OutboxWriter outbox,
+			LaneMonitorProjectionPort laneMonitor,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
-		return new VisitCompletion(repository, outbox, siteExternalId);
+		return new VisitCompletion(repository, outbox, laneMonitor, siteExternalId);
 	}
 
 	/**
@@ -180,9 +183,11 @@ public class ExecutionConfiguration {
 	@Bean
 	public LaneResetService laneResetService(AdmissionRepository repository, ProcessEngineGateway engine,
 			WorkItemIntake workItemIntake,
-			org.springframework.transaction.PlatformTransactionManager transactionManager) {
-		return new LaneResetService(repository, engine, workItemIntake,
-				new TransactionTemplate(transactionManager));
+			LaneMonitorProjectionPort laneMonitor,
+			org.springframework.transaction.PlatformTransactionManager transactionManager,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new LaneResetService(repository, engine, workItemIntake, laneMonitor,
+				new TransactionTemplate(transactionManager), siteExternalId);
 	}
 
 	@Bean

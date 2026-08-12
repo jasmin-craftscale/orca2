@@ -9,6 +9,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.lynxis.orca.runtime.execution.api.LaneVisitPort;
 import com.lynxis.orca.runtime.execution.api.ManualStepPort;
+import com.lynxis.orca.runtime.readmodel.api.LaneMonitorProjectionPort;
+import com.lynxis.orca.runtime.workitem.api.WorkItemGridPort;
 import com.lynxis.orca.runtime.workitem.api.WorkItemIntake;
 import com.lynxis.orca.runtime.workitem.domain.WorkItemTables.WorkItem;
 import com.lynxis.orca.runtime.workitem.domain.WorkItemTables.WorkItemAudit;
@@ -42,24 +44,27 @@ import lombok.extern.slf4j.Slf4j;
  * not the guard.
  */
 @Slf4j
-public class WorkItemService implements WorkItemIntake {
+public class WorkItemService implements WorkItemIntake, WorkItemGridPort {
 
 	private final WorkItemRepository repository;
 	private final RoutingReadRepository routing;
 	private final PresenceService presence;
 	private final ManualStepPort manualSteps;
 	private final LaneVisitPort laneVisits;
+	private final LaneMonitorProjectionPort laneMonitor;
 	private final TransactionTemplate transactions;
 	private final String siteExternalId;
 
 	public WorkItemService(WorkItemRepository repository, RoutingReadRepository routing,
 			PresenceService presence, ManualStepPort manualSteps, LaneVisitPort laneVisits,
-			TransactionTemplate transactions, String siteExternalId) {
+			LaneMonitorProjectionPort laneMonitor, TransactionTemplate transactions,
+			String siteExternalId) {
 		this.repository = repository;
 		this.routing = routing;
 		this.presence = presence;
 		this.manualSteps = manualSteps;
 		this.laneVisits = laneVisits;
+		this.laneMonitor = laneMonitor;
 		this.transactions = transactions;
 		this.siteExternalId = siteExternalId;
 	}
@@ -101,6 +106,7 @@ public class WorkItemService implements WorkItemIntake {
 			if (screenExternalId != null) {
 				pushAssign(workItemId, externalId, screenExternalId, step.laneExternalId());
 			}
+			laneMonitor.recordWorkItemQueued(snapshotOf(require(externalId)));
 		});
 	}
 
@@ -146,6 +152,7 @@ public class WorkItemService implements WorkItemIntake {
 				if (repository.fail(item.workItemId())) {
 					repository.audit(item.workItemId(), siteExternalId, WorkItemAudit.FAIL, actor,
 							item.assignee(), null, elapsedSince(item.queuedAt()));
+					laneMonitor.recordWorkItemCleared(cleared(item));
 					failed++;
 				}
 			}
@@ -171,7 +178,9 @@ public class WorkItemService implements WorkItemIntake {
 			}
 			repository.audit(before.workItemId(), siteExternalId, WorkItemAudit.TAKE, actor, null,
 					null, elapsedSince(before.queuedAt()));
-			return require(externalId);
+			WorkItem taken = require(externalId);
+			laneMonitor.recordWorkItemCleared(cleared(taken));
+			return taken;
 		});
 	}
 
@@ -212,7 +221,9 @@ public class WorkItemService implements WorkItemIntake {
 			repository.audit(before.workItemId(), siteExternalId, WorkItemAudit.TAKE_OVER, actor,
 					previous, secondsBetween(before.startedAt(), Instant.now()),
 					elapsedSince(before.queuedAt()));
-			return require(externalId);
+			WorkItem taken = require(externalId);
+			laneMonitor.recordWorkItemCleared(cleared(taken));
+			return taken;
 		});
 	}
 
@@ -225,7 +236,9 @@ public class WorkItemService implements WorkItemIntake {
 			}
 			repository.audit(before.workItemId(), siteExternalId, WorkItemAudit.PARK, actor, actor,
 					secondsBetween(before.startedAt(), Instant.now()), elapsedSince(before.queuedAt()));
-			return require(externalId);
+			WorkItem queued = require(externalId);
+			laneMonitor.recordWorkItemQueued(snapshotOf(queued));
+			return queued;
 		});
 	}
 
@@ -238,7 +251,9 @@ public class WorkItemService implements WorkItemIntake {
 			}
 			repository.audit(before.workItemId(), siteExternalId, WorkItemAudit.ASSIGN, actor,
 					before.assignee(), null, elapsedSince(before.queuedAt()));
-			return require(externalId);
+			WorkItem queued = require(externalId);
+			laneMonitor.recordWorkItemQueued(snapshotOf(queued));
+			return queued;
 		});
 	}
 
@@ -274,7 +289,9 @@ public class WorkItemService implements WorkItemIntake {
 
 			log.info("work item {} completed by {}; process {} advanced in the same transaction",
 					externalId, actor, before.processInstanceId());
-			return require(externalId);
+			WorkItem completed = require(externalId);
+			laneMonitor.recordWorkItemCleared(cleared(completed));
+			return completed;
 		});
 	}
 
@@ -351,6 +368,8 @@ public class WorkItemService implements WorkItemIntake {
 				}
 				repository.audit(item.workItemId(), siteExternalId, WorkItemAudit.SLA_BREACH,
 						"system:sla-timer", item.assignee(), null, elapsedSince(item.queuedAt()));
+				laneMonitor.recordWorkItemBreach(new LaneMonitorProjectionPort.WorkItemBreach(
+						siteExternalId, item.laneId(), item.laneExternalId(), item.externalId(), now));
 				log.warn("work item {} breached its SLA (queued {}, threshold {}s, assignee {})",
 						item.externalId(), item.queuedAt(), threshold.get().toSeconds(),
 						item.assignee());
@@ -458,6 +477,24 @@ public class WorkItemService implements WorkItemIntake {
 				.toList();
 	}
 
+	@Override
+	public List<WorkItemGridPort.GridItem> openQueue(String laneExternalId, String assignee,
+			String teamExternalId, int limit) {
+		return list(null, laneExternalId, assignee, teamExternalId, limit).stream()
+				.map(WorkItemService::toGridItem)
+				.toList();
+	}
+
+	@Override
+	public List<WorkItemGridPort.GridItem> completedWork(String status, String laneExternalId,
+			String assignee, Instant completedFrom, Instant completedUntil, int limit) {
+		String terminalStatus = status == null ? WorkItem.COMPLETED : status;
+		return repository.completedWork(terminalStatus, laneExternalId, assignee, completedFrom,
+						completedUntil, limit).stream()
+				.map(WorkItemService::toGridItem)
+				.toList();
+	}
+
 	public List<WorkItemAudit> auditTrail(String externalId) {
 		return repository.auditTrail(require(externalId).workItemId());
 	}
@@ -469,7 +506,37 @@ public class WorkItemService implements WorkItemIntake {
 				.orElseThrow(() -> new WorkItemNotFoundException(externalId));
 	}
 
+	private LaneMonitorProjectionPort.WorkItemQueued snapshotOf(WorkItem item) {
+		return new LaneMonitorProjectionPort.WorkItemQueued(siteExternalId, item.laneId(),
+				item.laneExternalId(), item.externalId(), item.queuedAt(), item.assignee(),
+				item.slaBreachedAt());
+	}
+
+	private LaneMonitorProjectionPort.WorkItemCleared cleared(WorkItem item) {
+		return new LaneMonitorProjectionPort.WorkItemCleared(siteExternalId, item.laneId(),
+				item.laneExternalId(), item.externalId());
+	}
+
 	/** The loser's answer carries the item's current state — a conflict a caller can act on. */
+	private static WorkItemGridPort.GridItem toGridItem(WorkItem item) {
+		return new WorkItemGridPort.GridItem(
+				item.externalId(),
+				item.visitExternalId(),
+				item.laneExternalId(),
+				item.processDefinitionKey(),
+				item.nodeReference(),
+				item.screenExternalId(),
+				item.status(),
+				item.assignee(),
+				item.queuedAt(),
+				item.startedAt(),
+				item.completedAt(),
+				item.completionDurationSec(),
+				item.slaBreachedAt(),
+				item.eventData(),
+				item.correctedEventData());
+	}
+
 	private WorkItemConflictException conflict(String externalId, String action) {
 		WorkItem now = repository.byExternalId(externalId).orElse(null);
 		return new WorkItemConflictException(externalId, action,

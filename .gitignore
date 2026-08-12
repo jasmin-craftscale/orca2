@@ -44,3 +44,6 @@ out/
 # Python bytecode from the hand-run tools in deploy/tools/
 __pycache__/
 *.pyc
+
+# Local service logs from background bootRun sessions.
+.run-logs/
