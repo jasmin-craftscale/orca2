@@ -24,13 +24,13 @@ So `V118` means "the 118th version of *this schema*", and a platform migration a
 a service migration **share one number line**. The split that keeps them apart today
 is the convention that platform takes `V001–V099` and services take `V100+`.
 
-**Where each schema stands right now** (read out of the migration files and confirmed
-against the running database, 10 Aug 2026):
+**Where each schema stands right now** (read out of the migration files, 12 Aug 2026;
+the corresponding implementation reports carry the live-database evidence):
 
 | Schema | Migrations | Highest | Notes |
 |---|---|---|---|
-| `runtime` | V100–V102, V110–V114, V115–V117 | **V117** | **V110–V114 are Flowable's 45 extracted tables.** V103–V109 are unused and stay that way — see §4 |
-| `core` | V100–V110 | **V110** | |
+| `runtime` | V100–V102, V110–V117, V128, V168–V170 | **V170** | **V110–V114 are Flowable's 45 extracted tables.** V103–V109 are unused and stay that way — see §4 |
+| `core` | V100–V111 | **V111** | |
 | `edge` | V100–V103 | **V103** | |
 | `portal` · `sync` · `fleet` | V100 | **V100** | Skeletons |
 | every schema | V001–V003 | — | The three primitives, applied into all six |

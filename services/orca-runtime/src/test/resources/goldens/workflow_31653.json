@@ -1,0 +1,277 @@
+{
+  "workflow_id" : 31653,
+  "workflow_uuid" : "790948ab-7bc8-45c8-a7dc-09497eb211d8",
+  "name" : "PLT In-Gate Portal",
+  "nodes" : [ {
+    "uuid" : "3ba67556-9fda-41f9-a9d9-7a1381b5dc7f",
+    "type" : "START",
+    "name" : "START"
+  }, {
+    "uuid" : "cca6860d-88aa-462a-b877-3d1f942fa235",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Portal OCR Scan",
+    "mode" : "INPUT",
+    "topic" : "orca-device-input"
+  }, {
+    "uuid" : "99ddf170-9731-4922-814a-633a219f6693",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Portal RFID Read",
+    "mode" : "INPUT",
+    "topic" : "orca-device-input"
+  }, {
+    "uuid" : "5091db50-fc15-4793-b3aa-6ef02c5e9f27",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Portal WIM Scale",
+    "mode" : "INPUT",
+    "topic" : "orca-device-input"
+  }, {
+    "uuid" : "3c72bce1-5c45-4874-90a7-716f774a4b7e",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Change OCR Classification Done",
+    "mode" : "INPUT",
+    "topic" : "orca-device-input"
+  }, {
+    "uuid" : "a6b64b8e-f1d2-40f4-9e4f-8e1866e061b1",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Change OCR Classification Reject Truck",
+    "mode" : "INPUT",
+    "topic" : "orca-device-input"
+  }, {
+    "uuid" : "7f468dd9-3cce-4003-9690-5f9be9928464",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Damage Inspection Complete",
+    "mode" : "INPUT",
+    "topic" : "orca-device-input"
+  }, {
+    "uuid" : "4c15be2f-b562-4eb3-ac51-3a40686ef68d",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Damage Inspection Reclassify",
+    "mode" : "INPUT",
+    "topic" : "orca-device-input"
+  }, {
+    "uuid" : "e8ab67a0-8db4-4f89-982d-e474a8a6a49c",
+    "type" : "INPUT_OUTPUT",
+    "name" : "Damage Inspection Reject Truck",
+    "mode" : "INPUT",
+    "topic" : "orca-device-input"
+  }, {
+    "uuid" : "f191b3da-f416-42a0-8f53-10d977b1983c",
+    "type" : "MANUAL_INPUT",
+    "name" : "Change OCR Classification"
+  }, {
+    "uuid" : "7cd1e279-fd18-465b-a49d-50cd68afc5b3",
+    "type" : "MANUAL_INPUT",
+    "name" : "Damage Inspection"
+  }, {
+    "uuid" : "7ce2fd02-dc16-407b-939d-a6fd4fb8326a",
+    "type" : "TERMINATOR",
+    "name" : "Passage Complete"
+  }, {
+    "uuid" : "a88f0d1c-4233-4e10-8e67-14e5eeb7c797",
+    "type" : "TERMINATOR",
+    "name" : "Passage Ended - OCR Reject"
+  }, {
+    "uuid" : "8d91bd5d-357c-42a5-bd95-405e490c01d2",
+    "type" : "TERMINATOR",
+    "name" : "Close Change OCR Classification (Done)"
+  }, {
+    "uuid" : "cf592c9a-5185-4c7a-9d85-5ef093d05171",
+    "type" : "TERMINATOR",
+    "name" : "Close Change OCR Classification (Reject Truck)"
+  }, {
+    "uuid" : "9a344dfb-2c96-4b54-bb4e-2a60e2ffb16e",
+    "type" : "TERMINATOR",
+    "name" : "Close Damage Inspection (Complete)"
+  }, {
+    "uuid" : "05921902-3616-415a-aeac-38f572a20b79",
+    "type" : "TERMINATOR",
+    "name" : "Close Damage Inspection (Reclassify)"
+  }, {
+    "uuid" : "125f1fab-adee-446c-92b5-8d6328f1569c",
+    "type" : "TERMINATOR",
+    "name" : "Close Damage Inspection (Reject Truck)"
+  }, {
+    "uuid" : "15c892d2-0ec9-4de6-9ad6-4168fb4c0e15",
+    "type" : "DECISION",
+    "name" : "Container on passage?"
+  }, {
+    "uuid" : "98e4e0f1-600f-4f7d-9122-38804659d3e5",
+    "type" : "DECISION",
+    "name" : "OCR confidence acceptable?"
+  } ],
+  "branches" : [ {
+    "uuid" : "b49f594f-28d5-4cb2-8348-b93034073faa",
+    "decision_uuid" : "15c892d2-0ec9-4de6-9ad6-4168fb4c0e15",
+    "name" : "Container present",
+    "order" : 1,
+    "condition" : [ {
+      "id" : "grp",
+      "logical_operator" : "AND",
+      "child_condition" : [ {
+        "id" : "c0",
+        "logical_operator" : "",
+        "field" : {
+          "value" : "$.workflow.dataset.plt_ocr_classification",
+          "selector_id" : "$.790948ab-7bc8-45c8-a7dc-09497eb211d8.dataset.plt_ocr_classification"
+        },
+        "comparison_operator" : "is equal to",
+        "value" : {
+          "value" : "One Container",
+          "selector_id" : ""
+        }
+      }, {
+        "id" : "c1",
+        "logical_operator" : "OR",
+        "field" : {
+          "value" : "$.workflow.dataset.plt_ocr_classification",
+          "selector_id" : "$.790948ab-7bc8-45c8-a7dc-09497eb211d8.dataset.plt_ocr_classification"
+        },
+        "comparison_operator" : "is equal to",
+        "value" : {
+          "value" : "Two Containers",
+          "selector_id" : ""
+        }
+      } ]
+    } ]
+  }, {
+    "uuid" : "0a8b49da-fdd0-4e2a-9c42-71891181e7d6",
+    "decision_uuid" : "15c892d2-0ec9-4de6-9ad6-4168fb4c0e15",
+    "name" : "No container",
+    "order" : 2,
+    "condition" : [ ]
+  }, {
+    "uuid" : "a025cff7-b430-4944-85cf-61b2d65c27f5",
+    "decision_uuid" : "98e4e0f1-600f-4f7d-9122-38804659d3e5",
+    "name" : "Low confidence",
+    "order" : 1,
+    "condition" : [ {
+      "id" : "grp",
+      "logical_operator" : "AND",
+      "child_condition" : [ {
+        "id" : "c0",
+        "logical_operator" : "",
+        "field" : {
+          "value" : "$.workflow.dataset.plt_ocr_container_confidence",
+          "selector_id" : "$.790948ab-7bc8-45c8-a7dc-09497eb211d8.dataset.plt_ocr_container_confidence"
+        },
+        "comparison_operator" : "is lesser than",
+        "value" : {
+          "value" : "0.85",
+          "selector_id" : ""
+        }
+      }, {
+        "id" : "c1",
+        "logical_operator" : "OR",
+        "field" : {
+          "value" : "$.workflow.dataset.plt_ocr_chassis_confidence",
+          "selector_id" : "$.790948ab-7bc8-45c8-a7dc-09497eb211d8.dataset.plt_ocr_chassis_confidence"
+        },
+        "comparison_operator" : "is lesser than",
+        "value" : {
+          "value" : "0.85",
+          "selector_id" : ""
+        }
+      } ]
+    } ]
+  }, {
+    "uuid" : "0fe643aa-4862-4c17-8afd-ff924fa1f1f6",
+    "decision_uuid" : "98e4e0f1-600f-4f7d-9122-38804659d3e5",
+    "name" : "Confidence acceptable",
+    "order" : 2,
+    "condition" : [ ]
+  } ],
+  "responses" : [ ],
+  "node_links" : [ {
+    "from" : "3ba67556-9fda-41f9-a9d9-7a1381b5dc7f",
+    "to" : "cca6860d-88aa-462a-b877-3d1f942fa235",
+    "position" : 0
+  }, {
+    "from" : "cca6860d-88aa-462a-b877-3d1f942fa235",
+    "to" : "99ddf170-9731-4922-814a-633a219f6693",
+    "position" : 1
+  }, {
+    "from" : "99ddf170-9731-4922-814a-633a219f6693",
+    "to" : "5091db50-fc15-4793-b3aa-6ef02c5e9f27",
+    "position" : 2
+  }, {
+    "from" : "0a8b49da-fdd0-4e2a-9c42-71891181e7d6",
+    "to" : "7ce2fd02-dc16-407b-939d-a6fd4fb8326a",
+    "position" : 3
+  }, {
+    "from" : "5091db50-fc15-4793-b3aa-6ef02c5e9f27",
+    "to" : "98e4e0f1-600f-4f7d-9122-38804659d3e5",
+    "position" : 4
+  }, {
+    "from" : "0fe643aa-4862-4c17-8afd-ff924fa1f1f6",
+    "to" : "15c892d2-0ec9-4de6-9ad6-4168fb4c0e15",
+    "position" : 5
+  }, {
+    "from" : "a025cff7-b430-4944-85cf-61b2d65c27f5",
+    "to" : "f191b3da-f416-42a0-8f53-10d977b1983c",
+    "position" : 6
+  }, {
+    "from" : "f191b3da-f416-42a0-8f53-10d977b1983c",
+    "to" : "3c72bce1-5c45-4874-90a7-716f774a4b7e",
+    "position" : 7
+  }, {
+    "from" : "3c72bce1-5c45-4874-90a7-716f774a4b7e",
+    "to" : "8d91bd5d-357c-42a5-bd95-405e490c01d2",
+    "position" : 8
+  }, {
+    "from" : "8d91bd5d-357c-42a5-bd95-405e490c01d2",
+    "to" : "15c892d2-0ec9-4de6-9ad6-4168fb4c0e15",
+    "position" : 9
+  }, {
+    "from" : "f191b3da-f416-42a0-8f53-10d977b1983c",
+    "to" : "a6b64b8e-f1d2-40f4-9e4f-8e1866e061b1",
+    "position" : 10
+  }, {
+    "from" : "a6b64b8e-f1d2-40f4-9e4f-8e1866e061b1",
+    "to" : "cf592c9a-5185-4c7a-9d85-5ef093d05171",
+    "position" : 11
+  }, {
+    "from" : "cf592c9a-5185-4c7a-9d85-5ef093d05171",
+    "to" : "a88f0d1c-4233-4e10-8e67-14e5eeb7c797",
+    "position" : 12
+  }, {
+    "from" : "b49f594f-28d5-4cb2-8348-b93034073faa",
+    "to" : "7cd1e279-fd18-465b-a49d-50cd68afc5b3",
+    "position" : 13
+  }, {
+    "from" : "7cd1e279-fd18-465b-a49d-50cd68afc5b3",
+    "to" : "7f468dd9-3cce-4003-9690-5f9be9928464",
+    "position" : 14
+  }, {
+    "from" : "7f468dd9-3cce-4003-9690-5f9be9928464",
+    "to" : "9a344dfb-2c96-4b54-bb4e-2a60e2ffb16e",
+    "position" : 15
+  }, {
+    "from" : "9a344dfb-2c96-4b54-bb4e-2a60e2ffb16e",
+    "to" : "7ce2fd02-dc16-407b-939d-a6fd4fb8326a",
+    "position" : 16
+  }, {
+    "from" : "7cd1e279-fd18-465b-a49d-50cd68afc5b3",
+    "to" : "4c15be2f-b562-4eb3-ac51-3a40686ef68d",
+    "position" : 17
+  }, {
+    "from" : "4c15be2f-b562-4eb3-ac51-3a40686ef68d",
+    "to" : "05921902-3616-415a-aeac-38f572a20b79",
+    "position" : 18
+  }, {
+    "from" : "05921902-3616-415a-aeac-38f572a20b79",
+    "to" : "7ce2fd02-dc16-407b-939d-a6fd4fb8326a",
+    "position" : 19
+  }, {
+    "from" : "7cd1e279-fd18-465b-a49d-50cd68afc5b3",
+    "to" : "e8ab67a0-8db4-4f89-982d-e474a8a6a49c",
+    "position" : 20
+  }, {
+    "from" : "e8ab67a0-8db4-4f89-982d-e474a8a6a49c",
+    "to" : "125f1fab-adee-446c-92b5-8d6328f1569c",
+    "position" : 21
+  }, {
+    "from" : "125f1fab-adee-446c-92b5-8d6328f1569c",
+    "to" : "7ce2fd02-dc16-407b-939d-a6fd4fb8326a",
+    "position" : 22
+  } ]
+}

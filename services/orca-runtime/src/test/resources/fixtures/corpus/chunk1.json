@@ -1,0 +1,1208 @@
+[
+  {
+    "source": "TestSelectorService_ProcessSelectors_Success",
+    "kind": "processSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "request": {
+        "field1": {
+          "value": "test-value",
+          "selector_id": "selector-1"
+        },
+        "field2": "static-value"
+      },
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": {
+        "field1": {
+          "selector_id": "selector-1",
+          "value": ""
+        },
+        "field2": "static-value"
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessSelectors_WithNestedData",
+    "kind": "processSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "request": {
+        "nested": {
+          "field1": {
+            "value": "nested-value",
+            "selector_id": "nested-selector"
+          }
+        },
+        "array": [
+          {
+            "value": "array-value",
+            "selector_id": "array-selector"
+          }
+        ]
+      },
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": {
+        "array": [
+          {
+            "selector_id": "array-selector",
+            "value": ""
+          }
+        ],
+        "nested": {
+          "field1": {
+            "selector_id": "nested-selector",
+            "value": ""
+          }
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_TraverseAndProcess_Map",
+    "kind": "traverseAndProcess",
+    "args": {
+      "data": {
+        "field1": "value1",
+        "field2": {
+          "nested": "nested-value"
+        }
+      },
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": {
+        "field1": "value1",
+        "field2": {
+          "nested": "nested-value"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_TraverseAndProcess_Array",
+    "kind": "traverseAndProcess",
+    "args": {
+      "data": [
+        "value1",
+        {
+          "nested": "nested-value"
+        },
+        [
+          "nested-array"
+        ]
+      ],
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": [
+        "value1",
+        {
+          "nested": "nested-value"
+        },
+        [
+          "nested-array"
+        ]
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_TraverseAndProcess_PrimitiveTypes",
+    "kind": "traverseAndProcess",
+    "args": {
+      "data": "test-string",
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": "test-string",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_Success",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "selector",
+        "1"
+      ],
+      "value": "cdl.scan.data",
+      "valueParts": [
+        "cdl",
+        "scan",
+        "data"
+      ]
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessMap_Success",
+    "kind": "processMap",
+    "args": {
+      "dataMap": {
+        "field1": "value1",
+        "field2": {
+          "nested": "nested-value"
+        }
+      },
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": {
+        "field1": "value1",
+        "field2": {
+          "nested": "nested-value"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertFieldMappings_Success",
+    "kind": "convertFieldMappings",
+    "args": {
+      "data": {
+        "field1": "value1",
+        "field2": "value2"
+      }
+    },
+    "expected": {
+      "value": {
+        "field1": "value1",
+        "field2": "value2"
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertArrayToObject_Success",
+    "kind": "convertArrayToObject",
+    "args": {
+      "data": [
+        {
+          "key": "value1"
+        },
+        {
+          "key": "value2"
+        }
+      ]
+    },
+    "expected": {
+      "value": {},
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertArrayToObjectDataSet_Success",
+    "kind": "convertArrayToObjectDataSet",
+    "args": {
+      "data": [
+        {
+          "key": "value1"
+        },
+        {
+          "key": "value2"
+        }
+      ]
+    },
+    "expected": {
+      "value": {},
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessArrayItems_Success",
+    "kind": "processArrayItems",
+    "args": {
+      "fields": [
+        "field1",
+        "field2"
+      ],
+      "items": {
+        "field1": "value1",
+        "field2": "value2"
+      }
+    },
+    "expected": {
+      "value": [],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_SplitSelector_Success",
+    "kind": "splitSelector",
+    "args": {
+      "selector": "workflow.dataset.field"
+    },
+    "source_expected": [
+      "workflow",
+      "dataset",
+      "field"
+    ],
+    "expected": {
+      "value": [
+        "workflow",
+        "dataset",
+        "field"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_GetResourceConfigurations_Success",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "config-key",
+      "resourceType": "resource-type",
+      "resourceUUID": "resource-uuid"
+    },
+    "repo": {
+      "GetResourceConfigurations": {
+        "returns": [
+          null,
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Error",
+        "code": 0,
+        "message": "Invalid resource type",
+        "errors": [
+          {
+            "message": "Invalid resource type",
+            "code": "WORK_FLOW_EXECUTOR_SQL_001"
+          }
+        ],
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExtractValue_Success",
+    "kind": "extractValue",
+    "args": {
+      "data": {
+        "field1": {
+          "nested": "nested-value"
+        }
+      },
+      "path": [
+        "field1",
+        "nested"
+      ]
+    },
+    "source_expected": "nested-value",
+    "expected": {
+      "value": "nested-value",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_GenerateTimeStamp_Success",
+    "kind": "generateTimeStamp",
+    "args": {
+      "part": ""
+    },
+    "volatile": true,
+    "expected": {
+      "value": 1786144304465,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_Success",
+    "kind": "handleString",
+    "args": {
+      "types": "string",
+      "value": "test-value"
+    },
+    "expected": {
+      "value": "test-value",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertCondition_Success",
+    "kind": "convertCondition",
+    "args": {
+      "condition": "field == value"
+    },
+    "expected": {
+      "value": "field == value",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertConditions_Success",
+    "kind": "convertConditions",
+    "args": {
+      "conditions": "field1 == value1 AND field2 == value2"
+    },
+    "expected": {
+      "value": "field1 == value1 AND field2 == value2",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_DeepDiveData_Success",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "field1",
+        "nested"
+      ],
+      "value": {
+        "field1": {
+          "nested": "nested-value"
+        }
+      }
+    },
+    "source_expected": "nested-value",
+    "expected": {
+      "value": "nested-value",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_SplitNestedRegexSelector_Success",
+    "kind": "splitNestedRegexSelector",
+    "args": {
+      "selector": "helper.regex.ismatch(pattern)"
+    },
+    "expected": {
+      "value": [
+        "helper",
+        "regex",
+        "ismatch(pattern)"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_UpdateSelectorValue_Success",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "selector",
+      "selectorID": "selector-id",
+      "selectorValue": "value",
+      "updation": "update",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveLaneSelector_Success",
+    "kind": "resolveLaneSelector",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "lane.selector",
+      "selectorID": "lane_id",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessSelectors_WithoutRequestID",
+    "kind": "processSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "request": {
+        "field1": "value1"
+      },
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "source_expected": {
+      "field1": "value1"
+    },
+    "expected": {
+      "value": {
+        "field1": "value1"
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_EmptySelector",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "",
+      "selectorID": "selector-1",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "dto": "Invalid selector type"
+      }
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_NilWorkflowExecutionID",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "test-selector",
+      "selectorID": "selector-1",
+      "workflowExecutionID": 0,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "dto": "Invalid selector type"
+      }
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_InvalidSelectorFormat",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "invalid",
+      "selectorID": "selector-1",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "dto": "Invalid selector type"
+      }
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_InvalidSelectorIDFormat",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "workflow.dataset",
+      "selectorID": "invalid",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "dto": "Invalid selector type"
+      }
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_HelperRegexIsMatch",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "helper.regex.ismatch",
+      "selectorID": "test_pattern",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": false,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_HelperRegexGetMatches",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "helper.regex.getmatches",
+      "selectorID": "test_pattern",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": null,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_HelperCount",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "helper.count",
+      "selectorID": "[]",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": {
+        "dto": "Incompatible data type to fetch count"
+      }
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_HelperExists",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "helper.exists",
+      "selectorID": "test_value",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": "false",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_GetPrimaryKeyByUUIDError",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "workflow.dataset",
+      "selectorID": "workflow.dataset",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          0,
+          {
+            "go": "assert.AnError general error for testing"
+          }
+        ]
+      }
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "dto": "assert.AnError general error for testing"
+      }
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_GetPreviousWorkflowExecutionIDError",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "dataset.field",
+      "selectorID": "dataset.field",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "repo": {
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          0,
+          {
+            "dto": "error fetching previous workflow execution"
+          }
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "dto": "error fetching previous workflow execution"
+      }
+    }
+  },
+  {
+    "source": "TestGetResourceConfigurations_Success_Site",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "",
+      "resourceType": "site",
+      "resourceUUID": "site-uuid-123"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "{\"key\": \"value\"}",
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Success",
+        "code": 0,
+        "message": "Resource configurations retrieved successfully",
+        "data": "{\"key\": \"value\"}",
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetResourceConfigurations_Success_Area",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "",
+      "resourceType": "area",
+      "resourceUUID": "area-uuid-456"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          2,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "{\"area\": \"config\"}",
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Success",
+        "code": 0,
+        "message": "Resource configurations retrieved successfully",
+        "data": "{\"area\": \"config\"}",
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetResourceConfigurations_Success_Lane",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "",
+      "resourceType": "lane",
+      "resourceUUID": "lane-uuid-789"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          3,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "{\"lane\": \"config\"}",
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Success",
+        "code": 0,
+        "message": "Resource configurations retrieved successfully",
+        "data": "{\"lane\": \"config\"}",
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetResourceConfigurations_Success_Device",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "",
+      "resourceType": "device",
+      "resourceUUID": "device-uuid-101"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          4,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "{\"device\": \"config\"}",
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Success",
+        "code": 0,
+        "message": "Resource configurations retrieved successfully",
+        "data": "{\"device\": \"config\"}",
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetResourceConfigurations_Success_WithConfigKey",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "specific-key",
+      "resourceType": "site",
+      "resourceUUID": "site-uuid-123"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "{\"specific\": \"value\"}",
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Success",
+        "code": 0,
+        "message": "Resource configurations retrieved successfully",
+        "data": "{\"specific\": \"value\"}",
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetResourceConfigurations_Success_NilData",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "",
+      "resourceType": "site",
+      "resourceUUID": "site-uuid-123"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          null,
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Success",
+        "code": 0,
+        "message": "Resource configurations retrieved successfully",
+        "data": "",
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetResourceConfigurations_InvalidResourceType",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "",
+      "resourceType": "invalid-type",
+      "resourceUUID": "uuid-123"
+    },
+    "expected": {
+      "value": {
+        "status": "Error",
+        "code": 0,
+        "message": "Invalid resource type",
+        "errors": [
+          {
+            "message": "Invalid resource type",
+            "code": "WORK_FLOW_EXECUTOR_SQL_001"
+          }
+        ],
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetResourceConfigurations_GetPrimaryKeyByUUID_RecordNotFound",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "",
+      "resourceType": "site",
+      "resourceUUID": "non-existent-uuid"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          0,
+          {
+            "gorm_not_found": true
+          }
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Error",
+        "code": 0,
+        "message": "Resource UUID not found",
+        "errors": [
+          {
+            "message": "record not found",
+            "code": "WORK_FLOW_EXECUTOR_SQL_001"
+          }
+        ],
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetResourceConfigurations_GetPrimaryKeyByUUID_Error",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "",
+      "resourceType": "site",
+      "resourceUUID": "site-uuid-123"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          0,
+          {
+            "go": "database connection error"
+          }
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Error",
+        "code": 0,
+        "message": "Failed to retrieve resource ID from UUID",
+        "errors": [
+          {
+            "message": "database connection error",
+            "code": "WORK_FLOW_EXECUTOR_SQL_006"
+          }
+        ],
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetResourceConfigurations_GetResourceConfigurations_Error",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "",
+      "resourceType": "site",
+      "resourceUUID": "site-uuid-123"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "",
+          {
+            "dto": "Configuration retrieval failed"
+          }
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Error",
+        "code": 0,
+        "message": "Failed to retrieve resource configurations",
+        "errors": [
+          {
+            "message": "Configuration retrieval failed",
+            "code": ""
+          }
+        ],
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetResourceConfigurations_NoRequestID_InContext",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "",
+      "resourceType": "site",
+      "resourceUUID": "site-uuid-123"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "{\"key\": \"value\"}",
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Success",
+        "code": 0,
+        "message": "Resource configurations retrieved successfully",
+        "data": "{\"key\": \"value\"}",
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestGetResourceConfigurations_CaseInsensitiveResourceType",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "",
+      "resourceType": "SITE",
+      "resourceUUID": "site-uuid-123"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "{\"key\": \"value\"}",
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Success",
+        "code": 0,
+        "message": "Resource configurations retrieved successfully",
+        "data": "{\"key\": \"value\"}",
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestNewSelectorService_Success",
+    "kind": "skip",
+    "args": {},
+    "skip": "constructor smoke test (NewSelectorService)"
+  },
+  {
+    "source": "TestSelectorService_TraverseAndProcess_NilData",
+    "kind": "traverseAndProcess",
+    "args": {
+      "data": null,
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": null,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_TraverseAndProcess_String",
+    "kind": "traverseAndProcess",
+    "args": {
+      "data": "simple-string",
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": "simple-string",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessMap_NilMap",
+    "kind": "processMap",
+    "args": {
+      "dataMap": null,
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": null,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessMap_EmptyMap",
+    "kind": "processMap",
+    "args": {
+      "dataMap": {},
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": {},
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertFieldMappings_NilData",
+    "kind": "convertFieldMappings",
+    "args": {
+      "data": null
+    },
+    "expected": {
+      "value": null,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertFieldMappings_NonMapData",
+    "kind": "convertFieldMappings",
+    "args": {
+      "data": "string-data"
+    },
+    "expected": {
+      "value": "string-data",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertArrayToObject_NilData",
+    "kind": "convertArrayToObject",
+    "args": {
+      "data": null
+    },
+    "expected": {
+      "value": null,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertArrayToObject_EmptyArray",
+    "kind": "convertArrayToObject",
+    "args": {
+      "data": []
+    },
+    "expected": {
+      "value": {},
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertArrayToObjectDataSet_NilData",
+    "kind": "convertArrayToObjectDataSet",
+    "args": {
+      "data": null
+    },
+    "expected": {
+      "value": null,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertArrayToObjectDataSet_EmptyArray",
+    "kind": "convertArrayToObjectDataSet",
+    "args": {
+      "data": []
+    },
+    "expected": {
+      "value": {},
+      "error": null
+    }
+  }
+]
