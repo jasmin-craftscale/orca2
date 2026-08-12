@@ -32,11 +32,13 @@ These are current repository and SQL Server facts, not proposed behaviour.
    Its internal identifier rule accepts ASCII letters, digits and underscore,
    starting with a letter, and an optional single schema qualifier for tables. The
    WP1 declaration boundary is narrower: exact lower-case
-   `[a-z][a-z0-9_]{0,62}`, with `row_id` and `external_id` reserved. There is no
-   approved dynamic-SQL compiler today.
+   `[a-z][a-z0-9_]{0,62}`, with `row_id`, `external_id` and
+   `site_external_id` reserved. There is no approved dynamic-SQL compiler today.
 4. WP1 reserves opaque table identifiers in the exact shape
    `ce_[0-9a-f]{32}`. Display-name changes never change that identifier. Its future
-   internal and external row keys are fixed as `row_id` and `external_id`.
+   internal and external row keys are fixed as `row_id` and `external_id`; its
+   future scope column is fixed as `site_external_id`, because every application
+   read must remain expressible through `platform/scope`.
 5. The default HTTP security chain authenticates every public route but applies no
    mutation entitlement. A valid user token is currently enough to reach any public
    controller. No existing rule answers who may declare a schema change, approve a
@@ -65,7 +67,7 @@ does not silently answer a row unless the option says so.
 | 2 | Narrowing with incompatible data | Refuse narrowing because the first executor has no narrowing verb | A staged preflight/backfill/validation operation, with an explicit rejected-row policy and no implicit truncation or coercion |
 | 3 | Drop | Never through the first executor. Retirement or hiding is metadata-only and leaves storage intact | A separately authorised destructive request with impact evidence, backup/restore evidence, an expiry window and named approval |
 | 4 | Migration record and replay | Per-entity monotonic sequence; canonical operations plus checksum; unique declaration version and idempotency key; duplicate key plus same checksum returns the recorded outcome, different checksum conflicts | Operator-approved records may add approval and maintenance-window states without changing replay semantics |
-| 5 | Identifier source | Only the persisted WP1 table identifier, fixed key names and persisted field identifiers; compile from a closed operation model after revalidation | No viable option permits request text, display names or arbitrary SQL fragments to become identifiers |
+| 5 | Identifier source | Only the persisted WP1 table identifier, fixed key/scope names and persisted field identifiers; compile from a closed operation model after revalidation | No viable option permits request text, display names or arbitrary SQL fragments to become identifiers |
 | 6 | Drift | Compare the recorded intended shape to `sys.tables`, `sys.columns`, keys, checks and indexes; report missing, unexpected and mismatched objects; never repair | Product may choose whether drift blocks later migrations or merely raises an operational incident |
 | 7 | Authority | Separate declaration entitlement from execution. Execution runs as a system identity over an authorised, recorded request and retains the human author | Direct synchronous execution by a specially entitled human, or an operator approval gate, with the additional availability and audit costs below |
 | 8 | Retention | No EVENT table becomes executable until its retention class is a closed, validated declaration and generated tables are included in the purge inventory and CI evidence | Product may initially permit REFERENCE only, or defer all execution until the retention catalogue is reconciled |
@@ -80,9 +82,10 @@ columns, constraints and tables are never renamed, narrowed or dropped.
 ### Permitted operation model
 
 - `CREATE_CUSTOM_ENTITY_TABLE` creates the opaque `ce_*` table, `row_id`,
-  `external_id`, declared fields, the primary key, external-id uniqueness, the
-  business-key uniqueness rule, shape checks, the site access path, and the approved
-  retention/index artifacts. The operation compiler owns every keyword and clause.
+  `external_id`, `site_external_id`, declared fields, the primary key, external-id
+  uniqueness, the business-key uniqueness rule, shape checks, the site-leading
+  access path, and the approved retention/index artifacts. The operation compiler
+  owns every keyword and clause.
 - `ADD_CUSTOM_ENTITY_FIELD` adds one field and only widens the shape. A nullable
   field is always safe. A non-null field is permitted only when the table is empty,
   or when Product has separately approved a deterministic default/backfill rule.

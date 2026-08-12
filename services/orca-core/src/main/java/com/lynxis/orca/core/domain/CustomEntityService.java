@@ -2,7 +2,7 @@ package com.lynxis.orca.core.domain;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -11,7 +11,6 @@ import java.util.stream.Collectors;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.lynxis.orca.core.domain.CustomEntityTables.CustomEntity;
 import com.lynxis.orca.core.domain.CustomEntityTables.CustomEntityField;
 import com.lynxis.orca.core.persistence.CustomEntityRepository;
 import com.lynxis.orca.core.persistence.SiteDirectoryRepository;
@@ -24,12 +23,15 @@ public class CustomEntityService {
 
 	public static final String ROW_ID_COLUMN = "row_id";
 	public static final String ROW_EXTERNAL_ID_COLUMN = "external_id";
+	public static final String ROW_SITE_EXTERNAL_ID_COLUMN = "site_external_id";
 
 	private static final Pattern FIELD_IDENTIFIER = Pattern.compile("[a-z][a-z0-9_]{0,62}");
-	private static final Set<String> RESERVED_FIELDS = Set.of(ROW_ID_COLUMN, ROW_EXTERNAL_ID_COLUMN);
+	private static final Set<String> RESERVED_FIELDS = Set.of(
+			ROW_ID_COLUMN, ROW_EXTERNAL_ID_COLUMN, ROW_SITE_EXTERNAL_ID_COLUMN);
 
 	private final CustomEntityRepository entities;
 	private final SiteDirectoryRepository sites;
+	private final AuditTrail audit;
 
 	public enum EntityKind {
 		REFERENCE, EVENT
@@ -52,30 +54,19 @@ public class CustomEntityService {
 			int ordinal) {
 	}
 
-	/** Entity metadata and its fields, assembled under one site scope. */
-	public record CustomEntityView(CustomEntity entity, List<CustomEntityField> fields) {
-	}
-
-	public List<CustomEntityView> list() {
-		Map<Long, List<CustomEntityField>> fieldsByEntity = entities.allFields().stream()
-				.collect(Collectors.groupingBy(CustomEntityField::customEntityId));
-		return entities.all().stream()
-				.map(entity -> new CustomEntityView(entity,
-						fieldsByEntity.getOrDefault(entity.customEntityId(), List.of()).stream()
-								.sorted(java.util.Comparator.comparingInt(CustomEntityField::ordinal))
-								.toList()))
-				.toList();
+	public List<CustomEntityDeclaration> list() {
+		return entities.all();
 	}
 
 	@Transactional
-	public CustomEntityView declare(String siteExternalId, String name, EntityKind kind,
+	public CustomEntityDeclaration declare(String siteExternalId, String name, EntityKind kind,
 			List<FieldDeclaration> fields) {
 		String validName = requireDisplayName(name, "Custom-entity name");
-		requireSite(siteExternalId);
-		requireFields(fields, true);
 		if (kind == null) {
 			throw invalid("Entity kind is required.");
 		}
+		requireSite(siteExternalId);
+		requireFields(fields, true);
 
 		String uuid = UUID.randomUUID().toString();
 		String externalId = "ce-" + uuid;
@@ -89,15 +80,16 @@ public class CustomEntityService {
 		}
 		catch (DuplicateKeyException conflict) {
 			throw new CustomEntityConflictException(
-					"A declaration of this kind and name, or one of its field identifiers, is already in use.");
+					"A declaration of this kind and name, or one of its field identifiers or display names, is already in use.");
 		}
+		audit.record("CUSTOM_ENTITY", externalId, "CREATED", "kind=" + kind.name());
 		return byExternalId(externalId);
 	}
 
 	@Transactional
-	public CustomEntityView evolve(String externalId, String name,
+	public CustomEntityDeclaration evolve(String externalId, String name,
 			List<FieldDeclaration> addedFields) {
-		CustomEntityView existing = byExternalId(externalId);
+		CustomEntityDeclaration existing = byExternalId(externalId);
 		List<FieldDeclaration> additions = addedFields == null ? List.of() : addedFields;
 		String validName = name == null ? null : requireDisplayName(name, "Custom-entity name");
 		boolean rename = validName != null && !validName.equals(existing.entity().name());
@@ -117,15 +109,16 @@ public class CustomEntityService {
 		}
 		catch (DuplicateKeyException conflict) {
 			throw new CustomEntityConflictException(
-					"The requested name, field identifier or field ordinal is already in use.");
+					"The requested name, field identifier, field display name or field ordinal is already in use.");
 		}
+		audit.record("CUSTOM_ENTITY", externalId, "UPDATED",
+				(rename ? "display name; " : "") + additions.size() + " field(s) added");
 		return byExternalId(externalId);
 	}
 
-	private CustomEntityView byExternalId(String externalId) {
-		CustomEntity entity = entities.byExternalId(externalId)
+	private CustomEntityDeclaration byExternalId(String externalId) {
+		return entities.byExternalId(externalId)
 				.orElseThrow(() -> new CustomEntityUnknownException(externalId));
-		return new CustomEntityView(entity, entities.fieldsFor(entity.customEntityId()));
 	}
 
 	private void requireSite(String siteExternalId) {
@@ -146,6 +139,7 @@ public class CustomEntityService {
 			throw invalid("A new declaration requires at least one field.");
 		}
 		Set<String> identifiers = new HashSet<>();
+		Set<String> displayNames = new HashSet<>();
 		Set<Integer> ordinals = new HashSet<>();
 		long businessKeys = 0;
 		for (FieldDeclaration field : fields) {
@@ -155,6 +149,9 @@ public class CustomEntityService {
 			requireField(field);
 			if (!identifiers.add(field.identifier())) {
 				throw invalid("Field identifier '" + field.identifier() + "' appears more than once.");
+			}
+			if (!displayNames.add(normalizedDisplayName(field.displayName()))) {
+				throw invalid("Field display name '" + field.displayName() + "' appears more than once.");
 			}
 			if (!ordinals.add(field.ordinal())) {
 				throw invalid("Field ordinal " + field.ordinal() + " appears more than once.");
@@ -216,12 +213,19 @@ public class CustomEntityService {
 			List<FieldDeclaration> additions) {
 		Set<String> identifiers = existing.stream().map(CustomEntityField::identifier)
 				.collect(Collectors.toSet());
+		Set<String> displayNames = existing.stream().map(CustomEntityField::displayName)
+				.map(CustomEntityService::normalizedDisplayName)
+				.collect(Collectors.toSet());
 		Set<Integer> ordinals = existing.stream().map(CustomEntityField::ordinal)
 				.collect(Collectors.toSet());
 		for (FieldDeclaration field : additions) {
 			if (identifiers.contains(field.identifier())) {
 				throw new CustomEntityConflictException(
 						"Field identifier '" + field.identifier() + "' is already declared.");
+			}
+			if (displayNames.contains(normalizedDisplayName(field.displayName()))) {
+				throw new CustomEntityConflictException(
+						"Field display name '" + field.displayName() + "' is already declared.");
 			}
 			if (ordinals.contains(field.ordinal())) {
 				throw new CustomEntityConflictException(
@@ -231,10 +235,18 @@ public class CustomEntityService {
 	}
 
 	private static String requireDisplayName(String value, String what) {
-		if (value == null || value.isBlank() || value.length() > 100) {
+		if (value == null) {
 			throw invalid(what + " must contain 1..100 characters.");
 		}
-		return value.strip();
+		String normalized = value.strip();
+		if (normalized.isEmpty() || normalized.length() > 100) {
+			throw invalid(what + " must contain 1..100 characters.");
+		}
+		return normalized;
+	}
+
+	private static String normalizedDisplayName(String value) {
+		return requireDisplayName(value, "Field display name").toLowerCase(Locale.ROOT);
 	}
 
 	private static CustomEntityValidationException invalid(String reason) {

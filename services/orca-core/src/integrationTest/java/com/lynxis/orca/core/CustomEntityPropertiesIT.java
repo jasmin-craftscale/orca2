@@ -2,8 +2,10 @@ package com.lynxis.orca.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import java.util.List;
+import java.util.Optional;
 
 import javax.sql.DataSource;
 
@@ -32,13 +34,20 @@ import com.lynxis.orca.core.api.generated.model.CustomEntitySummary;
 import com.lynxis.orca.core.api.generated.model.DeclareCustomEntityFieldRequest;
 import com.lynxis.orca.core.api.generated.model.DeclareCustomEntityRequest;
 import com.lynxis.orca.core.api.generated.model.EvolveCustomEntityDeclarationRequest;
+import com.lynxis.orca.core.domain.AuditTrail;
+import com.lynxis.orca.core.domain.CallerIdentity;
 import com.lynxis.orca.core.domain.CustomEntityService;
+import com.lynxis.orca.core.persistence.AuditEventRepository;
 import com.lynxis.orca.core.persistence.CustomEntityRepository;
 import com.lynxis.orca.core.persistence.SiteDirectoryRepository;
+import com.lynxis.orca.core.persistence.UserAccountRepository;
 import com.lynxis.orca.platform.outbox.testing.PlatformDatabase;
 import com.lynxis.orca.platform.scope.JdbcScopeSeam;
 import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.platform.web.ApiException;
+import com.lynxis.orca.platform.web.ApiExceptionHandler;
+import com.lynxis.orca.platform.web.ApiResponse;
+import com.lynxis.orca.platform.web.ApiStatus;
 
 /** Properties of the declared custom-entity model against real SQL Server. */
 class CustomEntityPropertiesIT {
@@ -84,9 +93,30 @@ class CustomEntityPropertiesIT {
 		}
 
 		@Bean
+		UserAccountRepository userAccountRepository(ScopeSeam seam) {
+			return new UserAccountRepository(seam);
+		}
+
+		@Bean
+		AuditEventRepository auditEventRepository(ScopeSeam seam) {
+			return new AuditEventRepository(seam);
+		}
+
+		@Bean
+		CallerIdentity callerIdentity() {
+			return Optional::empty;
+		}
+
+		@Bean
+		AuditTrail auditTrail(AuditEventRepository events, UserAccountRepository users,
+				CallerIdentity caller) {
+			return new AuditTrail(events, users, caller, SITE_A);
+		}
+
+		@Bean
 		CustomEntityService customEntityService(CustomEntityRepository entities,
-				SiteDirectoryRepository sites) {
-			return new CustomEntityService(entities, sites);
+				SiteDirectoryRepository sites, AuditTrail audit) {
+			return new CustomEntityService(entities, sites, audit);
 		}
 	}
 
@@ -109,6 +139,7 @@ class CustomEntityPropertiesIT {
 	@BeforeEach
 	void freshSitesAndApi() {
 		core = new JdbcTemplate(owner);
+		core.execute("DELETE FROM audit_event");
 		core.execute("DELETE FROM custom_entity_field");
 		core.execute("DELETE FROM custom_entity");
 		core.execute("DELETE FROM site");
@@ -137,6 +168,7 @@ class CustomEntityPropertiesIT {
 		assertThat(declared.getTableIdentifier()).matches("ce_[0-9a-f]{32}");
 		assertThat(declared.getRowIdColumn()).isEqualTo("row_id");
 		assertThat(declared.getRowExternalIdColumn()).isEqualTo("external_id");
+		assertThat(declared.getRowSiteExternalIdColumn()).isEqualTo("site_external_id");
 		assertThat(declared.getDeclarationVersion()).isEqualTo(1);
 		assertThat(declared.getFields()).extracting(field -> field.getType().getValue())
 				.containsExactly("TEXT", "NUMBER", "BOOLEAN", "DATE");
@@ -161,6 +193,12 @@ class CustomEntityPropertiesIT {
 				.containsExactly("code", "weight", "active", "effective_date", "notes");
 		assertThat(apiA.listCustomEntities().getBody().getData()).singleElement()
 				.extracting(CustomEntitySummary::getName).isEqualTo("Vehicle category");
+		assertThat(core.query(
+				"SELECT action, entity_external_id FROM audit_event ORDER BY audit_event_id",
+				(rs, row) -> rs.getString("action") + ":" + rs.getString("entity_external_id")))
+				.as("declaration and evolution are configuration mutations")
+				.containsExactly("CREATED:" + declared.getExternalId(),
+						"UPDATED:" + declared.getExternalId());
 	}
 
 	@Test
@@ -168,17 +206,16 @@ class CustomEntityPropertiesIT {
 	void invalidDeclarationsAreTyped() {
 		assertInvalid(text("UpperCase", "Bad", 20, false, true, 1));
 		assertInvalid(text("row_id", "Reserved", 20, false, true, 1));
+		assertInvalid(text("site_external_id", "Reserved scope", 20, false, true, 1));
 		assertInvalid(new DeclareCustomEntityFieldRequest()
 				.identifier("amount").displayName("Amount").type(CustomEntityFieldType.NUMBER)
 				.precision(4).scale(5).nullable(false).businessKey(true).ordinal(1));
 		assertInvalid(text("code", "Code", 20, true, true, 1));
 
-		assertThatThrownBy(() -> apiA.declareCustomEntity(new DeclareCustomEntityRequest()
+		ApiException noKey = catchThrowableOfType(() -> apiA.declareCustomEntity(new DeclareCustomEntityRequest()
 				.name("No key").kind(CustomEntityKind.EVENT)
-				.fields(List.of(text("value", "Value", 20, false, false, 1)))))
-				.isInstanceOfSatisfying(ApiException.class, refusal ->
-						assertThat(refusal.getErrorCode().code())
-								.isEqualTo("CUSTOM_ENTITY_DECLARATION_INVALID"));
+				.fields(List.of(text("value", "Value", 20, false, false, 1)))), ApiException.class);
+		assertTypedInvalidEnvelope(noKey);
 		assertThat(core.queryForObject("SELECT COUNT(*) FROM custom_entity", Long.class)).isZero();
 	}
 
@@ -193,6 +230,9 @@ class CustomEntityPropertiesIT {
 		assertThatThrownBy(() -> directField(entityId, "cef-reserved", "external_id", "TEXT",
 				20, null, null, false, true, 1))
 				.isInstanceOf(DataIntegrityViolationException.class);
+		assertThatThrownBy(() -> directField(entityId, "cef-scope", "site_external_id", "TEXT",
+				20, null, null, false, true, 1))
+				.isInstanceOf(DataIntegrityViolationException.class);
 		assertThatThrownBy(() -> directField(entityId, "cef-shape", "amount", "NUMBER",
 				null, 3, 4, false, true, 1))
 				.isInstanceOf(DataIntegrityViolationException.class);
@@ -205,10 +245,11 @@ class CustomEntityPropertiesIT {
 	}
 
 	@Test
-	@DisplayName("every external id, entity name, table id, field identifier, ordinal and business key is unique")
+	@DisplayName("every external id, entity name, table id, field name, identifier, ordinal and business key is unique")
 	void databaseUniquenessRulesHold() {
 		long entityId = directEntity("ce-one", "One", "ce_11111111111111111111111111111111");
-		directField(entityId, "cef-one", "code", "TEXT", 20, null, null, false, true, 1);
+		directField(entityId, "cef-one", "code", "Code", "TEXT",
+				20, null, null, false, true, 1);
 
 		assertThatThrownBy(() -> directEntity("ce-one", "Two",
 				"ce_22222222222222222222222222222222")).isInstanceOf(DuplicateKeyException.class);
@@ -217,36 +258,42 @@ class CustomEntityPropertiesIT {
 		assertThatThrownBy(() -> directEntity("ce-two", "Two",
 				"ce_11111111111111111111111111111111")).isInstanceOf(DuplicateKeyException.class);
 
-		assertThatThrownBy(() -> directField(entityId, "cef-one", "description", "TEXT",
+		assertThatThrownBy(() -> directField(entityId, "cef-one", "description", "Description", "TEXT",
 				20, null, null, true, false, 2)).isInstanceOf(DuplicateKeyException.class);
-		assertThatThrownBy(() -> directField(entityId, "cef-two", "code", "TEXT",
+		assertThatThrownBy(() -> directField(entityId, "cef-two", "code", "Other code", "TEXT",
 				20, null, null, true, false, 2)).isInstanceOf(DuplicateKeyException.class);
-		assertThatThrownBy(() -> directField(entityId, "cef-three", "description", "TEXT",
+		assertThatThrownBy(() -> directField(entityId, "cef-three", "description", "Description", "TEXT",
 				20, null, null, true, false, 1)).isInstanceOf(DuplicateKeyException.class);
-		assertThatThrownBy(() -> directField(entityId, "cef-four", "second_key", "TEXT",
+		assertThatThrownBy(() -> directField(entityId, "cef-four", "second_key", "Second key", "TEXT",
 				20, null, null, false, true, 2)).isInstanceOf(DuplicateKeyException.class);
+		assertThatThrownBy(() -> directField(entityId, "cef-five", "label", "code", "TEXT",
+				20, null, null, true, false, 2)).isInstanceOf(DuplicateKeyException.class);
 	}
 
 	@Test
 	@DisplayName("site scope prevents cross-site list, read and mutation of declarations")
 	void crossSiteAccessIsAbsent() {
-		CustomEntityController apiB = new CustomEntityController(
-				context.getBean(CustomEntityService.class), SITE_B);
 		CustomEntitySummary a = apiA.declareCustomEntity(declaration("A model", "a_code"))
 				.getBody().getData();
-		CustomEntitySummary b = apiB.declareCustomEntity(declaration("B model", "b_code"))
-				.getBody().getData();
+		core.update("INSERT INTO custom_entity "
+				+ "(external_id, site_external_id, entity_kind, name, table_identifier) "
+				+ "VALUES ('ce-b', ?, 'REFERENCE', 'B model', "
+				+ "'ce_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')", SITE_B);
+		long bId = core.queryForObject(
+				"SELECT custom_entity_id FROM custom_entity WHERE external_id = 'ce-b'", Long.class);
+		core.update("INSERT INTO custom_entity_field "
+				+ "(external_id, custom_entity_id, site_external_id, identifier, display_name, "
+				+ "field_type, max_length, is_nullable, is_business_key, ordinal) "
+				+ "VALUES ('cef-b', ?, ?, 'b_code', 'B code', 'TEXT', 32, 0, 1, 1)", bId, SITE_B);
 
 		assertThat(apiA.listCustomEntities().getBody().getData())
 				.extracting(CustomEntitySummary::getExternalId).containsExactly(a.getExternalId());
-		assertThat(apiB.listCustomEntities().getBody().getData())
-				.extracting(CustomEntitySummary::getExternalId).containsExactly(b.getExternalId());
-		assertThatThrownBy(() -> apiA.evolveCustomEntityDeclaration(b.getExternalId(),
+		assertThatThrownBy(() -> apiA.evolveCustomEntityDeclaration("ce-b",
 				new EvolveCustomEntityDeclarationRequest().name("Stolen")))
 				.isInstanceOfSatisfying(ApiException.class, refusal ->
 						assertThat(refusal.getErrorCode().code()).isEqualTo("NOT_FOUND"));
 		assertThat(core.queryForObject(
-				"SELECT name FROM custom_entity WHERE external_id = ?", String.class, b.getExternalId()))
+				"SELECT name FROM custom_entity WHERE external_id = 'ce-b'", String.class))
 				.isEqualTo("B model");
 	}
 
@@ -264,6 +311,7 @@ class CustomEntityPropertiesIT {
 				.containsEntry("table_identifier", declared.getTableIdentifier())
 				.containsEntry("row_id_column", "row_id")
 				.containsEntry("row_external_id_column", "external_id")
+				.containsEntry("row_site_external_id_column", "site_external_id")
 				.containsEntry("field_identifier", "code");
 
 		assertThatThrownBy(() -> runtime.queryForObject(
@@ -278,6 +326,13 @@ class CustomEntityPropertiesIT {
 				"SELECT COUNT(*) FROM core.topology_custom_entity", Long.class))
 				.as("published topology views hide a retired site's configuration by convention")
 				.isZero();
+		assertThat(apiA.listCustomEntities().getBody().getData())
+				.as("the owning API reads the same one-snapshot declared topology")
+				.isEmpty();
+		assertThatThrownBy(() -> apiA.evolveCustomEntityDeclaration(declared.getExternalId(),
+				new EvolveCustomEntityDeclarationRequest().name("Retired mutation")))
+				.isInstanceOfSatisfying(ApiException.class, refusal ->
+						assertThat(refusal.getErrorCode().code()).isEqualTo("NOT_FOUND"));
 	}
 
 	@Test
@@ -302,14 +357,42 @@ class CustomEntityPropertiesIT {
 
 		assertThat(core.queryForObject("SELECT COUNT(*) FROM custom_entity", Long.class)).isZero();
 		assertThat(core.queryForObject("SELECT COUNT(*) FROM custom_entity_field", Long.class)).isZero();
+		assertThat(core.queryForObject("SELECT COUNT(*) FROM audit_event", Long.class)).isZero();
+	}
+
+	@Test
+	@DisplayName("an audit failure rolls back the declaration, so mutation and audit cannot diverge")
+	void auditFailureRollsBackDeclaration() {
+		core.execute("ALTER TABLE audit_event ADD CONSTRAINT ck_audit_event_test_poison "
+				+ "CHECK (entity_type <> 'CUSTOM_ENTITY')");
+		try {
+			assertThatThrownBy(() -> apiA.declareCustomEntity(declaration("Unaudited", "code")))
+					.isInstanceOf(DataIntegrityViolationException.class);
+		}
+		finally {
+			core.execute("ALTER TABLE audit_event DROP CONSTRAINT ck_audit_event_test_poison");
+		}
+
+		assertThat(core.queryForObject("SELECT COUNT(*) FROM custom_entity", Long.class)).isZero();
+		assertThat(core.queryForObject("SELECT COUNT(*) FROM custom_entity_field", Long.class)).isZero();
+		assertThat(core.queryForObject("SELECT COUNT(*) FROM audit_event", Long.class)).isZero();
 	}
 
 	private void assertInvalid(DeclareCustomEntityFieldRequest field) {
-		assertThatThrownBy(() -> apiA.declareCustomEntity(new DeclareCustomEntityRequest()
-				.name("Invalid").kind(CustomEntityKind.REFERENCE).fields(List.of(field))))
-				.isInstanceOfSatisfying(ApiException.class, refusal ->
-						assertThat(refusal.getErrorCode().code())
-								.isEqualTo("CUSTOM_ENTITY_DECLARATION_INVALID"));
+		ApiException refusal = catchThrowableOfType(() -> apiA.declareCustomEntity(
+				new DeclareCustomEntityRequest().name("Invalid")
+						.kind(CustomEntityKind.REFERENCE).fields(List.of(field))), ApiException.class);
+		assertTypedInvalidEnvelope(refusal);
+	}
+
+	private static void assertTypedInvalidEnvelope(ApiException refusal) {
+		var response = new ApiExceptionHandler().handleApi(refusal);
+		assertThat(response.getStatusCode().value()).isEqualTo(422);
+		ApiResponse<Void> body = response.getBody();
+		assertThat(body).isNotNull();
+		assertThat(body.status()).isEqualTo(ApiStatus.ERROR);
+		assertThat(body.code()).isEqualTo("CUSTOM_ENTITY_DECLARATION_INVALID");
+		assertThat(body.data()).isNull();
 	}
 
 	private static DeclareCustomEntityRequest declaration(String name, String identifier) {
@@ -352,11 +435,18 @@ class CustomEntityPropertiesIT {
 	private void directField(long entityId, String externalId, String identifier, String type,
 			Integer maxLength, Integer precision, Integer scale, boolean nullable,
 			boolean businessKey, int ordinal) {
+		directField(entityId, externalId, identifier, "Field", type, maxLength, precision,
+				scale, nullable, businessKey, ordinal);
+	}
+
+	private void directField(long entityId, String externalId, String identifier, String displayName,
+			String type, Integer maxLength, Integer precision, Integer scale, boolean nullable,
+			boolean businessKey, int ordinal) {
 		core.update("INSERT INTO custom_entity_field "
 				+ "(external_id, custom_entity_id, site_external_id, identifier, display_name, "
 				+ "field_type, max_length, number_precision, number_scale, is_nullable, "
-				+ "is_business_key, ordinal) VALUES (?, ?, ?, ?, 'Field', ?, ?, ?, ?, ?, ?, ?)",
-				externalId, entityId, SITE_A, identifier, type, maxLength, precision, scale,
+				+ "is_business_key, ordinal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				externalId, entityId, SITE_A, identifier, displayName, type, maxLength, precision, scale,
 				nullable, businessKey, ordinal);
 	}
 }

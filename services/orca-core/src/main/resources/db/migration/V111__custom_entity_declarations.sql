@@ -13,8 +13,9 @@
 -- Identifiers may become SQL Server column names in a later, controlled step.
 -- They are exact lower-case ASCII, start with a letter, and contain only letters,
 -- digits and underscores. Display names remain Unicode and administrator-facing.
--- The future row keys are fixed as `row_id` and `external_id`; declaration fields
--- cannot take either name.
+-- The future row keys are fixed as `row_id` and `external_id`, and the future
+-- scope column is fixed as `site_external_id`; declaration fields cannot take
+-- any of those names.
 --
 -- WHAT THIS DELIBERATELY DOES NOT SAY
 -- There is no applied/pending status, generated-table registry, drift flag or
@@ -70,7 +71,7 @@ CREATE TABLE custom_entity_field (
 		LEN(identifier) BETWEEN 1 AND 63
 		AND LEFT(identifier, 1) LIKE '[a-z]'
 		AND identifier NOT LIKE '%[^a-z0-9_]%'
-		AND identifier NOT IN ('row_id', 'external_id')),
+		AND identifier NOT IN ('row_id', 'external_id', 'site_external_id')),
 	CONSTRAINT ck_custom_entity_field_display_name CHECK (LEN(LTRIM(RTRIM(display_name))) > 0),
 	CONSTRAINT ck_custom_entity_field_type CHECK (field_type IN ('TEXT', 'NUMBER', 'BOOLEAN', 'DATE')),
 	CONSTRAINT ck_custom_entity_field_shape CHECK (
@@ -90,6 +91,7 @@ CREATE TABLE custom_entity_field (
 		is_business_key = 0 OR is_nullable = 0),
 	CONSTRAINT ck_custom_entity_field_ordinal CHECK (ordinal > 0),
 	CONSTRAINT uq_custom_entity_field_identifier UNIQUE (custom_entity_id, identifier),
+	CONSTRAINT uq_custom_entity_field_display_name UNIQUE (custom_entity_id, display_name),
 	CONSTRAINT uq_custom_entity_field_ordinal UNIQUE (custom_entity_id, ordinal)
 );
 
@@ -107,8 +109,8 @@ CREATE INDEX ix_custom_entity_field_scope
 GO
 
 -- Runtime sees only the flattened declaration contract, one row per field. It
--- cannot read or mutate the owning tables. Literal row-key names make the future
--- contract explicit without pretending that those columns already exist.
+-- cannot read or mutate the owning tables. Literal row-key and scope-column
+-- names make the future contract explicit without pretending those columns exist.
 IF DATABASE_PRINCIPAL_ID(N'orca_runtime') IS NULL
 	THROW 50111, 'orca_runtime does not exist in this database. Run deploy/bootstrap/run.sh before starting orca-core: a published view that no consumer can read is not published.', 1;
 GO
@@ -123,6 +125,7 @@ SELECT
 	ce.table_identifier,
 	CAST('row_id' AS VARCHAR(63)) AS row_id_column,
 	CAST('external_id' AS VARCHAR(63)) AS row_external_id_column,
+	CAST('site_external_id' AS VARCHAR(63)) AS row_site_external_id_column,
 	ce.declaration_version,
 	cef.custom_entity_field_id,
 	cef.external_id AS field_external_id,
@@ -135,6 +138,7 @@ SELECT
 	cef.is_nullable,
 	cef.is_business_key,
 	cef.ordinal AS field_ordinal,
+	cef.created_at AS field_created_at,
 	ce.created_at,
 	ce.updated_at
 FROM custom_entity ce

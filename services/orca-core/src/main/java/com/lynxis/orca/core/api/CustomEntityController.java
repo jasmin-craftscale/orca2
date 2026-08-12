@@ -18,12 +18,12 @@ import com.lynxis.orca.core.api.generated.model.DeclareCustomEntityFieldRequest;
 import com.lynxis.orca.core.api.generated.model.DeclareCustomEntityRequest;
 import com.lynxis.orca.core.api.generated.model.EvolveCustomEntityDeclarationRequest;
 import com.lynxis.orca.core.domain.CoreScopes;
+import com.lynxis.orca.core.domain.CustomEntityDeclaration;
 import com.lynxis.orca.core.domain.CustomEntityService;
 import com.lynxis.orca.core.domain.CustomEntityService.CustomEntityConflictException;
 import com.lynxis.orca.core.domain.CustomEntityService.CustomEntitySiteUnknownException;
 import com.lynxis.orca.core.domain.CustomEntityService.CustomEntityUnknownException;
 import com.lynxis.orca.core.domain.CustomEntityService.CustomEntityValidationException;
-import com.lynxis.orca.core.domain.CustomEntityService.CustomEntityView;
 import com.lynxis.orca.core.domain.CustomEntityService.EntityKind;
 import com.lynxis.orca.core.domain.CustomEntityService.FieldDeclaration;
 import com.lynxis.orca.core.domain.CustomEntityService.FieldType;
@@ -49,7 +49,7 @@ public class CustomEntityController implements CustomEntitiesApi {
 
 	@Override
 	public ResponseEntity<CustomEntitiesEnvelope> listCustomEntities() {
-		List<CustomEntityView> declarations = ScopeContext.callIn(scope(), service::list);
+		List<CustomEntityDeclaration> declarations = ScopeContext.callIn(scope(), service::list);
 		return ResponseEntity.ok(new CustomEntitiesEnvelope()
 				.status(ApiStatus.SUCCESS)
 				.code(ApiResponse.OK)
@@ -59,7 +59,7 @@ public class CustomEntityController implements CustomEntitiesApi {
 
 	@Override
 	public ResponseEntity<CustomEntityEnvelope> declareCustomEntity(DeclareCustomEntityRequest request) {
-		CustomEntityView declared = ScopeContext.callIn(scope(), () -> translating(() ->
+		CustomEntityDeclaration declared = ScopeContext.callIn(scope(), () -> translating(() ->
 				service.declare(siteExternalId, request.getName(),
 						EntityKind.valueOf(request.getKind().getValue()),
 						request.getFields().stream().map(CustomEntityController::field).toList())));
@@ -71,7 +71,7 @@ public class CustomEntityController implements CustomEntitiesApi {
 			String customEntityExternalId, EvolveCustomEntityDeclarationRequest request) {
 		List<FieldDeclaration> additions = request.getAddFields() == null ? List.of()
 				: request.getAddFields().stream().map(CustomEntityController::field).toList();
-		CustomEntityView evolved = ScopeContext.callIn(scope(), () -> translating(() ->
+		CustomEntityDeclaration evolved = ScopeContext.callIn(scope(), () -> translating(() ->
 				service.evolve(customEntityExternalId, request.getName(), additions)));
 		return ResponseEntity.ok(envelope(evolved));
 	}
@@ -114,7 +114,7 @@ public class CustomEntityController implements CustomEntitiesApi {
 		return CoreScopes.installation(siteExternalId);
 	}
 
-	private static CustomEntityEnvelope envelope(CustomEntityView declaration) {
+	private static CustomEntityEnvelope envelope(CustomEntityDeclaration declaration) {
 		return new CustomEntityEnvelope()
 				.status(ApiStatus.SUCCESS)
 				.code(ApiResponse.OK)
@@ -122,7 +122,7 @@ public class CustomEntityController implements CustomEntitiesApi {
 				.data(summary(declaration));
 	}
 
-	private static CustomEntitySummary summary(CustomEntityView declaration) {
+	private static CustomEntitySummary summary(CustomEntityDeclaration declaration) {
 		var entity = declaration.entity();
 		return new CustomEntitySummary()
 				.externalId(entity.externalId())
@@ -132,6 +132,7 @@ public class CustomEntityController implements CustomEntitiesApi {
 				.tableIdentifier(entity.tableIdentifier())
 				.rowIdColumn(CustomEntityService.ROW_ID_COLUMN)
 				.rowExternalIdColumn(CustomEntityService.ROW_EXTERNAL_ID_COLUMN)
+				.rowSiteExternalIdColumn(CustomEntityService.ROW_SITE_EXTERNAL_ID_COLUMN)
 				.declarationVersion(entity.declarationVersion())
 				.fields(declaration.fields().stream()
 						.map(field -> new CustomEntityFieldSummary()

@@ -23,14 +23,16 @@ class CustomEntityServiceTest {
 	private static final String SITE = "SITE-UNIT";
 
 	private CustomEntityRepository entities;
+	private AuditTrail audit;
 	private CustomEntityService service;
 
 	@BeforeEach
 	void serviceWithKnownSite() {
 		entities = mock(CustomEntityRepository.class);
+		audit = mock(AuditTrail.class);
 		SiteDirectoryRepository sites = mock(SiteDirectoryRepository.class);
 		when(sites.activeSiteExternalIds()).thenReturn(Set.of(SITE));
-		service = new CustomEntityService(entities, sites);
+		service = new CustomEntityService(entities, sites, audit);
 	}
 
 	@Test
@@ -44,19 +46,20 @@ class CustomEntityServiceTest {
 				.isInstanceOf(CustomEntityValidationException.class)
 				.hasMessageContaining("cannot be nullable");
 
-		verifyNoInteractions(entities);
+		verifyNoInteractions(entities, audit);
 	}
 
 	@Test
 	void futureRowKeysAndUnsafeSqlIdentifiersAreRefusedBeforeAnyWrite() {
-		for (String identifier : List.of("row_id", "external_id", "UpperCase", "two words", "1starts_wrong")) {
+		for (String identifier : List.of("row_id", "external_id", "site_external_id",
+				"UpperCase", "two words", "1starts_wrong")) {
 			assertThatThrownBy(() -> service.declare(SITE, "Unsafe", EntityKind.EVENT,
 					List.of(text(identifier, false, true))))
 					.isInstanceOf(CustomEntityValidationException.class)
 					.hasMessageContaining("storage identifier");
 		}
 
-		verifyNoInteractions(entities);
+		verifyNoInteractions(entities, audit);
 	}
 
 	@Test
@@ -74,7 +77,21 @@ class CustomEntityServiceTest {
 						10, null, null, false, true, 1))))
 				.isInstanceOf(CustomEntityValidationException.class).hasMessageContaining("no modifiers");
 
-		verifyNoInteractions(entities);
+		verifyNoInteractions(entities, audit);
+	}
+
+	@Test
+	void fieldDisplayNamesAreUniqueAfterNormalizationBeforeAnyWrite() {
+		assertThatThrownBy(() -> service.declare(SITE, "Duplicate labels", EntityKind.REFERENCE,
+				List.of(
+						new FieldDeclaration("code", " Code ", FieldType.TEXT,
+								40, null, null, false, true, 1),
+						new FieldDeclaration("description", "code", FieldType.TEXT,
+								80, null, null, true, false, 2))))
+				.isInstanceOf(CustomEntityValidationException.class)
+				.hasMessageContaining("display name");
+
+		verifyNoInteractions(entities, audit);
 	}
 
 	private static FieldDeclaration text(String identifier, boolean nullable, boolean businessKey) {
