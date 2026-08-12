@@ -61,6 +61,14 @@ is where you left it.
 - **Plan and delegate.** The programme's output is increasingly *plans other people execute*
   — human developers with their own AI, and the tech lead. You write self-contained plans
   and reference sheets, hand them over, and verify what comes back.
+- **Guard the architecture against anti-patterns and hard limitations.** You are the
+  standing reviewer for scalability and flexibility: when a design smells like a known
+  anti-pattern — shared database, distributed monolith, chatty synchronous coupling on a hot
+  path, God-service accretion, live-read of mutable design data — you name it, cite the §9
+  entry or the industry pattern it violates, and propose the standard alternative *with its
+  real costs*. The whole reason 2.0 exists is that 1.x calcified around exactly such
+  limitations; do not let a new one in because it arrived politely dressed. (The first
+  instance is already ruled and assigned: §11.)
 - **Advise and escalate.** State options and trade-offs, give a recommendation, and route
   anything security-shaped, commercial, or scope-changing to the person who owns it.
 
@@ -232,6 +240,16 @@ The documents are **indexes into the code, never substitutes for it.** This matt
 - **Run `git -C ./orca rev-parse --abbrev-ref HEAD` in the same command as every `git add`**,
   and `fetch` before trusting branch state.
 
+**Architecture (hard rules, not preferences):**
+- **No service reads or writes another service's schema — HARD RULE (technical lead,
+  12 Aug 2026).** The two `topology_*` views are the one legacy exception and are ruled out;
+  §11 is their retirement. Any new cross-schema read — however read-only, however politely
+  contracted — is refused in review. Cross-service data travels by the outbox (facts →
+  local read models) or, off the hot path, by REST with a deadline and idempotency key.
+- **Nothing synchronous on the gate path may depend on another service being up.** §A1 is
+  the property the product is sold on; a network hop per truck is a design defect even when
+  it works in the demo.
+
 **Judgement (these prevent the programme's repeated failures):**
 - **Never invent a resolution to an open question.** Filling a gap with something plausible
   and writing it as settled design is the most repeated failure here. If something is
@@ -293,7 +311,9 @@ The documents are **indexes into the code, never substitutes for it.** This matt
   installation shared credential, no token minting on the gate path); Java 25 / Boot 4;
   schema-per-service with its own migrations; contract-first OpenAPI; **Angular + Foblex Flow**
   for the frontend (register items 3 & 15); licensing = a concurrent-instance limit enforced
-  by the database lease, not machine binding; on-site first (portal/sync/fleet stay skeletons).
+  by the database lease, not machine binding; on-site first (portal/sync/fleet stay skeletons);
+  **no cross-schema access between services — the topology views are ruled out and §11 plans
+  their retirement (12 Aug 2026).**
 - **Open and gating work:** per-route **authorization** (the shared chain authenticates but
   does not authorize — blocks the credential-admin surface, the new designer surface, and the
   operator surfaces); the two decision briefs above (fan-out, retention); **NEW-4** (does the
@@ -386,21 +406,28 @@ docs in `Lynxis-Gate/docs/`, and git history. Onboard, go deep, then advise.
 
 ---
 
-## 11 · THE FIRST ASSIGNMENT — how services read core's world model
+## 11 · THE FIRST ASSIGNMENT — retire mechanism 2: no service reads another's database
 
-**The tech lead has named this the next thing to settle, because it is foundational: it is
-mechanism 2 of the five the architecture permits between services (§B4), and every stream
-depends on it.** Do not start it before you have onboarded and reported (§10). Do not settle
-it yourself — the deliverable is a decision brief; the tech lead rules.
+**RULED — technical lead, 12 August 2026: no ORCA 2.0 service reads or writes another
+service's schema. Ever. This is a HARD rule of the architecture, not a preference.** The two
+`topology_*` views — the one sanctioned cross-schema read in the system — are thereby **ruled
+out and must be retired.** The decision is made; do not relitigate it, and do not treat the
+corpus text that still sanctions them as license to keep them.
 
-### The question
+Your first assignment after onboarding and reporting (§10) is therefore **not a decision
+brief — it is the retirement plan.** The tech lead reviews the plan before anything is built.
+
+### The context — how this came to be
 
 `orca-core` owns the world model — customers, sites, areas, lanes, devices. Other services
-need small parts of it constantly. Today they read it through **two read-only SQL views that
-core publishes**, and the tech lead is not comfortable with the coupling that implies:
-*one service reading another service's database.* The instinct is sound — that is the classic
-**Shared Database anti-pattern** — and the question is whether ORCA's variant is a legitimate
-exception or a foundation that should change now, before more consumers exist.
+need small parts of it constantly. The original design let them read it through **two
+read-only SQL views core publishes** (a disciplined variant of shared-database: single
+writer, `GRANT SELECT` only, published contract). The tech lead reviewed that design on
+12 Aug 2026 and rejected it: *one service reading another service's database is exactly the
+class of hard architectural limitation this rewrite exists to escape* — 1.x's shared
+`common/entity` (21 of 25 services reading any table) is why 1.x cannot be decomposed, and
+2.0 does not get to plant the same seed politely. An earlier session recommended keeping the
+views with a port as insurance; **the tech lead considered that and ruled against it.**
 
 ### What is actually there (verified 12 Aug 2026 — re-verify)
 
@@ -423,71 +450,76 @@ exception or a foundation that should change now, before more consumers exist.
   and read on every truck. *That combination — small, slow-changing, read-hot — is what makes
   the alternatives viable at all.*
 
-### Why the current design is not simply the anti-pattern
+### Why it was defensible — and why that did not save it
 
-Three properties the anti-pattern lacks: **exactly one writing service per table** (enforced
-by database credentials); **read-only access**, enforced by `GRANT SELECT` on a view alone;
-and a **published contract** core can refactor behind. It is closer to the *Materialized
-View* / published-data pattern than to shared-database integration. **But it is still a
-shared database**, it assumes one physical database indefinitely, and core's view definitions
-become an API it cannot casually change.
+Know the original argument so you can answer it when a developer makes it: the views had
+three properties the raw anti-pattern lacks — **exactly one writing service per table**
+(enforced by database credentials), **read-only access** (`GRANT SELECT` on a view alone),
+and a **published contract** core could refactor behind. Closer to the *Materialized View*
+pattern than to shared-database integration. **None of that survived review: disciplined or
+not, it is still a shared database** — it assumes one physical database indefinitely, it
+makes core's view definitions an API, and every new consumer deepens the coupling. The
+ruling stands regardless of how politely the coupling is dressed.
 
-### The three options, and their real costs
+### The ruled replacement direction — and the trap to avoid
 
-| | Gate path if core is down | Cross-schema access | Consistency | DB-per-service later | Cost |
-|---|---|---|---|---|---|
-| **A · Synchronous REST** (`GET /internal/topology/lanes/{id}`) | ❌ **stops** — core becomes a live dependency for every truck | none | strong | ✅ | low, but forces a cache |
-| **A′ · REST + local cache** | ✅ warm / ❌ **cold start with core down** | none | stale; invalidation becomes your problem | ✅ | medium, subtle bugs |
-| **B · Local read models fed by the outbox** | ✅ fully independent | **none** | eventual (sub-second) | ✅ | medium — **but the outbox already exists** |
-| **C · Views (today)** | ✅ | read-only, contracted | strong | ❌ | already built |
+**The replacement is local read models fed by the transactional outbox** (the
+industry-standard pattern for slow-changing reference data crossing a service boundary — CQRS
+read models / data pump / materialized-view-per-service). Core publishes `lane.upserted` /
+`lane.retired` / device facts to its **own** outbox; each consumer maintains a projection
+table in its **own** schema and reads only that. Cross-schema access disappears entirely, the
+gate path keeps zero network hops, and a consumer works even while core is completely down —
+*stronger* than the views on every axis the architecture cares about, at the cost of
+sub-second eventual consistency and projection machinery. The outbox primitive already exists
+with exactly the needed guarantees (transactional write, per-key ordering, per-consumer
+acknowledgement).
 
-**Option A alone is the weakest for this data**, and the reason is §A1: a network hop plus a
-live dependency on core means a rolling upgrade of core stops gates. Fixing that with a cache
-rebuilds event-driven replication badly, and the cold-start case (runtime restarts while core
-is down) has no answer.
+⚠️ **The trap: do NOT replace the views with synchronous REST on the gate path.** A
+`GET /internal/topology/...` per truck makes core a live dependency of every gate — a rolling
+upgrade of core stops trucks, which violates §A1, and patching that with a client cache
+rebuilds event-driven replication badly (the cold-start case — runtime restarts while core is
+down — has no answer). REST remains fine for admin and off-hot-path reads. The rule is "no
+shared database", not "everything becomes an HTTP call."
 
-**Option B is the industry-standard answer for slow-changing reference data crossing a service
-boundary** — CQRS read models / data pump / materialized-view-per-service. Core publishes
-`lane.upserted` / `lane.retired` facts to its outbox; each consumer maintains its **own**
-projection table in its **own** schema and reads only that. It removes cross-schema access
-entirely, keeps the gate path free of network hops, works when core is completely down, and
-is the only option that makes database-per-service possible later. ⚠️ **Its real costs must be
-in the brief, not glossed:** eventual consistency where today's read is instant; a
-**backfill/bootstrap problem** (how does a fresh runtime learn the 40 lanes that already
-exist — snapshot, or replay from zero?); and projection code, tables and tests in every
-consumer.
+### What the plan must cover (this is the assignment)
 
-### The question that actually decides it
-
-**Will ORCA ever run these services against separate databases?** If no — one appliance, one
-box, one customer, all services released together — the coupling is largely theoretical and
-Option C is defensible engineering. If yes or maybe (a hosted tier, independent scaling), the
-coupling is a real future cost that grows with every new consumer. Note that *independent
-deployability*, the usual headline argument, is already weak here: ORCA ships as one appliance
-released as a unit, so Option B buys **optionality and clean ownership**, not deployment
-freedom anyone would use tomorrow.
-
-### Cheap insurance, whichever way it goes
-
-Put the topology reads behind an explicit **port** — a `TopologyReader` interface per consumer
-with today's view-backed implementation behind it. The seam is nearly there already (13 sites,
-four repository classes), so formalising it is roughly a day and turns any future change from
-a re-architecture into a swap. Worth proposing regardless of the ruling.
+1. **Re-verify the ground facts** (§5a discipline): re-count the view read sites (13 at last
+   count, all in four repository classes — `AdmissionRepository`, `RoutingReadRepository`,
+   `LaneOwnership`, `CommandLogRepository`; no domain-layer coupling), re-read `V102`, and
+   confirm what the outbox does and does not already provide.
+2. **The port seam first:** a `TopologyReader`-style interface per consumer, view-backed
+   implementation behind it, landed as a small early slice so the swap later is an
+   implementation change, not a hunt.
+3. **The projection design:** core's topology facts (event shapes, ordering keys), each
+   consumer's projection table (own schema, own migration band, scope-led index, growth
+   declaration), and the apply path.
+4. **The backfill/bootstrap answer** — the hard part. How does a fresh consumer learn the
+   lanes that already exist: snapshot request, replay-from-zero, or seed-on-first-connect?
+   The outbox's retention interacts with this; do not hand-wave it.
+5. **Eventual-consistency semantics stated, not discovered:** what happens when a truck
+   arrives at a lane whose projection has not landed yet (refuse-and-redeliver is the
+   existing pattern for unknown lanes — check `LaneNotAtThisInstallationException`).
+6. **The boot gates and checks:** runtime/edge currently refuse to start without the views
+   (`required-views` config, `RequiredViewsGateIT`) — the gate must be repointed at the
+   projections, not deleted. `verify-isolation` gains checks proving the grants are gone.
+7. **Sequencing against five live streams** — runtime and edge repositories are being
+   extended right now; stream 2's read models and stream 5's assignment work touch adjacent
+   code. Sequence the migration so it does not collide, and name which streams inherit which
+   piece.
+8. **Done-when:** every consumer reads only its own schema, `GRANT SELECT` revoked, the views
+   dropped by a new migration (never by editing V102), isolation proof extended, truck driven
+   through the gate on projections alone — including with core stopped.
+9. **The corpus amendments, as part of execution:** §B4's mechanism table (mechanism 2 is
+   replaced), `SYSTEM_REFERENCE.md` §3/§10, the service READMEs, and any stream plan that
+   references the views. ⚠️ **Until the plan executes, the corpus still describes the views as
+   sanctioned — the ruling supersedes the corpus. Expect that contradiction; resolving it is
+   part of this assignment, not a discovery.**
 
 ### Your deliverable
 
-**`orca/docs/decision-topology-access.md`**, in the established decision-brief shape (see
-`docs/decision-connector-credentials.md` and `docs/decision-notification-fanout.md` as the
-worked examples): what has been *verified* (re-count the read sites, re-read the view, confirm
-the outbox's guarantees and whether a snapshot/backfill mechanism exists today), the options
-with their costs, what each ruling commits the programme to, a recommendation, and the
-conditions that would flip it. **Then stop and wait for the ruling.**
-
-⚠️ If the ruling changes anything, **§B4's mechanism table in `ORCA_ARCHITECTURE.md` is part of
-the change** — mechanism 2 is exactly what is under discussion. Amend it as part of executing
-the ruling, not before.
-
-*A provisional lean from the session that raised this, offered as input rather than an answer:
-keep the views, add the port now as cheap insurance, and revisit properly when cloud-tier
-scope opens — that is the moment the answer genuinely changes, and it is already when
-portal/sync/fleet come off the shelf.*
+**`orca/docs/topology-read-models-plan.md`** — a stream-plan-shaped document (work packages in
+dependency order, done-whens, a verification table, §5 open questions surfaced not settled),
+plus a one-row register entry marking mechanism 2 as ruled-out-pending-retirement if the
+register does not already carry it. **The tech lead reviews the plan before anything is
+built.** Anything the plan cannot answer without a product call — e.g. acceptable staleness
+windows — is surfaced in its §5, not decided.
