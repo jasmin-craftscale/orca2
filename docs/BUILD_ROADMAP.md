@@ -196,10 +196,12 @@ builder UI. Assigned 12 Aug 2026 to the developer who ported the compiler.
   /internal/deployments/v1`, definition binding — runtime V171–V180), and the
   builder UI (**Angular + Foblex Flow** — register items 3 and 15, re-ruled
   12 Aug 2026)
-- **Reference:** `docs/design-tables-from-1x.md` — in preparation
-- **Plan:** `docs/stream-5-plan.md` — in preparation
-- **Launch gate:** `feature/OCS-4-runtime-migration` independently verified and
-  merged — the stream builds directly on the compiler it carries
+- **Reference:** ✅ `docs/design-tables-from-1x.md` — §0's seven decisions, the
+  save-document → publish-payload delta, eighteen defects not carried forward
+- **Plan:** ✅ `docs/stream-5-plan.md` — WP0–WP5 backend (no Angular), WP6–WP7 the
+  Angular + Foblex builder UI
+- **Launch gate:** ✅ **open** — the OCS-4 compiler merged to `develop` on 12 Aug 2026;
+  the stream builds directly on it
 - ⚠️ **Two seams to respect.** `orca-core` has **no module walls** (only runtime
   is decomposed), so streams 3 and 5 share a flat codebase: disjoint packages,
   disjoint migration bands, and the core OpenAPI document is the one file both

@@ -43,9 +43,10 @@ commit:**
 2. **`docs/CODE_PATTERNS.md`** — §1 (a request end to end), §4 (the shape of a migration),
    §5 (the engine is confined — the rule your delegates already obey).
 3. **`docs/MIGRATION_NUMBER_RANGES.md`** — **your bands are `core` V151–V180 and `runtime`
-   V171–V180.** ⚠️ The runtime band is **usable only after `feature/OCS-4-runtime-migration`
-   merges** — your V168–V170 must exist below it. Read §3.1 for the out-of-order failure you
-   will hit when you pull another stream's runtime migration.
+   V171–V180.** ✅ The OCS-4 compiler merged to `develop` on 12 Aug 2026, so `runtime` is at
+   V170 and your V171 band sits cleanly above it. Read §3.1 for the out-of-order failure you
+   will hit when you pull another stream's `runtime` or `core` migration — streams 2 and 3
+   are live, so this will happen.
 4. **This plan, in full.**
 5. **`docs/design-tables-from-1x.md`** — the DERIVED-FROM-1X reference. **Read its §0 (the
    seven things that decide this stream) first**, then §5 (the save-document → publish-payload
@@ -137,16 +138,13 @@ Concretely, in dependency order:
 
 - **`core` V151–V180** — design storage, screen artifacts, the deployment/version store,
   assignment. Nobody else writes here (stream 3 is V111–V150).
-- **`runtime` V171–V180** — the deployment-receiving half and definition binding. ⚠️ **These
-  sit above your V168–V170**, which arrive only when `feature/OCS-4-runtime-migration` merges.
-  **Do not write a runtime migration in this stream until that branch is on `develop`** — a
-  V171 with no V168–V170 beneath it is an out-of-order failure on every database.
+- **`runtime` V171–V180** — the deployment-receiving half and definition binding. ✅ Your
+  V168–V170 are on `develop` (merged 12 Aug 2026), so V171 sits cleanly above them.
 
-**The launch gate for this whole stream:** `feature/OCS-4-runtime-migration` independently
-verified and merged to `develop`. You build directly on the compiler it carries. Until then,
-the stream is `READY — WAITING FOR OCS-4 MERGE`; you may onboard, ratify the BPMN profile
-(WP0) against the branch, and design the schema, but you branch and write migrations from the
-merged `develop`.
+**The launch gate is open.** The OCS-4 compiler merged to `develop` on 12 Aug 2026 — you
+build directly on the compiler it carries. Branch from the current `origin/develop`, which
+also already carries stream 3 WP1 (custom entities) and will carry more as the other streams
+land; **fetch before you branch**, every time.
 
 ---
 

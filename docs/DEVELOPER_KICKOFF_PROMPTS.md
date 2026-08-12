@@ -354,14 +354,12 @@ work-package branches.
 
 Repository: github.com:jasmin-craftscale/orca2
 Base: origin/develop
-Migration bands: core V151-V180, runtime V171-V180 (runtime band usable ONLY after
-feature/OCS-4-runtime-migration merges — your V168-V170 must exist below it).
+Migration bands: core V151-V180, runtime V171-V180. The OCS-4 compiler merged to
+origin/develop on 12 Aug 2026, so runtime is at V170 and your V171 band sits above it.
 
-LAUNCH GATE: this stream builds on the compiler in feature/OCS-4-runtime-migration.
-Do not branch or write migrations until that branch is independently verified and
-merged to origin/develop. Until then your state is READY — WAITING FOR OCS-4 MERGE:
-you may onboard, ratify the BPMN execution profile (WP0), and design the schema on
-paper, but you branch from the merged develop.
+LAUNCH GATE: open. The compiler you built is on origin/develop, which also already
+carries stream 3 WP1 (custom entities) with more streams landing continuously. Fetch
+origin/develop and branch from it; re-fetch before every new work-package branch.
 
 AUTHORITY
 
