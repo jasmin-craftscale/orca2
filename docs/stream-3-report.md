@@ -23,18 +23,23 @@ table. WP2–WP5 remain absent.
     display name, closed type/shape, key/nullability flags and ordinal.
 - SQL Server constraints hold the declared invariants: exact kinds and types,
   safe lower-case identifiers, fixed reserved-key exclusion, valid TEXT/NUMBER
-  modifiers, non-null business key, positive ordinals, and every uniqueness rule.
+  modifiers, non-null business key, positive ordinals, and every uniqueness rule,
+  including the legacy model's per-entity field-display-name uniqueness.
 - `core.topology_custom_entity` publishes one row per field to `orca_runtime` and
-  hides retired sites. Runtime receives `SELECT` on the view and no access to the
-  underlying metadata tables.
+  hides retired sites. Core also assembles each declaration from this flattened
+  view in one SQL statement, so a concurrent evolution cannot pair one declaration
+  version with another version's field list. Runtime receives `SELECT` on the view
+  and no access to the underlying metadata tables.
 - All reads and writes go through `platform/scope`. Creation and evolution are
-  Spring transactions. The controller implements the generated interface and maps
+  Spring transactions and append `CREATED`/`UPDATED` audit facts atomically with
+  the declaration. The controller implements the generated interface and maps
   declaration faults to `CUSTOM_ENTITY_DECLARATION_INVALID` (422), conflicts to
   `CONFLICT`, and cross-scope/unknown entities to `NOT_FOUND`.
-- Three unit tests state the identifier, business-key and field-shape validation.
-  Seven real-SQL-Server properties cover create/list/evolution, SQL constraints,
-  cross-site isolation, view permissions, absence of a generated table, and
-  rollback after a deliberately injected mid-write failure.
+- Four unit tests state identifier, display-name, business-key and field-shape
+  validation. Eight real-SQL-Server properties cover create/list/evolution, SQL
+  constraints, cross-site isolation, view permissions, the serialized typed error
+  envelope, absence of a generated table, and rollback after deliberately injected
+  mid-write and audit-write failures.
 
 ### WP2 · decision proposal only
 
@@ -55,7 +60,7 @@ authorises no implementation.
 |---|---|---|
 | `AutoMigrate` is not a migration | `declarationRoundTripAndAdditiveEvolution` proves a reserved `ce_*` identifier has no object in `sys.objects`; WP1 stores only the declaration | The recorded-once executor and migration history are WP2 |
 | Destructive DDL must not run from an HTTP rename | PATCH changes the display name, preserves the opaque table identifier, increments the declaration version and creates no table | Which later DDL verbs are permitted is Product decision 1–3 |
-| Identifiers must be allow-listed | Unit and integration tests reject unsafe/reserved identifiers with the typed 422; direct SQL violates `ck_custom_entity_field_identifier` | WP2 must prove a rejected identifier never reaches its SQL adapter |
+| Identifiers must be allow-listed | Unit and integration tests reject unsafe/reserved identifiers—including the fixed site-scope column—with the typed 422 envelope; direct SQL violates `ck_custom_entity_field_identifier` | WP2 must prove a rejected identifier never reaches its SQL adapter |
 | One controlled executor, not general admin DDL | No DDL surface or executor exists. The 36-check isolation proof still confines each service to its schema, and runtime reads only the published view | Executor authority and public mutation authorisation are Product decisions |
 | Drift is detected, never auto-applied | No reconciliation or drift correction was introduced | Drift reporting is WP2 and deliberately not claimed by WP1 |
 | One identifier policy, not duplicated name transforms | Storage identifiers are client-declared exact lower-case tokens; table identifiers are server-minted and display names never transform into either | The future DDL compiler must consume only persisted, revalidated identifiers |
@@ -82,20 +87,44 @@ authorises no implementation.
   `vis-86e76838-...` completed; `RAISE_GATE` executed; `visit.completed` was
   recorded. The three gate services were stopped before implementation suites.
 
-### Final commands on implementation commit `5fddd73`
+### Final commands on hardened implementation commit `10cea97`
 
 | Evidence | Result |
 |---|---|
-| `./gradlew build` | **BUILD SUCCESSFUL in 13s**; 75 actionable tasks, 10 executed, 65 up-to-date |
-| `./gradlew check integrationTest --rerun-tasks` | **BUILD SUCCESSFUL in 9m29s**; 75/75 tasks executed |
-| XML count — unit | 20 suites, **83 tests**, 0 failures, 0 errors, 0 skipped |
-| XML count — integration | 34 suites, **273 tests**, 0 failures, 0 errors, 0 skipped |
-| Focused `CustomEntityServiceTest` + `CustomEntityPropertiesIT` with `--rerun-tasks` | 1 unit suite / 3 tests and 1 integration suite / 7 tests; all green; 22/22 tasks executed |
-| Duplicate constraints | Real SQL Server refused duplicate entity external id, site/kind/name, table identifier, field external id, per-entity identifier, ordinal and second business key |
+| `./gradlew build` | **BUILD SUCCESSFUL in 4s**; 75 actionable tasks, 2 executed, 73 up-to-date |
+| `./gradlew check --rerun-tasks` | **BUILD SUCCESSFUL in 11s**; 60/60 tasks executed |
+| `./gradlew check integrationTest --rerun-tasks` | **BUILD SUCCESSFUL in 7m**; 75/75 tasks executed |
+| XML count — unit | 20 suites, **84 tests**, 0 failures, 0 errors, 0 skipped |
+| XML count — integration | 34 suites, **274 tests**, 0 failures, 0 errors, 0 skipped |
+| Focused `CustomEntityServiceTest` + `CustomEntityPropertiesIT` with `--rerun-tasks` | 1 unit suite / 4 tests and 1 integration suite / 8 tests; all green; 22/22 tasks executed |
+| Duplicate constraints | Real SQL Server refused duplicate entity external id, site/kind/name, table identifier, field external id, per-entity identifier, display name, ordinal and second business key |
 | Cross-site isolation | Site A and B list only their declarations; A's PATCH of B returns typed `NOT_FOUND`; B's stored name is unchanged |
-| Failed multi-write | A test-only CHECK rejects the second field after parent and first field writes; the transaction leaves zero parent and zero field rows |
-| View boundary | `orca_runtime` reads `core.topology_custom_entity`, cannot read `core.custom_entity`, cannot update the view, and sees no rows after site retirement |
+| Failed multi-write | A test-only CHECK rejects the second field after parent and first field writes; the transaction leaves zero parent, field and audit rows. A separately poisoned audit write rolls the declaration back too |
+| View boundary | `orca_runtime` reads `core.topology_custom_entity`, cannot read `core.custom_entity`, cannot update the view, and sees no rows after site retirement. Core's owner read uses the same flattened result in one statement |
 | Generated table absent | `OBJECT_ID(reserved_ce_identifier, 'U')` is null after declaration and evolution |
+
+### Read-only cross-check against 1.x
+
+The legacy checkout at `/Users/jasmintankic/Documents/Projects/lynxis/Lynxis-Gate`
+was inspected read-only. The comparison used the actual request DTO, metadata
+entity, validation/type mapping utilities and create/update repository paths:
+`reference_data_request.go`, `customer_entity.go`, `utils.go` and
+`reference_data_management_repository.go`.
+
+- 1.x has two `rd_`/`ed_` families, site/customer/name/type/schema metadata,
+  `string`/`float`/`boolean`/`date` fields, exactly one primary field, and rejects
+  duplicate field names and mappings. WP1 preserves those semantics deliberately
+  as REFERENCE/EVENT, TEXT/NUMBER/BOOLEAN/DATE, exactly one business key and both
+  per-entity identifier/display-name uniqueness rules.
+- 1.x also derives identifiers from mutable names and executes `AutoMigrate`,
+  drop, rename-table and rename-column operations directly from the management
+  path. WP1 does not copy those unsafe mechanics: identifiers are separated from
+  display names, declarations perform no DDL, and destructive evolution remains
+  behind the open WP2 decision.
+- 1.x generated rows carry customer/site identity plus framework audit/status
+  columns. WP1 now reserves and publishes a fixed `site_external_id` contract so
+  future 2.0 generated-table reads can satisfy the existing scope seam. No claim
+  is made yet about the remaining physical row columns because WP2 is unruled.
 
 ### Negative build-check mutations
 
@@ -125,15 +154,19 @@ with a clean diff before continuing.
 
 - `docker compose run --rm verify-isolation` → **PASS — 36 checks**: six own-schema
   writes/reads and all thirty cross-schema reads refused.
-- Core started first, validated 14 migrations, applied V111 and reached health 200.
-  Runtime, edge, portal, sync and fleet then booted. All six health checks returned
-  200 on ports 18081–18086.
+- Because the unpublished V111 migration was hardened after an earlier local boot,
+  Flyway correctly rejected the stale checksum in the disposable validation
+  database. The local ORCA Docker volumes were rebuilt using the documented
+  bootstrap path; no source or shared environment was reset. Core then applied all
+  14 migrations to the fresh schema and reached health 200. Runtime, edge, portal,
+  sync and fleet also booted, and all six health checks returned 200 on ports
+  18081–18086.
 - Current-hash gate proof:
-  - plate `S3-WP1-5FDDD73`, event
-    `evt-46d64565-5c8c-473e-b323-1a3ce73ae4f4` → camera ACK;
+  - plate `S3-WP1-10CEA97`, event
+    `evt-26569476-b45d-4a02-832f-2afdd60c132e` → camera ACK;
   - edge buffer → `ACKED`, attempts `0`;
-  - visit `vis-bd982ab1-147c-4e04-9142-785981020bf6` → `COMPLETED`;
-  - command `294fb3c3-95e3-11f1-a7de-f68083829ce1` →
+  - visit `vis-ffb3678e-1246-4f11-9b19-1b8043cba7e6` → `COMPLETED`;
+  - command `549e4e7c-95eb-11f1-bd45-f68083829ce1` →
     `RAISE_GATE / EXECUTED`;
   - runtime outbox → `visit.completed`, ordering key `lane:LANE-DEMO-01`.
 - All six owned service sessions were interrupted afterwards. Ports 18081–18086
@@ -175,11 +208,15 @@ with a clean diff before continuing.
    rather than two physical-name dialects. The prefix identifies generated tables
    at a glance; 32 UUID hex characters make the identifier stable and collision
    resistant. A display rename never becomes a table rename.
-2. **Fixed future row keys: `row_id` and `external_id`.** They retain the dual-key
-   convention without embedding the mutable table name in every column.
+2. **Fixed future row keys and scope: `row_id`, `external_id` and
+   `site_external_id`.** The keys retain the dual-key convention without embedding
+   the mutable table name in every column. The scope column is reserved because a
+   future generated-table read must remain expressible through `platform/scope`.
 3. **Exact field identifiers.** Lower-case ASCII, start with a letter, maximum 63
-   characters, letters/digits/underscore only; the two future row keys are reserved.
-   Display names remain separate Unicode values.
+   characters, letters/digits/underscore only; the two future row keys and future
+   scope column are reserved. Display names remain separate Unicode values and are
+   unique per entity, carrying forward 1.x's duplicate-label refusal as a database
+   constraint rather than an application-only check.
 4. **Closed declaration vocabulary.** Entity kinds are REFERENCE/EVENT. Field types
    translate 1.x's shape as TEXT, NUMBER, BOOLEAN and DATE. TEXT requires length
    1–4000; NUMBER requires SQL Server-compatible precision 1–38 and scale
@@ -234,10 +271,24 @@ not a ruling.
    authored migrations. Neither can see a future runtime-generated table. The WP2
    decision must extend enforceable inventory/check evidence before EVENT DDL is
    allowed; merely attaching metadata would not make either existing check true.
-4. No additional claim in the plan, reference sheet or current code was disproved
-   by execution. The known old-repository singular-table-name claim remains false,
-   as already recorded in `custom-entities-from-1x.md`; both singular and plural
-   searches were required.
+4. No other claim in the plan or reference sheet was disproved by execution. The
+   known old-repository singular-table-name claim remains false, as already recorded
+   in `custom-entities-from-1x.md`; both singular and plural searches were required.
+5. The first WP1 implementation assembled parent and field rows with separate
+   read-committed statements. A concurrent evolution could therefore expose a
+   declaration version and field list from different snapshots. The owning read now
+   consumes `topology_custom_entity` once and assembles that one result set.
+6. The first WP1 implementation did not audit declaration mutations, despite core's
+   existing audit trail being designed to share the configuration mutation's
+   transaction. Create/evolve now append audit facts; a poisoned audit write proves
+   the declaration rolls back rather than becoming unaudited.
+7. The first WP1 identifier reservation omitted `site_external_id`. The old generated
+   tables carried site identity, and ORCA 2.0 requires every application read through
+   the scope seam. Leaving the name customer-claimable would block a safe generated
+   table later; it is now a fixed, published and database-enforced reserved column.
+8. Direct inspection of 1.x confirmed it refuses duplicate `FieldName` and
+   `FieldMapping` values. WP1 initially constrained only the stable identifier. The
+   per-entity display-name rule is now also validated and enforced by SQL Server.
 
 ## Next slice — proposed only
 
