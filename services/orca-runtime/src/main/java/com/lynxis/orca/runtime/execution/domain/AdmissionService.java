@@ -13,6 +13,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.lynxis.orca.platform.idempotency.IdempotencyOutcome;
 import com.lynxis.orca.platform.idempotency.IdempotencyStore;
 import com.lynxis.orca.runtime.execution.persistence.AdmissionRepository;
+import com.lynxis.orca.runtime.readmodel.api.LaneMonitorProjectionPort;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -84,13 +85,14 @@ public class AdmissionService {
 	private final String siteExternalId;
 	private final String holderId;
 	private final ProcessStartVariables startVariables;
+	private final LaneMonitorProjectionPort laneMonitor;
 
 	/** Reported, not asserted on: how often SQL Server chose a victim during a run. */
 	private final AtomicInteger deadlockRetries = new AtomicInteger();
 
 	public AdmissionService(AdmissionRepository repository, ProcessEngineGateway engine,
 			IdempotencyStore idempotency, TransactionTemplate transactions, String siteExternalId,
-			String holderId, ProcessStartVariables startVariables) {
+			String holderId, ProcessStartVariables startVariables, LaneMonitorProjectionPort laneMonitor) {
 		this.repository = repository;
 		this.engine = engine;
 		this.idempotency = idempotency;
@@ -98,6 +100,7 @@ public class AdmissionService {
 		this.siteExternalId = siteExternalId;
 		this.holderId = holderId;
 		this.startVariables = startVariables;
+		this.laneMonitor = laneMonitor;
 	}
 
 	/**
@@ -213,6 +216,9 @@ public class AdmissionService {
 		Admission admission = admit(event, laneId);
 		repository.attachEvent(event.eventUuid(), siteExternalId, admission.executionId(), laneId,
 				event.eventType(), event.deviceExternalId(), event.attributes(), event.occurredAt());
+		laneMonitor.recordDeviceEvent(new LaneMonitorProjectionPort.DeviceEventObserved(siteExternalId,
+				laneId, event.laneExternalId(), event.eventUuid(), event.eventType(),
+				event.attributes(), event.occurredAt()));
 		idempotency.complete(event.eventUuid(), operation, admission.visitExternalId());
 
 		return EventOutcome.admitted(event.eventUuid(), admission);
@@ -259,6 +265,8 @@ public class AdmissionService {
 
 		repository.recordProcessInstance(executionId, processInstanceId);
 		repository.bindLane(laneId, plate, true);
+		laneMonitor.recordVisitStarted(new LaneMonitorProjectionPort.VisitStarted(siteExternalId,
+				laneId, event.laneExternalId(), visitExternalId, plate));
 
 		return new Admission.Started(executionId, visitExternalId, processInstanceId);
 	}

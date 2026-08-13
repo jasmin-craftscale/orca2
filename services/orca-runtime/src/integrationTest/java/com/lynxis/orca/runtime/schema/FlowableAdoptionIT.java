@@ -326,6 +326,10 @@ class FlowableAdoptionIT {
 				IF OBJECT_ID(N'work_item_audit', 'U') IS NOT NULL DROP TABLE work_item_audit;
 				IF OBJECT_ID(N'work_item', 'U') IS NOT NULL DROP TABLE work_item;
 				IF OBJECT_ID(N'user_activity', 'U') IS NOT NULL DROP TABLE user_activity;
+				IF OBJECT_ID(N'notification_ws_ticket', 'U') IS NOT NULL DROP TABLE notification_ws_ticket;
+				IF OBJECT_ID(N'notification', 'U') IS NOT NULL DROP TABLE notification;
+				IF OBJECT_ID(N'grid_export_job', 'U') IS NOT NULL DROP TABLE grid_export_job;
+				IF OBJECT_ID(N'lane_monitor', 'U') IS NOT NULL DROP TABLE lane_monitor;
 				IF OBJECT_ID(N'visit_dataset', 'U') IS NOT NULL DROP TABLE visit_dataset;
 				IF OBJECT_ID(N'node_execution', 'U') IS NOT NULL DROP TABLE node_execution;
 				IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_execution_process_instance'

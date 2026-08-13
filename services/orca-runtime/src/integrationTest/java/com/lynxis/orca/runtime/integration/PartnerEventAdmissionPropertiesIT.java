@@ -213,8 +213,14 @@ class PartnerEventAdmissionPropertiesIT {
 		admin("IF SCHEMA_ID(N'core') IS NULL EXEC('CREATE SCHEMA [core]')");
 		admin("IF OBJECT_ID(N'core.topology_lane', 'V') IS NOT NULL DROP VIEW core.topology_lane");
 		admin("EXEC('CREATE VIEW core.topology_lane AS SELECT lane_id, lane_external_id, "
-				+ "site_external_id FROM (VALUES (CAST(1 AS BIGINT), ''" + LANE + "'', ''" + SITE
-				+ "'')) AS lanes (lane_id, lane_external_id, site_external_id)')");
+				+ "site_external_id, site_code, site_is_primary, area_id, area_external_id, area_code, "
+				+ "lane_code, lane_name, lane_priority, is_out_of_service FROM (VALUES (CAST(1 AS BIGINT), ''"
+				+ LANE + "'', ''" + SITE + "'', ''" + SITE
+				+ "'', CAST(1 AS BIT), CAST(10 AS BIGINT), ''AREA-PARTNER-IT'', ''AREA'', "
+				+ "''LP'', N''Partner Lane'', CAST(1 AS INT), CAST(0 AS BIT))) AS lanes "
+				+ "(lane_id, lane_external_id, site_external_id, site_code, site_is_primary, "
+				+ "area_id, area_external_id, area_code, lane_code, lane_name, lane_priority, "
+				+ "is_out_of_service)')");
 	}
 
 	private static void grantTopologyLaneTo(String login) {

@@ -120,6 +120,42 @@ public class WorkItemRepository {
 	 * executor's acquire interval is seconds); an open-only read would silently
 	 * drop exactly the borderline breaches the statistics exist to count.
 	 */
+	/**
+	 * Terminal work history, newest completed first. This is deliberately separate
+	 * from {@link #list}: the open queue's ordering is by queued time and routing
+	 * priority, while completed work is a bounded history read over
+	 * {@code completed_at}.
+	 */
+	public List<WorkItem> completedWork(String status, String laneExternalId, String assignee,
+			Instant completedFrom, Instant completedUntil, int limit) {
+		StringBuilder where = new StringBuilder("status = ? AND completed_at IS NOT NULL");
+		List<Object> parameters = new ArrayList<>();
+		parameters.add(status);
+		if (laneExternalId != null) {
+			where.append(" AND lane_external_id = ?");
+			parameters.add(laneExternalId);
+		}
+		if (assignee != null) {
+			where.append(" AND assignee = ?");
+			parameters.add(assignee);
+		}
+		if (completedFrom != null) {
+			where.append(" AND completed_at >= ?");
+			parameters.add(Utc.timestampOf(completedFrom));
+		}
+		if (completedUntil != null) {
+			where.append(" AND completed_at <= ?");
+			parameters.add(Utc.timestampOf(completedUntil));
+		}
+		return seam.select(ScopedSelect.from("work_item")
+						.columns(COLUMNS)
+						.scopedBy(SCOPE_COLUMN)
+						.where(where.toString(), parameters.toArray())
+						.orderByDescending("completed_at")
+						.limit(limit),
+				(rs, row) -> map(rs));
+	}
+
 	public List<WorkItem> itemsOfProcessInstance(String processInstanceId) {
 		return seam.select(ScopedSelect.from("work_item")
 						.columns(COLUMNS)

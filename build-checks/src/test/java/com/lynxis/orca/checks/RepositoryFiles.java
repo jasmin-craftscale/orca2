@@ -53,7 +53,7 @@ final class RepositoryFiles {
 	/** Every service's authored OpenAPI document. Generated and bundled copies excluded. */
 	static List<Path> serviceContracts() {
 		return under(root().resolve("services"), path ->
-				path.toString().contains("/src/main/resources/openapi/")
+				portable(path).contains("/src/main/resources/openapi/")
 						&& path.getFileName().toString().endsWith(".yaml"));
 	}
 
@@ -61,9 +61,9 @@ final class RepositoryFiles {
 	static List<Path> migrations() {
 		return Stream.concat(
 						under(root().resolve("services"), path ->
-								path.toString().contains("/src/main/resources/db/")).stream(),
+								portable(path).contains("/src/main/resources/db/")).stream(),
 						under(root().resolve("platform"), path ->
-								path.toString().contains("/src/main/resources/db/")).stream())
+								portable(path).contains("/src/main/resources/db/")).stream())
 				.filter(path -> path.getFileName().toString().endsWith(".sql"))
 				.sorted()
 				.toList();
@@ -81,7 +81,7 @@ final class RepositoryFiles {
 	private static List<Path> under(Path directory, java.util.function.Predicate<Path> matching) {
 		try (Stream<Path> walk = Files.walk(directory)) {
 			return walk.filter(Files::isRegularFile)
-					.filter(path -> !path.toString().contains("/build/"))
+					.filter(path -> !portable(path).contains("/build/"))
 					.filter(matching)
 					.sorted(Comparator.comparing(Path::toString))
 					.toList();
@@ -89,5 +89,9 @@ final class RepositoryFiles {
 		catch (IOException unreadable) {
 			throw new UncheckedIOException(unreadable);
 		}
+	}
+
+	private static String portable(Path path) {
+		return path.toString().replace('\\', '/');
 	}
 }
