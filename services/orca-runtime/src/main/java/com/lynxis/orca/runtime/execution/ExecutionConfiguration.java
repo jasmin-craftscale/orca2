@@ -18,11 +18,13 @@ import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.runtime.execution.api.DeviceEventController;
 import com.lynxis.orca.runtime.execution.api.LaneResetController;
 import com.lynxis.orca.runtime.execution.api.ManualStepPort;
+import com.lynxis.orca.runtime.execution.api.PartnerEventAdmissionPort;
 import com.lynxis.orca.runtime.execution.domain.AdmissionService;
 import com.lynxis.orca.runtime.execution.domain.ConnectorCallDelegate;
 import com.lynxis.orca.runtime.execution.domain.DeviceCommandDelegate;
 import com.lynxis.orca.runtime.execution.domain.DeviceCommandPort;
 import com.lynxis.orca.runtime.execution.domain.LaneResetService;
+import com.lynxis.orca.runtime.execution.domain.PartnerEventAdmissionAdapter;
 import com.lynxis.orca.runtime.execution.domain.ProcessEngineGateway;
 import com.lynxis.orca.runtime.execution.domain.VisitCompletion;
 import com.lynxis.orca.runtime.execution.domain.VisitCompletionListener;
@@ -113,6 +115,11 @@ public class ExecutionConfiguration {
 				new TransactionTemplate(transactionManager), siteExternalId, holderId,
 				new AdmissionService.ProcessStartVariables(connectorName, commandAction,
 						commandDeviceExternalId, commandDeadlineMillis));
+	}
+
+	@Bean
+	public PartnerEventAdmissionPort partnerEventAdmissionPort(AdmissionService admission) {
+		return new PartnerEventAdmissionAdapter(admission);
 	}
 
 	@Bean

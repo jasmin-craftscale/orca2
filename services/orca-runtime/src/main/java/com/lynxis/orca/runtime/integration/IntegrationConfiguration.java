@@ -11,8 +11,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.platform.secrets.SecretBox;
 import com.lynxis.orca.runtime.integration.api.ConnectorPort;
+import com.lynxis.orca.runtime.execution.api.PartnerEventAdmissionPort;
 import com.lynxis.orca.runtime.integration.domain.ConnectorCredentialService;
 import com.lynxis.orca.runtime.integration.domain.CredentialRewrapService;
+import com.lynxis.orca.runtime.integration.domain.PartnerEventAdmission;
 import com.lynxis.orca.runtime.integration.domain.RestConnector;
 import com.lynxis.orca.runtime.integration.persistence.ConnectorConfigRepository;
 import com.lynxis.orca.runtime.integration.persistence.ConnectorCredentialRepository;
@@ -35,6 +37,12 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
  */
 @Configuration(proxyBeanMethods = false)
 public class IntegrationConfiguration {
+
+	@Bean
+	public PartnerEventAdmission partnerEventAdmission(PartnerEventAdmissionPort admission,
+			@Value("${orca.installation.site-external-id}") String siteExternalId) {
+		return new PartnerEventAdmission(admission, siteExternalId);
+	}
 
 	@Bean
 	public ConnectorConfigRepository connectorConfigRepository(ScopeSeam seam) {
