@@ -1,7 +1,7 @@
 # Migration number ranges — who may write which numbers
 
 **Read this before you write your first migration. It is the one piece of
-coordination four parallel streams cannot do implicitly.**
+coordination parallel streams cannot do implicitly.**
 
 Assigned 10 August 2026, before any stream started, because a number collision is
 a conflict that surfaces only when somebody's database refuses to start.
@@ -24,13 +24,13 @@ So `V118` means "the 118th version of *this schema*", and a platform migration a
 a service migration **share one number line**. The split that keeps them apart today
 is the convention that platform takes `V001–V099` and services take `V100+`.
 
-**Where each schema stands right now** (read out of the migration files and confirmed
-against the running database, 10 Aug 2026):
+**Where each schema stands right now** (read out of the migration files, 12 Aug 2026;
+the corresponding implementation reports carry the live-database evidence):
 
 | Schema | Migrations | Highest | Notes |
 |---|---|---|---|
-| `runtime` | V100–V102, V110–V114, V115–V117 | **V117** | **V110–V114 are Flowable's 45 extracted tables.** V103–V109 are unused and stay that way — see §4 |
-| `core` | V100–V110 | **V110** | |
+| `runtime` | V100–V102, V110–V117, V128, V168–V170 | **V170** | **V110–V114 are Flowable's 45 extracted tables.** V103–V109 are unused and stay that way — see §4 |
+| `core` | V100–V111 | **V111** | |
 | `edge` | V100–V103 | **V103** | |
 | `portal` · `sync` · `fleet` | V100 | **V100** | Skeletons |
 | every schema | V001–V003 | — | The three primitives, applied into all six |
@@ -45,7 +45,9 @@ against the running database, 10 Aug 2026):
 | **V128–V137** | **Stream 1 Track B** — connector breadth, including the shared credentials-at-rest first consumer |
 | **V138–V157** | **Stream 2** — read models and notifications |
 | **V158–V167** | **Stream 4** — retention and purge, runtime's share |
-| V168–V199 | Reserved: Flowable version upgrades, and anything urgent that cannot wait for a band |
+| **V168–V170** | **OCS-4 runtime migration** — the step trace (`node_execution`), the visit dataset, and the compiled-definition columns on `execution`. Taken from the reserved band, 10 Aug 2026, because the migration is not one of the four streams |
+| **V171–V180** | **Stream 5** — the workflow builder's runtime half: deployment receiving and definition binding (assigned 12 Aug 2026). ⚠️ Usable only after `feature/OCS-4-runtime-migration` merges — V168–V170 must exist below them |
+| V181–V199 | Reserved: Flowable version upgrades, and anything urgent that cannot wait for a band |
 
 **Core**
 
@@ -53,7 +55,8 @@ against the running database, 10 Aug 2026):
 |---|---|
 | **V111–V140** | **Stream 3** — custom entities, the DDL executor, licence verification |
 | **V141–V150** | **Stream 4** — retention and purge, core's share |
-| V151–V199 | Reserved |
+| **V151–V180** | **Stream 5** — the workflow builder: design storage, screen artifacts, the deployment store, lane/area assignment (assigned 12 Aug 2026) |
+| V181–V199 | Reserved |
 
 **Edge**
 

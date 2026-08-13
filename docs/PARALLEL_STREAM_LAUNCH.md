@@ -61,11 +61,13 @@ Do not invent an undocumented multi-stack port/database arrangement. Use
 | **1** | Stream 1 Track A | `feature/stream-1-a1` | A1 admission seam only | Credentials gate passes |
 | **2** | Stream 2 | `feature/stream-2-wp0-wp1` | WP0's readmodel transition + WP1 | Credentials gate passes |
 | **3** | Stream 3 | `feature/stream-3-wp1` | WP1 declared model + WP2 decision proposal | Credentials gate passes |
-| **4** | Stream 1 Track B | `feature/stream-1-b1` | B1 connector configuration | Credentials gate passes **and A1 is merged** |
+| **4** | Stream 1 Track B — **newly staffed 12 Aug 2026** (Selvedin moved to Stream 5) | `feature/stream-1-b1` | B1 connector configuration | Credentials gate passes **and A1 is merged** |
+| **5 · Selvedin** | **Stream 5 · workflow builder** (design storage + publish pipeline + Angular builder UI) | per `docs/stream-5-plan.md` | WP0 profile ratification + WP1 design store | ✅ **OCS-4 compiler merged to `develop` 12 Aug 2026** — gate open, pending the orchestrator's suite re-verification of merged `develop` |
 
-Developer 4 may onboard, establish the baseline and study B1 while A1 is in review.
-They do not branch or implement B1 from a pre-A1 baseline. Their correct interim
-state is `READY — WAITING FOR A1`.
+**Track B is staffed by a fifth developer** (product-owner decision, 12 Aug 2026). Its
+gate is unchanged — credentials on `develop` **and** A1 merged — so Developer 4 onboards
+and studies B1 while A1 is in review, exactly as originally sequenced. Developer 5
+(Selvedin) owns Stream 5 end to end and is the single writer of `docs/stream-5-report.md`.
 
 Use one work package per branch and review, except where the plan explicitly makes
 two inseparable (`Stream 2 WP0's readmodel transition + WP1`). WP0 completes later

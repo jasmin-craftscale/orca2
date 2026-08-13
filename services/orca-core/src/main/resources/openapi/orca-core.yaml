@@ -65,6 +65,11 @@ tags:
     description: Per-site branding colors and localization languages.
   - name: audit
     description: The typed audit trail of configuration mutations.
+  - name: customEntities
+    description: |
+      Customer-declared reference and event data models. This surface changes
+      declarations only; no generated table exists until the separately ruled
+      controlled executor applies a declared migration.
 
 paths:
   /api/v1/users:
@@ -1479,6 +1484,131 @@ paths:
               schema:
                 $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
 
+  /api/v1/custom-entities:
+    get:
+      tags: [customEntities]
+      operationId: listCustomEntities
+      summary: List this site's declared custom entities
+      description: Returns declarations only. It makes no claim about physical tables or applied migrations.
+      responses:
+        "200":
+          description: The declared models
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomEntitiesEnvelope"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+    post:
+      tags: [customEntities]
+      operationId: declareCustomEntity
+      summary: Declare a custom entity
+      description: |
+        Reserves the stable generated-table identifier and stores the declared
+        fields atomically. It does not create that table or execute DDL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeclareCustomEntityRequest"
+      responses:
+        "201":
+          description: Declared; no physical migration has been applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomEntityEnvelope"
+        "400":
+          description: The request fails generated schema validation (`VALIDATION_FAILED`)
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: This site already has a declaration of that kind and name
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: A schema-valid request violates a declaration invariant (`CUSTOM_ENTITY_DECLARATION_INVALID`)
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
+  /api/v1/custom-entities/{customEntityExternalId}:
+    patch:
+      tags: [customEntities]
+      operationId: evolveCustomEntityDeclaration
+      summary: Evolve the declaration without applying DDL
+      description: |
+        This declaration-only surface permits changing the display name and adding
+        non-business-key fields.
+        Existing identifiers, types, constraints and the business key are
+        immutable here. Removing or narrowing anything belongs to the controlled
+        executor decision and is deliberately absent.
+      parameters:
+        - name: customEntityExternalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvolveCustomEntityDeclarationRequest"
+      responses:
+        "200":
+          description: The evolved declaration; no physical migration has been applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomEntityEnvelope"
+        "400":
+          description: The request fails generated schema validation (`VALIDATION_FAILED`)
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "401":
+          description: No credential, or one that did not verify
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "404":
+          description: No such declaration in this site
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "409":
+          description: The name, a field identifier, display name or ordinal is already in use
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        "422":
+          description: A schema-valid additive change violates a declaration invariant (`CUSTOM_ENTITY_DECLARATION_INVALID`)
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+
   /api/v1/entitlements:
     get:
       tags: [entitlements]
@@ -2791,6 +2921,231 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/AuditEventSummary"
+
+    # --- declared custom-entity model ----------------------------------------
+
+    CustomEntityKind:
+      type: string
+      description: REFERENCE is a maintained lookup list; EVENT is append-oriented event data.
+      enum: [REFERENCE, EVENT]
+
+    CustomEntityFieldType:
+      type: string
+      description: |
+        The declared value vocabulary. Its eventual SQL representation and the
+        permitted changes between types belong to the controlled-executor decision.
+      enum: [TEXT, NUMBER, BOOLEAN, DATE]
+
+    CustomEntityFieldSummary:
+      type: object
+      required: [externalId, identifier, displayName, type, nullable, businessKey, ordinal]
+      properties:
+        externalId:
+          type: string
+        identifier:
+          type: string
+          description: Stable allow-listed storage identifier; never derived from the display name. The fixed row/scope names are reserved.
+        displayName:
+          type: string
+          description: Administrator-facing label, unique within this entity.
+        type:
+          $ref: "#/components/schemas/CustomEntityFieldType"
+        maxLength:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 4000
+          description: Required for TEXT and absent for every other type.
+        precision:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 38
+          description: Required for NUMBER and absent for every other type.
+        scale:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 38
+          description: Required for NUMBER, no greater than precision, and absent otherwise.
+        nullable:
+          type: boolean
+        businessKey:
+          type: boolean
+          description: Exactly one field in a new declaration; it is immutable on this declaration-only surface.
+        ordinal:
+          type: integer
+          format: int32
+          minimum: 1
+
+    DeclareCustomEntityFieldRequest:
+      type: object
+      required: [identifier, displayName, type, nullable, businessKey, ordinal]
+      properties:
+        identifier:
+          type: string
+          minLength: 1
+          maxLength: 63
+          pattern: '^[a-z][a-z0-9_]{0,62}$'
+          description: "`row_id`, `external_id` and `site_external_id` are reserved."
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Must be unique within the entity.
+        type:
+          $ref: "#/components/schemas/CustomEntityFieldType"
+        maxLength:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 4000
+        precision:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 38
+        scale:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 38
+        nullable:
+          type: boolean
+        businessKey:
+          type: boolean
+        ordinal:
+          type: integer
+          format: int32
+          minimum: 1
+
+    AddCustomEntityFieldRequest:
+      type: object
+      description: An additive non-business-key field; existing fields remain immutable on this declaration-only surface.
+      required: [identifier, displayName, type, nullable, ordinal]
+      properties:
+        identifier:
+          type: string
+          minLength: 1
+          maxLength: 63
+          pattern: '^[a-z][a-z0-9_]{0,62}$'
+          description: "`row_id`, `external_id` and `site_external_id` are reserved."
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Must be unique within the entity.
+        type:
+          $ref: "#/components/schemas/CustomEntityFieldType"
+        maxLength:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 4000
+        precision:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 38
+        scale:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 38
+        nullable:
+          type: boolean
+        ordinal:
+          type: integer
+          format: int32
+          minimum: 1
+
+    DeclareCustomEntityRequest:
+      type: object
+      required: [name, kind, fields]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        kind:
+          $ref: "#/components/schemas/CustomEntityKind"
+        fields:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/DeclareCustomEntityFieldRequest"
+
+    EvolveCustomEntityDeclarationRequest:
+      type: object
+      description: At least one of name or addFields must carry a real change.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        addFields:
+          type: array
+          items:
+            $ref: "#/components/schemas/AddCustomEntityFieldRequest"
+
+    CustomEntitySummary:
+      type: object
+      required: [externalId, siteExternalId, name, kind, tableIdentifier,
+                 rowIdColumn, rowExternalIdColumn, rowSiteExternalIdColumn,
+                 declarationVersion, fields, createdAt, updatedAt]
+      properties:
+        externalId:
+          type: string
+        siteExternalId:
+          type: string
+        name:
+          type: string
+        kind:
+          $ref: "#/components/schemas/CustomEntityKind"
+        tableIdentifier:
+          type: string
+          description: Stable ce_-prefixed identifier reserved for the controlled executor; its presence does not mean a table exists.
+        rowIdColumn:
+          type: string
+          description: Fixed future internal integer-key column (`row_id`), independent of the table name.
+        rowExternalIdColumn:
+          type: string
+          description: Fixed future external-id column (`external_id`), independent of the table name.
+        rowSiteExternalIdColumn:
+          type: string
+          description: Fixed future scope column (`site_external_id`) required by the site scope seam.
+        declarationVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomEntityFieldSummary"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CustomEntityEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/CustomEntitySummary"
+
+    CustomEntitiesEnvelope:
+      allOf:
+        - $ref: "../../../../../../platform/web/src/main/resources/openapi/_shared.yaml#/components/schemas/ApiResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/CustomEntitySummary"
 
     EntitlementActionItem:
       type: object

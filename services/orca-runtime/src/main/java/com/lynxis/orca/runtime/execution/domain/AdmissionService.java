@@ -68,7 +68,7 @@ public class AdmissionService {
 	/** The one process definition currently assigned to every lane. */
 	public static final String PROCESS_KEY = "gate-visit";
 
-	/** The idempotency operation name; each kind of key has its own namespace. */
+	/** The device-event idempotency operation; each producer kind has its own namespace. */
 	public static final String OPERATION = "device-event";
 
 	/**
@@ -140,6 +140,15 @@ public class AdmissionService {
 	 *         guessed lane
 	 */
 	public EventOutcome accept(InboundDeviceEvent event) {
+		return accept(event, OPERATION);
+	}
+
+	/**
+	 * Accepts one event in the operation namespace owned by its inbound adapter.
+	 * Package-private so a caller outside {@code execution} cannot choose a namespace
+	 * and accidentally make one producer answer for another.
+	 */
+	EventOutcome accept(InboundDeviceEvent event, String operation) {
 		long laneId = repository.laneIdOf(event.laneExternalId())
 				.orElseThrow(() -> new LaneNotAtThisInstallationException(event.laneExternalId()));
 
@@ -152,7 +161,7 @@ public class AdmissionService {
 
 		for (int attempt = 1; ; attempt++) {
 			try {
-				return transactions.execute(status -> acceptOnce(event, laneId));
+				return transactions.execute(status -> acceptOnce(event, laneId, operation));
 			}
 			catch (PessimisticLockingFailureException victim) {
 				// 1205 (deadlock victim) or 1222 (lock request timeout). The server has
@@ -168,7 +177,7 @@ public class AdmissionService {
 		}
 	}
 
-	private EventOutcome acceptOnce(InboundDeviceEvent event, long laneId) {
+	private EventOutcome acceptOnce(InboundDeviceEvent event, long laneId, String operation) {
 		// --- 0 · take the lane, THEN claim the event ----------------------------
 		// Coarse resource before fine, in that order on every path. The other order
 		// was tried first and it deadlocks: two events for one truck each claim their
@@ -187,7 +196,7 @@ public class AdmissionService {
 					+ "Admission without the lane lock is not a mode this operation has.");
 		}
 
-		IdempotencyOutcome claim = idempotency.begin(event.eventUuid(), OPERATION, holderId);
+		IdempotencyOutcome claim = idempotency.begin(event.eventUuid(), operation, holderId);
 		switch (claim) {
 			case IdempotencyOutcome.Completed completed -> {
 				// NOT an error. The caller retried because it never saw the first
@@ -210,7 +219,7 @@ public class AdmissionService {
 		laneMonitor.recordDeviceEvent(new LaneMonitorProjectionPort.DeviceEventObserved(siteExternalId,
 				laneId, event.laneExternalId(), event.eventUuid(), event.eventType(),
 				event.attributes(), event.occurredAt()));
-		idempotency.complete(event.eventUuid(), OPERATION, admission.visitExternalId());
+		idempotency.complete(event.eventUuid(), operation, admission.visitExternalId());
 
 		return EventOutcome.admitted(event.eventUuid(), admission);
 	}

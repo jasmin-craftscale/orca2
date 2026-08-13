@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:orca="http://lynxis.com/orca"
+             targetNamespace="http://lynxis.com/orca">
+  <process id="proc_31657" name="PLT Out-Gate" isExecutable="true">
+    <startEvent id="n_d847469f-9008-4192-a2b6-8cfb91dbf0ac" name="START"/>
+    <receiveTask id="n_a85f2970-68a4-4fa3-a343-d21a911bc4fc" name="Out-Gate RFID Read" orca:kind="wait" orca:topic="orca-device-input"/>
+    <serviceTask id="n_3dc40ee3-3d00-4cc1-bc86-a0aa269f3082" name="Raise Gate Arm" flowable:delegateExpression="${orcaDeviceEffectDelegate}" orca:kind="effect" orca:topic="orca-device-io"/>
+    <receiveTask id="n_1b461c7c-e6fb-4662-aac2-42d421239651" name="Truck Exit" orca:kind="wait" orca:topic="orca-device-input"/>
+    <serviceTask id="n_82d8b28d-858b-4417-8b00-0b3be92e5ed9" name="Close Gate Arm" flowable:delegateExpression="${orcaDeviceEffectDelegate}" orca:kind="effect" orca:topic="orca-device-io"/>
+    <receiveTask id="n_6990db30-b27c-475d-a93f-cd764abe176b" name="OCR Matchup Done" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_15647f32-2025-4e73-89f9-0a55248dffc8" name="OCR Matchup No Match" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_ffb88e27-ca1d-4d36-94bf-25a1b55cd41d" name="Empty Inspection Yes" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_2b679c95-b884-4e37-86a9-2ff8bb7fd376" name="Empty Inspection Reclassify" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_0b84f890-f97a-4b9c-a8ac-5bf79657ddea" name="Empty Inspection Could Not Inspect" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_aa66e082-99bf-41b4-b8dc-adfdf07d4e8a" name="Empty Inspection No" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_1f788c8f-f4b2-4b81-bcdf-66d6103851e7" name="Out-Gate Wrap-Up Submit" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_3d0a5124-9f6f-47ea-b577-e8172c0de973" name="Out-Gate Wrap-Up Trouble" orca:kind="wait" orca:topic="orca-device-input"/>
+    <userTask id="n_8e58b7ad-0835-4d66-a8ec-afe79372709e" name="OCR Matchup" flowable:candidateGroups="gate-clerk"/>
+    <userTask id="n_42dbac42-bb3b-4bfb-aef2-a955f60e6012" name="Out-Gate Wrap-Up" flowable:candidateGroups="gate-clerk"/>
+    <userTask id="n_bff2e7cb-8a81-4e8f-9e02-ec4697c6b351" name="Empty Inspection" flowable:candidateGroups="gate-clerk"/>
+    <serviceTask id="n_c063009e-6a2b-49e2-9bf1-9a9c40791dfd" name="Open Container Doors" flowable:delegateExpression="${orcaDisplayDelegate}" orca:kind="effect"/>
+    <serviceTask id="n_83da6091-b53e-4430-a82d-dfbdd631e8a8" name="DO NOT EXIT - Turn Left, Go to Trouble Window" flowable:delegateExpression="${orcaDisplayDelegate}" orca:kind="effect"/>
+    <serviceTask id="n_f4a224bd-28da-433f-a517-b12935288009" name="Move Has Been Finalized - Please Exit" flowable:delegateExpression="${orcaDisplayDelegate}" orca:kind="effect"/>
+    <endEvent id="n_eb919efb-f0b9-4d13-b92e-56f3f5dc4d17" name="Out-Gate Complete"/>
+    <endEvent id="n_8028fd74-9110-448f-8f0a-8f6c5e31b168" name="Out-Gate Handled Manually"/>
+    <task id="n_ef581a95-82fe-4f18-9456-220e32ad56d6" name="Close OCR Matchup (Done)"/>
+    <task id="n_b3dc2b68-cca9-482f-9788-ab3ef6fe144b" name="Close OCR Matchup (No Match)"/>
+    <task id="n_60a99cf7-fc22-4010-b504-767d5d36693d" name="Close Empty Inspection (Yes)"/>
+    <task id="n_0f71806b-14ae-4873-b7b8-d3db9e414a9a" name="Close Empty Inspection (Reclassify)"/>
+    <task id="n_e744c975-fc1f-42fd-806c-49728adc9763" name="Close Empty Inspection (Could Not Inspect)"/>
+    <task id="n_2d403d56-49ab-487f-9fe6-ffee0fc314e1" name="Close Empty Inspection (No)"/>
+    <task id="n_41f0e6e1-a5c7-496b-a432-c10220af7055" name="Close Out-Gate Wrap-Up (Submit)"/>
+    <task id="n_821bd709-13a2-4a43-9870-cb1f10308923" name="Close Out-Gate Wrap-Up (Trouble)"/>
+    <exclusiveGateway id="n_e1d81988-e967-4266-977d-015a194f73ae" name="Auto out-gate enabled?" default="flow_37"/>
+    <exclusiveGateway id="n_40151b7d-406c-4290-b439-cd575c4454d6" name="Transaction type?" default="flow_39"/>
+    <exclusiveGateway id="n_3a2e3c62-c8d5-41eb-a2c5-7c919276b7b4" name="No active turnaround?" default="flow_41"/>
+    <serviceTask id="n_de44fa90-2c08-417e-a12f-2135453aa8f9" name="Lookup Visit and Portal Match" flowable:delegateExpression="${orcaConnectorDelegate}" orca:kind="effect"/>
+    <serviceTask id="n_628d32b1-86c4-4813-868d-e985375803f8" name="TOS Out-Gate Lookup" flowable:delegateExpression="${orcaConnectorDelegate}" orca:kind="effect"/>
+    <serviceTask id="n_6d3ae443-b246-4a36-8c76-fb0343ea134e" name="TOS Out-Gate Submit" flowable:delegateExpression="${orcaConnectorDelegate}" orca:kind="effect"/>
+    <serviceTask id="n_cbe91588-4949-42a9-bb1e-0ab24486f183" name="TOS Out-Gate Submit (Corrected)" flowable:delegateExpression="${orcaConnectorDelegate}" orca:kind="effect"/>
+    <serviceTask id="n_399829b6-0416-4c19-a60b-88ac107f8750" name="Set Active Turnaround" flowable:delegateExpression="${orcaConnectorDelegate}" orca:kind="effect"/>
+    <sequenceFlow id="flow_1" sourceRef="n_d847469f-9008-4192-a2b6-8cfb91dbf0ac" targetRef="n_a85f2970-68a4-4fa3-a343-d21a911bc4fc"/>
+    <sequenceFlow id="flow_2" sourceRef="n_a85f2970-68a4-4fa3-a343-d21a911bc4fc" targetRef="n_de44fa90-2c08-417e-a12f-2135453aa8f9"/>
+    <sequenceFlow id="flow_3" sourceRef="n_3dc40ee3-3d00-4cc1-bc86-a0aa269f3082" targetRef="n_1b461c7c-e6fb-4662-aac2-42d421239651"/>
+    <sequenceFlow id="flow_4" sourceRef="n_1b461c7c-e6fb-4662-aac2-42d421239651" targetRef="n_82d8b28d-858b-4417-8b00-0b3be92e5ed9"/>
+    <sequenceFlow id="flow_5" sourceRef="n_82d8b28d-858b-4417-8b00-0b3be92e5ed9" targetRef="n_eb919efb-f0b9-4d13-b92e-56f3f5dc4d17"/>
+    <sequenceFlow id="flow_6" sourceRef="n_6990db30-b27c-475d-a93f-cd764abe176b" targetRef="n_ef581a95-82fe-4f18-9456-220e32ad56d6"/>
+    <sequenceFlow id="flow_7" sourceRef="n_15647f32-2025-4e73-89f9-0a55248dffc8" targetRef="n_b3dc2b68-cca9-482f-9788-ab3ef6fe144b"/>
+    <sequenceFlow id="flow_8" sourceRef="n_ffb88e27-ca1d-4d36-94bf-25a1b55cd41d" targetRef="n_60a99cf7-fc22-4010-b504-767d5d36693d"/>
+    <sequenceFlow id="flow_9" sourceRef="n_2b679c95-b884-4e37-86a9-2ff8bb7fd376" targetRef="n_0f71806b-14ae-4873-b7b8-d3db9e414a9a"/>
+    <sequenceFlow id="flow_10" sourceRef="n_0b84f890-f97a-4b9c-a8ac-5bf79657ddea" targetRef="n_e744c975-fc1f-42fd-806c-49728adc9763"/>
+    <sequenceFlow id="flow_11" sourceRef="n_aa66e082-99bf-41b4-b8dc-adfdf07d4e8a" targetRef="n_2d403d56-49ab-487f-9fe6-ffee0fc314e1"/>
+    <sequenceFlow id="flow_12" sourceRef="n_1f788c8f-f4b2-4b81-bcdf-66d6103851e7" targetRef="n_41f0e6e1-a5c7-496b-a432-c10220af7055"/>
+    <sequenceFlow id="flow_13" sourceRef="n_3d0a5124-9f6f-47ea-b577-e8172c0de973" targetRef="n_821bd709-13a2-4a43-9870-cb1f10308923"/>
+    <exclusiveGateway id="gw_manual_1" name="outcome of OCR Matchup" default="flow_16"/>
+    <sequenceFlow id="flow_14" sourceRef="n_8e58b7ad-0835-4d66-a8ec-afe79372709e" targetRef="gw_manual_1"/>
+    <sequenceFlow id="flow_15" sourceRef="gw_manual_1" targetRef="n_6990db30-b27c-475d-a93f-cd764abe176b">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaManualOutcome == &apos;6990db30-b27c-475d-a93f-cd764abe176b&apos;}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_16" sourceRef="gw_manual_1" targetRef="n_15647f32-2025-4e73-89f9-0a55248dffc8"/>
+    <exclusiveGateway id="gw_manual_2" name="outcome of Out-Gate Wrap-Up" default="flow_19"/>
+    <sequenceFlow id="flow_17" sourceRef="n_42dbac42-bb3b-4bfb-aef2-a955f60e6012" targetRef="gw_manual_2"/>
+    <sequenceFlow id="flow_18" sourceRef="gw_manual_2" targetRef="n_1f788c8f-f4b2-4b81-bcdf-66d6103851e7">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaManualOutcome == &apos;1f788c8f-f4b2-4b81-bcdf-66d6103851e7&apos;}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_19" sourceRef="gw_manual_2" targetRef="n_3d0a5124-9f6f-47ea-b577-e8172c0de973"/>
+    <exclusiveGateway id="gw_manual_3" name="outcome of Empty Inspection" default="flow_24"/>
+    <sequenceFlow id="flow_20" sourceRef="n_bff2e7cb-8a81-4e8f-9e02-ec4697c6b351" targetRef="gw_manual_3"/>
+    <sequenceFlow id="flow_21" sourceRef="gw_manual_3" targetRef="n_ffb88e27-ca1d-4d36-94bf-25a1b55cd41d">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaManualOutcome == &apos;ffb88e27-ca1d-4d36-94bf-25a1b55cd41d&apos;}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_22" sourceRef="gw_manual_3" targetRef="n_2b679c95-b884-4e37-86a9-2ff8bb7fd376">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaManualOutcome == &apos;2b679c95-b884-4e37-86a9-2ff8bb7fd376&apos;}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_23" sourceRef="gw_manual_3" targetRef="n_0b84f890-f97a-4b9c-a8ac-5bf79657ddea">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaManualOutcome == &apos;0b84f890-f97a-4b9c-a8ac-5bf79657ddea&apos;}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_24" sourceRef="gw_manual_3" targetRef="n_aa66e082-99bf-41b4-b8dc-adfdf07d4e8a"/>
+    <sequenceFlow id="flow_25" sourceRef="n_c063009e-6a2b-49e2-9bf1-9a9c40791dfd" targetRef="n_bff2e7cb-8a81-4e8f-9e02-ec4697c6b351"/>
+    <sequenceFlow id="flow_26" sourceRef="n_83da6091-b53e-4430-a82d-dfbdd631e8a8" targetRef="n_3dc40ee3-3d00-4cc1-bc86-a0aa269f3082"/>
+    <sequenceFlow id="flow_27" sourceRef="n_f4a224bd-28da-433f-a517-b12935288009" targetRef="n_3dc40ee3-3d00-4cc1-bc86-a0aa269f3082"/>
+    <sequenceFlow id="flow_28" sourceRef="n_ef581a95-82fe-4f18-9456-220e32ad56d6" targetRef="n_628d32b1-86c4-4813-868d-e985375803f8"/>
+    <sequenceFlow id="flow_29" sourceRef="n_b3dc2b68-cca9-482f-9788-ab3ef6fe144b" targetRef="n_8028fd74-9110-448f-8f0a-8f6c5e31b168"/>
+    <sequenceFlow id="flow_30" sourceRef="n_60a99cf7-fc22-4010-b504-767d5d36693d" targetRef="n_e1d81988-e967-4266-977d-015a194f73ae"/>
+    <sequenceFlow id="flow_31" sourceRef="n_0f71806b-14ae-4873-b7b8-d3db9e414a9a" targetRef="n_e1d81988-e967-4266-977d-015a194f73ae"/>
+    <sequenceFlow id="flow_32" sourceRef="n_e744c975-fc1f-42fd-806c-49728adc9763" targetRef="n_e1d81988-e967-4266-977d-015a194f73ae"/>
+    <sequenceFlow id="flow_33" sourceRef="n_2d403d56-49ab-487f-9fe6-ffee0fc314e1" targetRef="n_83da6091-b53e-4430-a82d-dfbdd631e8a8"/>
+    <sequenceFlow id="flow_34" sourceRef="n_41f0e6e1-a5c7-496b-a432-c10220af7055" targetRef="n_cbe91588-4949-42a9-bb1e-0ab24486f183"/>
+    <sequenceFlow id="flow_35" sourceRef="n_821bd709-13a2-4a43-9870-cb1f10308923" targetRef="n_399829b6-0416-4c19-a60b-88ac107f8750"/>
+    <sequenceFlow id="flow_36" sourceRef="n_e1d81988-e967-4266-977d-015a194f73ae" targetRef="n_6d3ae443-b246-4a36-8c76-fb0343ea134e">
+      <extensionElements>
+        <orca:field var="v_workflow_dataset_plt_auto_out_gate" selector="$.workflow.dataset.plt_auto_out_gate"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orca:grp(orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_auto_out_gate&apos;, null), &apos;true&apos;))}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_37" sourceRef="n_e1d81988-e967-4266-977d-015a194f73ae" targetRef="n_42dbac42-bb3b-4bfb-aef2-a955f60e6012"/>
+    <sequenceFlow id="flow_38" sourceRef="n_40151b7d-406c-4290-b439-cd575c4454d6" targetRef="n_c063009e-6a2b-49e2-9bf1-9a9c40791dfd">
+      <extensionElements>
+        <orca:field var="v_workflow_dataset_plt_bm_txn_type" selector="$.workflow.dataset.plt_bm_txn_type"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orca:grp(orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_bm_txn_type&apos;, null), &apos;Deliver Empty&apos;))}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_39" sourceRef="n_40151b7d-406c-4290-b439-cd575c4454d6" targetRef="n_e1d81988-e967-4266-977d-015a194f73ae"/>
+    <sequenceFlow id="flow_40" sourceRef="n_3a2e3c62-c8d5-41eb-a2c5-7c919276b7b4" targetRef="n_f4a224bd-28da-433f-a517-b12935288009">
+      <extensionElements>
+        <orca:field var="v_workflow_dataset_plt_active_turnaround" selector="$.workflow.dataset.plt_active_turnaround"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orca:grp(orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_active_turnaround&apos;, null), &apos;false&apos;))}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_41" sourceRef="n_3a2e3c62-c8d5-41eb-a2c5-7c919276b7b4" targetRef="n_f4a224bd-28da-433f-a517-b12935288009"/>
+    <exclusiveGateway id="gw_resp_4" name="status of Lookup Visit and Portal Match" default="flow_45"/>
+    <sequenceFlow id="flow_42" sourceRef="n_de44fa90-2c08-417e-a12f-2135453aa8f9" targetRef="gw_resp_4"/>
+    <sequenceFlow id="flow_43" sourceRef="gw_resp_4" targetRef="n_628d32b1-86c4-4813-868d-e985375803f8">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 200}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_44" sourceRef="gw_resp_4" targetRef="n_8e58b7ad-0835-4d66-a8ec-afe79372709e">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 404}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_45" sourceRef="gw_resp_4" targetRef="n_8e58b7ad-0835-4d66-a8ec-afe79372709e"/>
+    <exclusiveGateway id="gw_resp_5" name="status of TOS Out-Gate Lookup" default="flow_49"/>
+    <sequenceFlow id="flow_46" sourceRef="n_628d32b1-86c4-4813-868d-e985375803f8" targetRef="gw_resp_5"/>
+    <sequenceFlow id="flow_47" sourceRef="gw_resp_5" targetRef="n_40151b7d-406c-4290-b439-cd575c4454d6">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 200}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_48" sourceRef="gw_resp_5" targetRef="n_42dbac42-bb3b-4bfb-aef2-a955f60e6012">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 404}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_49" sourceRef="gw_resp_5" targetRef="n_42dbac42-bb3b-4bfb-aef2-a955f60e6012"/>
+    <exclusiveGateway id="gw_resp_6" name="status of TOS Out-Gate Submit" default="flow_54"/>
+    <sequenceFlow id="flow_50" sourceRef="n_6d3ae443-b246-4a36-8c76-fb0343ea134e" targetRef="gw_resp_6"/>
+    <sequenceFlow id="flow_51" sourceRef="gw_resp_6" targetRef="n_3a2e3c62-c8d5-41eb-a2c5-7c919276b7b4">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 200}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_52" sourceRef="gw_resp_6" targetRef="n_42dbac42-bb3b-4bfb-aef2-a955f60e6012">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 422}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_53" sourceRef="gw_resp_6" targetRef="n_42dbac42-bb3b-4bfb-aef2-a955f60e6012">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 404}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_54" sourceRef="gw_resp_6" targetRef="n_42dbac42-bb3b-4bfb-aef2-a955f60e6012"/>
+    <exclusiveGateway id="gw_resp_7" name="status of TOS Out-Gate Submit (Corrected)" default="flow_59"/>
+    <sequenceFlow id="flow_55" sourceRef="n_cbe91588-4949-42a9-bb1e-0ab24486f183" targetRef="gw_resp_7"/>
+    <sequenceFlow id="flow_56" sourceRef="gw_resp_7" targetRef="n_3a2e3c62-c8d5-41eb-a2c5-7c919276b7b4">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 200}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_57" sourceRef="gw_resp_7" targetRef="n_42dbac42-bb3b-4bfb-aef2-a955f60e6012">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 422}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_58" sourceRef="gw_resp_7" targetRef="n_42dbac42-bb3b-4bfb-aef2-a955f60e6012">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 404}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_59" sourceRef="gw_resp_7" targetRef="n_42dbac42-bb3b-4bfb-aef2-a955f60e6012"/>
+    <exclusiveGateway id="gw_resp_8" name="status of Set Active Turnaround" default="flow_63"/>
+    <sequenceFlow id="flow_60" sourceRef="n_399829b6-0416-4c19-a60b-88ac107f8750" targetRef="gw_resp_8"/>
+    <sequenceFlow id="flow_61" sourceRef="gw_resp_8" targetRef="n_83da6091-b53e-4430-a82d-dfbdd631e8a8">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 200}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_62" sourceRef="gw_resp_8" targetRef="n_83da6091-b53e-4430-a82d-dfbdd631e8a8">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 404}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_63" sourceRef="gw_resp_8" targetRef="n_83da6091-b53e-4430-a82d-dfbdd631e8a8"/>
+  </process>
+</definitions>

@@ -1,0 +1,385 @@
+{
+  "workflow_id" : 10000090,
+  "workflow_uuid" : "1fefb12d-e74d-40bf-aadf-4cc0ef28e98b",
+  "name" : "PLT Best Match Reservation@3",
+  "nodes" : [ {
+    "uuid" : "c14a0e03-8833-406c-b271-9b70d2a77abb",
+    "type" : "START",
+    "name" : "START"
+  }, {
+    "uuid" : "a3c20a4f-600f-4e1d-866b-da8c5fa78c58",
+    "type" : "TERMINATOR",
+    "name" : "End Process - Send Results"
+  }, {
+    "uuid" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "type" : "DECISION",
+    "name" : "Results set to 0"
+  }, {
+    "uuid" : "d7fdd682-3080-4a7f-bdc9-d74b2a49a665",
+    "type" : "DECISION",
+    "name" : "Truck eligible?"
+  }, {
+    "uuid" : "edbd3fa1-f2cf-44d1-8634-43a2eca07d32",
+    "type" : "DECISION",
+    "name" : "Load type?"
+  }, {
+    "uuid" : "279d52c6-f97d-441c-a3c4-692c5ef3f567",
+    "type" : "DECISION",
+    "name" : "Empty type?"
+  }, {
+    "uuid" : "a3fe031f-a3a4-4dd7-b14a-66d435021889",
+    "type" : "DECISION",
+    "name" : "Evaluate Best Match"
+  }, {
+    "uuid" : "dd55c930-c8b3-46e4-b525-0a3c086eccb7",
+    "type" : "CONNECTOR",
+    "name" : "TRS Truck Lookup"
+  }, {
+    "uuid" : "86991959-f122-461f-a142-3f03edfd16ca",
+    "type" : "CONNECTOR",
+    "name" : "Validated Reservations - Loaded"
+  }, {
+    "uuid" : "94083897-40bb-40bb-b806-345660aed74d",
+    "type" : "CONNECTOR",
+    "name" : "Validated Reservations - Generic Empty"
+  }, {
+    "uuid" : "c0f282be-56de-4981-90db-d9f1e24fa6ae",
+    "type" : "CONNECTOR",
+    "name" : "Validated Reservations - Specific Empty"
+  }, {
+    "uuid" : "288f22e0-e2ac-4d1b-b116-5ecd06a38e65",
+    "type" : "CONNECTOR",
+    "name" : "Validated Reservations - Bobtail"
+  } ],
+  "branches" : [ {
+    "uuid" : "be812b4a-09b4-48f2-bb30-a73462e4d4d0",
+    "decision_uuid" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "name" : "No results",
+    "order" : 1,
+    "condition" : [ ]
+  }, {
+    "uuid" : "5eddffb3-fe76-4351-81b7-910367c5a0ac",
+    "decision_uuid" : "d7fdd682-3080-4a7f-bdc9-d74b2a49a665",
+    "name" : "Eligible",
+    "order" : 1,
+    "condition" : [ {
+      "id" : "grp",
+      "logical_operator" : "AND",
+      "child_condition" : [ {
+        "id" : "c0",
+        "logical_operator" : "",
+        "field" : {
+          "value" : "$.workflow.dataset.plt_truck_active",
+          "selector_id" : "$.workflow.dataset.plt_truck_active"
+        },
+        "comparison_operator" : "is equal to",
+        "value" : {
+          "value" : "true",
+          "selector_id" : ""
+        }
+      }, {
+        "id" : "c1",
+        "logical_operator" : "AND",
+        "field" : {
+          "value" : "$.workflow.dataset.plt_truck_banned",
+          "selector_id" : "$.workflow.dataset.plt_truck_banned"
+        },
+        "comparison_operator" : "is equal to",
+        "value" : {
+          "value" : "false",
+          "selector_id" : ""
+        }
+      }, {
+        "id" : "c2",
+        "logical_operator" : "AND",
+        "field" : {
+          "value" : "$.workflow.dataset.plt_truck_program_status",
+          "selector_id" : "$.workflow.dataset.plt_truck_program_status"
+        },
+        "comparison_operator" : "is equal to",
+        "value" : {
+          "value" : "1",
+          "selector_id" : ""
+        }
+      } ]
+    } ]
+  }, {
+    "uuid" : "88b84d32-1224-4ddd-8f78-62f857a6f3f3",
+    "decision_uuid" : "d7fdd682-3080-4a7f-bdc9-d74b2a49a665",
+    "name" : "Not eligible",
+    "order" : 2,
+    "condition" : [ ]
+  }, {
+    "uuid" : "6d661970-54c0-4ca2-a4fa-b61660493265",
+    "decision_uuid" : "edbd3fa1-f2cf-44d1-8634-43a2eca07d32",
+    "name" : "Loaded",
+    "order" : 1,
+    "condition" : [ {
+      "id" : "grp",
+      "logical_operator" : "AND",
+      "child_condition" : [ {
+        "id" : "c0",
+        "logical_operator" : "",
+        "field" : {
+          "value" : "$.workflow.dataset.plt_trs_load_type",
+          "selector_id" : "$.workflow.dataset.plt_trs_load_type"
+        },
+        "comparison_operator" : "is equal to",
+        "value" : {
+          "value" : "Loaded",
+          "selector_id" : ""
+        }
+      } ]
+    } ]
+  }, {
+    "uuid" : "51aa2415-23a0-4941-974f-4c6befbedf4d",
+    "decision_uuid" : "edbd3fa1-f2cf-44d1-8634-43a2eca07d32",
+    "name" : "Empty",
+    "order" : 2,
+    "condition" : [ {
+      "id" : "grp",
+      "logical_operator" : "AND",
+      "child_condition" : [ {
+        "id" : "c0",
+        "logical_operator" : "",
+        "field" : {
+          "value" : "$.workflow.dataset.plt_trs_load_type",
+          "selector_id" : "$.workflow.dataset.plt_trs_load_type"
+        },
+        "comparison_operator" : "is equal to",
+        "value" : {
+          "value" : "Empty",
+          "selector_id" : ""
+        }
+      } ]
+    } ]
+  }, {
+    "uuid" : "3f6b006f-e927-44fe-b18d-fa663d141246",
+    "decision_uuid" : "edbd3fa1-f2cf-44d1-8634-43a2eca07d32",
+    "name" : "Bobtail or bare chassis",
+    "order" : 3,
+    "condition" : [ ]
+  }, {
+    "uuid" : "71166e98-ec27-43e9-abe2-3f61a7338d1a",
+    "decision_uuid" : "279d52c6-f97d-441c-a3c4-692c5ef3f567",
+    "name" : "Generic empty",
+    "order" : 1,
+    "condition" : [ {
+      "id" : "grp",
+      "logical_operator" : "AND",
+      "child_condition" : [ {
+        "id" : "c0",
+        "logical_operator" : "",
+        "field" : {
+          "value" : "$.workflow.dataset.plt_trs_generic_empty",
+          "selector_id" : "$.workflow.dataset.plt_trs_generic_empty"
+        },
+        "comparison_operator" : "is equal to",
+        "value" : {
+          "value" : "true",
+          "selector_id" : ""
+        }
+      } ]
+    } ]
+  }, {
+    "uuid" : "25da9f1d-fdd3-45eb-a0d0-4b5d2bff7972",
+    "decision_uuid" : "279d52c6-f97d-441c-a3c4-692c5ef3f567",
+    "name" : "Specific empty",
+    "order" : 2,
+    "condition" : [ ]
+  }, {
+    "uuid" : "f3a0aed6-7885-44a4-a594-c496009af7ac",
+    "decision_uuid" : "a3fe031f-a3a4-4dd7-b14a-66d435021889",
+    "name" : "Results found",
+    "order" : 1,
+    "condition" : [ {
+      "id" : "grp",
+      "logical_operator" : "AND",
+      "child_condition" : [ {
+        "id" : "c0",
+        "logical_operator" : "",
+        "field" : {
+          "value" : "$.workflow.dataset.plt_bm_found",
+          "selector_id" : "$.workflow.dataset.plt_bm_found"
+        },
+        "comparison_operator" : "is equal to",
+        "value" : {
+          "value" : "true",
+          "selector_id" : ""
+        }
+      } ]
+    } ]
+  }, {
+    "uuid" : "3235fba1-2dad-4fa3-b392-9c89b5e13a37",
+    "decision_uuid" : "a3fe031f-a3a4-4dd7-b14a-66d435021889",
+    "name" : "No results",
+    "order" : 2,
+    "condition" : [ ]
+  } ],
+  "responses" : [ {
+    "uuid" : "7dc8bc2c-71aa-40f2-be93-85c8256cfea5",
+    "connector_uuid" : "dd55c930-c8b3-46e4-b525-0a3c086eccb7",
+    "status_code" : 200
+  }, {
+    "uuid" : "0d7794f7-9c8e-431c-a858-c1cd7c6add30",
+    "connector_uuid" : "dd55c930-c8b3-46e4-b525-0a3c086eccb7",
+    "status_code" : 404
+  }, {
+    "uuid" : "9257ca3f-71d1-446e-9896-b40a0869095e",
+    "connector_uuid" : "dd55c930-c8b3-46e4-b525-0a3c086eccb7",
+    "status_code" : 0
+  }, {
+    "uuid" : "96f70be6-e02d-42a0-bb6e-f4d1ce1acd39",
+    "connector_uuid" : "86991959-f122-461f-a142-3f03edfd16ca",
+    "status_code" : 200
+  }, {
+    "uuid" : "4e9e29a2-6a41-497a-b346-cb46d1ce8c14",
+    "connector_uuid" : "86991959-f122-461f-a142-3f03edfd16ca",
+    "status_code" : 404
+  }, {
+    "uuid" : "0a4c0cf4-1a8d-482f-94bc-0a5b19d98cca",
+    "connector_uuid" : "86991959-f122-461f-a142-3f03edfd16ca",
+    "status_code" : 0
+  }, {
+    "uuid" : "77088cea-a12d-420a-9c54-d60ace5fe3b8",
+    "connector_uuid" : "94083897-40bb-40bb-b806-345660aed74d",
+    "status_code" : 200
+  }, {
+    "uuid" : "5e7773f2-d496-4c65-a9d2-fda126bffd57",
+    "connector_uuid" : "94083897-40bb-40bb-b806-345660aed74d",
+    "status_code" : 404
+  }, {
+    "uuid" : "24685046-5f94-4f37-8bd6-b828ec37a073",
+    "connector_uuid" : "94083897-40bb-40bb-b806-345660aed74d",
+    "status_code" : 0
+  }, {
+    "uuid" : "bdd98799-bed6-4e3b-8dda-59c04d9b99d7",
+    "connector_uuid" : "c0f282be-56de-4981-90db-d9f1e24fa6ae",
+    "status_code" : 200
+  }, {
+    "uuid" : "510f6c2d-7bfa-4188-9ab8-0a4d322d2c0c",
+    "connector_uuid" : "c0f282be-56de-4981-90db-d9f1e24fa6ae",
+    "status_code" : 404
+  }, {
+    "uuid" : "01653242-a235-4044-b490-2b2dc070edb2",
+    "connector_uuid" : "c0f282be-56de-4981-90db-d9f1e24fa6ae",
+    "status_code" : 0
+  }, {
+    "uuid" : "3d333f77-4a6d-4254-9bf3-31e265c45d88",
+    "connector_uuid" : "288f22e0-e2ac-4d1b-b116-5ecd06a38e65",
+    "status_code" : 200
+  }, {
+    "uuid" : "7e35f93d-9322-4d7c-984c-c032d42df9d2",
+    "connector_uuid" : "288f22e0-e2ac-4d1b-b116-5ecd06a38e65",
+    "status_code" : 404
+  }, {
+    "uuid" : "ec15a9d1-a89f-42e0-99a0-ac6f7d4f14ea",
+    "connector_uuid" : "288f22e0-e2ac-4d1b-b116-5ecd06a38e65",
+    "status_code" : 0
+  } ],
+  "node_links" : [ {
+    "from" : "be812b4a-09b4-48f2-bb30-a73462e4d4d0",
+    "to" : "a3c20a4f-600f-4e1d-866b-da8c5fa78c58",
+    "position" : 0
+  }, {
+    "from" : "c14a0e03-8833-406c-b271-9b70d2a77abb",
+    "to" : "dd55c930-c8b3-46e4-b525-0a3c086eccb7",
+    "position" : 1
+  }, {
+    "from" : "0d7794f7-9c8e-431c-a858-c1cd7c6add30",
+    "to" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "position" : 2
+  }, {
+    "from" : "9257ca3f-71d1-446e-9896-b40a0869095e",
+    "to" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "position" : 3
+  }, {
+    "from" : "7dc8bc2c-71aa-40f2-be93-85c8256cfea5",
+    "to" : "d7fdd682-3080-4a7f-bdc9-d74b2a49a665",
+    "position" : 4
+  }, {
+    "from" : "88b84d32-1224-4ddd-8f78-62f857a6f3f3",
+    "to" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "position" : 5
+  }, {
+    "from" : "5eddffb3-fe76-4351-81b7-910367c5a0ac",
+    "to" : "edbd3fa1-f2cf-44d1-8634-43a2eca07d32",
+    "position" : 6
+  }, {
+    "from" : "51aa2415-23a0-4941-974f-4c6befbedf4d",
+    "to" : "279d52c6-f97d-441c-a3c4-692c5ef3f567",
+    "position" : 7
+  }, {
+    "from" : "f3a0aed6-7885-44a4-a594-c496009af7ac",
+    "to" : "a3c20a4f-600f-4e1d-866b-da8c5fa78c58",
+    "position" : 8
+  }, {
+    "from" : "3235fba1-2dad-4fa3-b392-9c89b5e13a37",
+    "to" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "position" : 9
+  }, {
+    "from" : "96f70be6-e02d-42a0-bb6e-f4d1ce1acd39",
+    "to" : "a3fe031f-a3a4-4dd7-b14a-66d435021889",
+    "position" : 10
+  }, {
+    "from" : "4e9e29a2-6a41-497a-b346-cb46d1ce8c14",
+    "to" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "position" : 11
+  }, {
+    "from" : "0a4c0cf4-1a8d-482f-94bc-0a5b19d98cca",
+    "to" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "position" : 12
+  }, {
+    "from" : "6d661970-54c0-4ca2-a4fa-b61660493265",
+    "to" : "86991959-f122-461f-a142-3f03edfd16ca",
+    "position" : 13
+  }, {
+    "from" : "77088cea-a12d-420a-9c54-d60ace5fe3b8",
+    "to" : "a3fe031f-a3a4-4dd7-b14a-66d435021889",
+    "position" : 14
+  }, {
+    "from" : "5e7773f2-d496-4c65-a9d2-fda126bffd57",
+    "to" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "position" : 15
+  }, {
+    "from" : "24685046-5f94-4f37-8bd6-b828ec37a073",
+    "to" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "position" : 16
+  }, {
+    "from" : "71166e98-ec27-43e9-abe2-3f61a7338d1a",
+    "to" : "94083897-40bb-40bb-b806-345660aed74d",
+    "position" : 17
+  }, {
+    "from" : "bdd98799-bed6-4e3b-8dda-59c04d9b99d7",
+    "to" : "a3fe031f-a3a4-4dd7-b14a-66d435021889",
+    "position" : 18
+  }, {
+    "from" : "510f6c2d-7bfa-4188-9ab8-0a4d322d2c0c",
+    "to" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "position" : 19
+  }, {
+    "from" : "01653242-a235-4044-b490-2b2dc070edb2",
+    "to" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "position" : 20
+  }, {
+    "from" : "25da9f1d-fdd3-45eb-a0d0-4b5d2bff7972",
+    "to" : "c0f282be-56de-4981-90db-d9f1e24fa6ae",
+    "position" : 21
+  }, {
+    "from" : "3d333f77-4a6d-4254-9bf3-31e265c45d88",
+    "to" : "a3fe031f-a3a4-4dd7-b14a-66d435021889",
+    "position" : 22
+  }, {
+    "from" : "7e35f93d-9322-4d7c-984c-c032d42df9d2",
+    "to" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "position" : 23
+  }, {
+    "from" : "ec15a9d1-a89f-42e0-99a0-ac6f7d4f14ea",
+    "to" : "edc65369-317f-404e-bb08-0ef099d4a224",
+    "position" : 24
+  }, {
+    "from" : "3f6b006f-e927-44fe-b18d-fa663d141246",
+    "to" : "288f22e0-e2ac-4d1b-b116-5ecd06a38e65",
+    "position" : 25
+  } ]
+}

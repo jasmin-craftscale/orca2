@@ -11,6 +11,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 
 import com.lynxis.orca.core.api.AuditEventController;
 import com.lynxis.orca.core.api.BreakTemplateController;
+import com.lynxis.orca.core.api.CustomEntityController;
 import com.lynxis.orca.core.api.DeviceAdminController;
 import com.lynxis.orca.core.api.DeviceCatalogController;
 import com.lynxis.orca.core.api.EntitlementCatalogController;
@@ -24,6 +25,7 @@ import com.lynxis.orca.core.api.UserAdminController;
 import com.lynxis.orca.core.api.WorkspaceController;
 import com.lynxis.orca.core.domain.AuditTrail;
 import com.lynxis.orca.core.domain.CallerIdentity;
+import com.lynxis.orca.core.domain.CustomEntityService;
 import com.lynxis.orca.core.domain.DeviceAdminService;
 import com.lynxis.orca.core.domain.ResourceConfigurationService;
 import com.lynxis.orca.core.domain.RoleAdminService;
@@ -35,6 +37,7 @@ import com.lynxis.orca.core.domain.UserAdminService;
 import com.lynxis.orca.core.domain.WorkspaceService;
 import com.lynxis.orca.core.persistence.AuditEventRepository;
 import com.lynxis.orca.core.persistence.BreakTemplateRepository;
+import com.lynxis.orca.core.persistence.CustomEntityRepository;
 import com.lynxis.orca.core.persistence.DeviceCatalogRepository;
 import com.lynxis.orca.core.persistence.DeviceRepository;
 import com.lynxis.orca.core.persistence.EntitlementCatalogRepository;
@@ -137,6 +140,25 @@ public class CoreConfiguration {
 	public EntitlementCatalogController entitlementCatalogController(EntitlementCatalogRepository catalog,
 			InstallationProperties installation) {
 		return new EntitlementCatalogController(catalog, installation.siteExternalId());
+	}
+
+	// --- custom-entity declarations -----------------------------------------
+
+	@Bean
+	public CustomEntityRepository customEntityRepository(ScopeSeam seam) {
+		return new CustomEntityRepository(seam);
+	}
+
+	@Bean
+	public CustomEntityService customEntityService(CustomEntityRepository entities,
+			SiteDirectoryRepository sites, AuditTrail audit) {
+		return new CustomEntityService(entities, sites, audit);
+	}
+
+	@Bean
+	public CustomEntityController customEntityController(CustomEntityService service,
+			InstallationProperties installation) {
+		return new CustomEntityController(service, installation.siteExternalId());
 	}
 
 	// --- teams & templates --------------------------------------------------

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:orca="http://lynxis.com/orca"
+             targetNamespace="http://lynxis.com/orca">
+  <process id="proc_31653" name="PLT In-Gate Portal" isExecutable="true">
+    <startEvent id="n_3ba67556-9fda-41f9-a9d9-7a1381b5dc7f" name="START"/>
+    <receiveTask id="n_cca6860d-88aa-462a-b877-3d1f942fa235" name="Portal OCR Scan" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_99ddf170-9731-4922-814a-633a219f6693" name="Portal RFID Read" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_5091db50-fc15-4793-b3aa-6ef02c5e9f27" name="Portal WIM Scale" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_3c72bce1-5c45-4874-90a7-716f774a4b7e" name="Change OCR Classification Done" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_a6b64b8e-f1d2-40f4-9e4f-8e1866e061b1" name="Change OCR Classification Reject Truck" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_7f468dd9-3cce-4003-9690-5f9be9928464" name="Damage Inspection Complete" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_4c15be2f-b562-4eb3-ac51-3a40686ef68d" name="Damage Inspection Reclassify" orca:kind="wait" orca:topic="orca-device-input"/>
+    <receiveTask id="n_e8ab67a0-8db4-4f89-982d-e474a8a6a49c" name="Damage Inspection Reject Truck" orca:kind="wait" orca:topic="orca-device-input"/>
+    <userTask id="n_f191b3da-f416-42a0-8f53-10d977b1983c" name="Change OCR Classification" flowable:candidateGroups="gate-clerk"/>
+    <userTask id="n_7cd1e279-fd18-465b-a49d-50cd68afc5b3" name="Damage Inspection" flowable:candidateGroups="gate-clerk"/>
+    <endEvent id="n_7ce2fd02-dc16-407b-939d-a6fd4fb8326a" name="Passage Complete"/>
+    <endEvent id="n_a88f0d1c-4233-4e10-8e67-14e5eeb7c797" name="Passage Ended - OCR Reject"/>
+    <task id="n_8d91bd5d-357c-42a5-bd95-405e490c01d2" name="Close Change OCR Classification (Done)"/>
+    <task id="n_cf592c9a-5185-4c7a-9d85-5ef093d05171" name="Close Change OCR Classification (Reject Truck)"/>
+    <task id="n_9a344dfb-2c96-4b54-bb4e-2a60e2ffb16e" name="Close Damage Inspection (Complete)"/>
+    <task id="n_05921902-3616-415a-aeac-38f572a20b79" name="Close Damage Inspection (Reclassify)"/>
+    <task id="n_125f1fab-adee-446c-92b5-8d6328f1569c" name="Close Damage Inspection (Reject Truck)"/>
+    <exclusiveGateway id="n_15c892d2-0ec9-4de6-9ad6-4168fb4c0e15" name="Container on passage?" default="flow_23"/>
+    <exclusiveGateway id="n_98e4e0f1-600f-4f7d-9122-38804659d3e5" name="OCR confidence acceptable?" default="flow_25"/>
+    <sequenceFlow id="flow_1" sourceRef="n_3ba67556-9fda-41f9-a9d9-7a1381b5dc7f" targetRef="n_cca6860d-88aa-462a-b877-3d1f942fa235"/>
+    <sequenceFlow id="flow_2" sourceRef="n_cca6860d-88aa-462a-b877-3d1f942fa235" targetRef="n_99ddf170-9731-4922-814a-633a219f6693"/>
+    <sequenceFlow id="flow_3" sourceRef="n_99ddf170-9731-4922-814a-633a219f6693" targetRef="n_5091db50-fc15-4793-b3aa-6ef02c5e9f27"/>
+    <sequenceFlow id="flow_4" sourceRef="n_5091db50-fc15-4793-b3aa-6ef02c5e9f27" targetRef="n_98e4e0f1-600f-4f7d-9122-38804659d3e5"/>
+    <sequenceFlow id="flow_5" sourceRef="n_3c72bce1-5c45-4874-90a7-716f774a4b7e" targetRef="n_8d91bd5d-357c-42a5-bd95-405e490c01d2"/>
+    <sequenceFlow id="flow_6" sourceRef="n_a6b64b8e-f1d2-40f4-9e4f-8e1866e061b1" targetRef="n_cf592c9a-5185-4c7a-9d85-5ef093d05171"/>
+    <sequenceFlow id="flow_7" sourceRef="n_7f468dd9-3cce-4003-9690-5f9be9928464" targetRef="n_9a344dfb-2c96-4b54-bb4e-2a60e2ffb16e"/>
+    <sequenceFlow id="flow_8" sourceRef="n_4c15be2f-b562-4eb3-ac51-3a40686ef68d" targetRef="n_05921902-3616-415a-aeac-38f572a20b79"/>
+    <sequenceFlow id="flow_9" sourceRef="n_e8ab67a0-8db4-4f89-982d-e474a8a6a49c" targetRef="n_125f1fab-adee-446c-92b5-8d6328f1569c"/>
+    <exclusiveGateway id="gw_manual_1" name="outcome of Change OCR Classification" default="flow_12"/>
+    <sequenceFlow id="flow_10" sourceRef="n_f191b3da-f416-42a0-8f53-10d977b1983c" targetRef="gw_manual_1"/>
+    <sequenceFlow id="flow_11" sourceRef="gw_manual_1" targetRef="n_3c72bce1-5c45-4874-90a7-716f774a4b7e">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaManualOutcome == &apos;3c72bce1-5c45-4874-90a7-716f774a4b7e&apos;}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_12" sourceRef="gw_manual_1" targetRef="n_a6b64b8e-f1d2-40f4-9e4f-8e1866e061b1"/>
+    <exclusiveGateway id="gw_manual_2" name="outcome of Damage Inspection" default="flow_16"/>
+    <sequenceFlow id="flow_13" sourceRef="n_7cd1e279-fd18-465b-a49d-50cd68afc5b3" targetRef="gw_manual_2"/>
+    <sequenceFlow id="flow_14" sourceRef="gw_manual_2" targetRef="n_7f468dd9-3cce-4003-9690-5f9be9928464">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaManualOutcome == &apos;7f468dd9-3cce-4003-9690-5f9be9928464&apos;}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_15" sourceRef="gw_manual_2" targetRef="n_4c15be2f-b562-4eb3-ac51-3a40686ef68d">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaManualOutcome == &apos;4c15be2f-b562-4eb3-ac51-3a40686ef68d&apos;}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_16" sourceRef="gw_manual_2" targetRef="n_e8ab67a0-8db4-4f89-982d-e474a8a6a49c"/>
+    <sequenceFlow id="flow_17" sourceRef="n_8d91bd5d-357c-42a5-bd95-405e490c01d2" targetRef="n_15c892d2-0ec9-4de6-9ad6-4168fb4c0e15"/>
+    <sequenceFlow id="flow_18" sourceRef="n_cf592c9a-5185-4c7a-9d85-5ef093d05171" targetRef="n_a88f0d1c-4233-4e10-8e67-14e5eeb7c797"/>
+    <sequenceFlow id="flow_19" sourceRef="n_9a344dfb-2c96-4b54-bb4e-2a60e2ffb16e" targetRef="n_7ce2fd02-dc16-407b-939d-a6fd4fb8326a"/>
+    <sequenceFlow id="flow_20" sourceRef="n_05921902-3616-415a-aeac-38f572a20b79" targetRef="n_7ce2fd02-dc16-407b-939d-a6fd4fb8326a"/>
+    <sequenceFlow id="flow_21" sourceRef="n_125f1fab-adee-446c-92b5-8d6328f1569c" targetRef="n_7ce2fd02-dc16-407b-939d-a6fd4fb8326a"/>
+    <sequenceFlow id="flow_22" sourceRef="n_15c892d2-0ec9-4de6-9ad6-4168fb4c0e15" targetRef="n_7cd1e279-fd18-465b-a49d-50cd68afc5b3">
+      <extensionElements>
+        <orca:field var="v_workflow_dataset_plt_ocr_classification" selector="$.workflow.dataset.plt_ocr_classification"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orca:grp((orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_ocr_classification&apos;, null), &apos;One Container&apos;) or orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_ocr_classification&apos;, null), &apos;Two Containers&apos;)))}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_23" sourceRef="n_15c892d2-0ec9-4de6-9ad6-4168fb4c0e15" targetRef="n_7ce2fd02-dc16-407b-939d-a6fd4fb8326a"/>
+    <sequenceFlow id="flow_24" sourceRef="n_98e4e0f1-600f-4f7d-9122-38804659d3e5" targetRef="n_f191b3da-f416-42a0-8f53-10d977b1983c">
+      <extensionElements>
+        <orca:field var="v_workflow_dataset_plt_ocr_container_confidence" selector="$.workflow.dataset.plt_ocr_container_confidence"/>
+        <orca:field var="v_workflow_dataset_plt_ocr_chassis_confidence" selector="$.workflow.dataset.plt_ocr_chassis_confidence"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orca:grp((orca:cmp(&apos;is lesser than&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_ocr_container_confidence&apos;, null), &apos;0.85&apos;) or orca:cmp(&apos;is lesser than&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_ocr_chassis_confidence&apos;, null), &apos;0.85&apos;)))}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_25" sourceRef="n_98e4e0f1-600f-4f7d-9122-38804659d3e5" targetRef="n_15c892d2-0ec9-4de6-9ad6-4168fb4c0e15"/>
+  </process>
+</definitions>

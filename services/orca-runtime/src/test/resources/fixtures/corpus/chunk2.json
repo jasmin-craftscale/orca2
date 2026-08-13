@@ -1,0 +1,894 @@
+[
+  {
+    "source": "TestSelectorService_ProcessArrayItems_NilFields",
+    "kind": "processArrayItems",
+    "args": {
+      "fields": null,
+      "items": {
+        "key": "value"
+      }
+    },
+    "expected": {
+      "value": [],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessArrayItems_EmptyFields",
+    "kind": "processArrayItems",
+    "args": {
+      "fields": [],
+      "items": {
+        "key": "value"
+      }
+    },
+    "expected": {
+      "value": [],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_SplitSelector_EmptySelector",
+    "kind": "splitSelector",
+    "args": {
+      "selector": ""
+    },
+    "expected": {
+      "value": [
+        ""
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_SplitSelector_SimpleSelector",
+    "kind": "splitSelector",
+    "args": {
+      "selector": "field1.field2.field3"
+    },
+    "expected": {
+      "value": [
+        "field1",
+        "field2",
+        "field3"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExtractValue_NilData",
+    "kind": "extractValue",
+    "args": {
+      "data": null,
+      "path": [
+        "field"
+      ]
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExtractValue_EmptyPath",
+    "kind": "extractValue",
+    "args": {
+      "data": {
+        "field": "value"
+      },
+      "path": []
+    },
+    "expected": {
+      "value": {
+        "field": "value"
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_UpdateSelectorValue_EmptySelector",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "",
+      "selectorID": "selector-id",
+      "selectorValue": "value",
+      "updation": "update",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_UpdateSelectorValue_NilValue",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "selector",
+      "selectorID": "selector-id",
+      "selectorValue": null,
+      "updation": "update",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_NilValue",
+    "kind": "handleString",
+    "args": {
+      "types": "string",
+      "value": null
+    },
+    "expected": {
+      "value": null,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_StringType",
+    "kind": "handleString",
+    "args": {
+      "types": "string",
+      "value": "test-value"
+    },
+    "expected": {
+      "value": "test-value",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertCondition_EmptyCondition",
+    "kind": "convertCondition",
+    "args": {
+      "condition": ""
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertCondition_SimpleCondition",
+    "kind": "convertCondition",
+    "args": {
+      "condition": "field == value"
+    },
+    "expected": {
+      "value": "field == value",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertConditions_EmptyConditions",
+    "kind": "convertConditions",
+    "args": {
+      "conditions": ""
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertConditions_MultipleConditions",
+    "kind": "convertConditions",
+    "args": {
+      "conditions": "field1 == value1 AND field2 == value2"
+    },
+    "expected": {
+      "value": "field1 == value1 AND field2 == value2",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_DeepDiveData_NilValue",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "field"
+      ],
+      "value": null
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "go": "Unexpected type: \u003cnil\u003e (code: WORK_FLOW_EXECUTOR_VAL_001)"
+      }
+    }
+  },
+  {
+    "source": "TestSelectorService_DeepDiveData_EmptyPath",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [],
+      "value": {
+        "field": "value"
+      }
+    },
+    "expected": {
+      "value": {
+        "field": "value"
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_NilValue",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [],
+      "value": "",
+      "valueParts": []
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_EmptyParts",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [],
+      "value": "test-value",
+      "valueParts": []
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_NilValue",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "selector-id",
+      "value": null,
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "source_expected": false,
+    "expected": {
+      "value": false,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_EmptyValue",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "selector-id",
+      "value": "",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "source_expected": false,
+    "expected": {
+      "value": false,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_SplitNestedRegexSelector_EmptySelector",
+    "kind": "splitNestedRegexSelector",
+    "args": {
+      "selector": ""
+    },
+    "expected": {
+      "value": [
+        ""
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_SplitNestedRegexSelector_SimpleSelector",
+    "kind": "splitNestedRegexSelector",
+    "args": {
+      "selector": "regex(pattern)"
+    },
+    "expected": {
+      "value": [
+        "regex(pattern)"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveLaneSelector_EmptySelector",
+    "kind": "resolveLaneSelector",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "",
+      "selectorID": "selector-id",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveLaneSelector_InvalidSelector",
+    "kind": "resolveLaneSelector",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "invalid-selector",
+      "selectorID": "selector-id",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_GenerateTimeStamp_ReturnsValidTimestamp",
+    "kind": "generateTimeStamp",
+    "args": {
+      "part": ""
+    },
+    "volatile": true,
+    "expected": {
+      "value": 1786144304468,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_GenerateTimeStamp_PartSelectors",
+    "kind": "generateTimeStamp",
+    "args": {
+      "part": "z"
+    },
+    "source_expected": -1,
+    "volatile": true,
+    "expected": {
+      "value": -1,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessSelectors_WithError",
+    "kind": "processSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "request": {
+        "field1": {
+          "value": "test-value",
+          "selector_id": "selector-1"
+        }
+      },
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": {
+        "field1": {
+          "selector_id": "selector-1",
+          "value": ""
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_TraverseAndProcess_NestedMap",
+    "kind": "traverseAndProcess",
+    "args": {
+      "data": {
+        "level1": {
+          "level2": {
+            "field": "value"
+          }
+        }
+      },
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": {
+        "level1": {
+          "level2": {
+            "field": "value"
+          }
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessMap_WithNestedData",
+    "kind": "processMap",
+    "args": {
+      "dataMap": {
+        "field1": "value1",
+        "field2": {
+          "nested": "nested-value"
+        }
+      },
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": {
+        "field1": "value1",
+        "field2": {
+          "nested": "nested-value"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertFieldMappings_WithMapData",
+    "kind": "convertFieldMappings",
+    "args": {
+      "data": {
+        "field1": "value1",
+        "field2": "value2"
+      }
+    },
+    "expected": {
+      "value": {
+        "field1": "value1",
+        "field2": "value2"
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertArrayToObject_WithArrayData",
+    "kind": "convertArrayToObject",
+    "args": {
+      "data": [
+        {
+          "key": "value1"
+        },
+        {
+          "key": "value2"
+        }
+      ]
+    },
+    "expected": {
+      "value": {},
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertArrayToObjectDataSet_WithArrayData",
+    "kind": "convertArrayToObjectDataSet",
+    "args": {
+      "data": [
+        {
+          "key": "value1"
+        },
+        {
+          "key": "value2"
+        }
+      ]
+    },
+    "expected": {
+      "value": {},
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessArrayItems_WithMultipleFields",
+    "kind": "processArrayItems",
+    "args": {
+      "fields": [
+        "field1",
+        "field2",
+        "field3"
+      ],
+      "items": {
+        "field1": "value1",
+        "field2": "value2",
+        "field3": "value3"
+      }
+    },
+    "expected": {
+      "value": [],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_SplitSelector_NestedPath",
+    "kind": "splitSelector",
+    "args": {
+      "selector": "parent.child.grandchild"
+    },
+    "expected": {
+      "value": [
+        "parent",
+        "child",
+        "grandchild"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExtractValue_WithNestedPath",
+    "kind": "extractValue",
+    "args": {
+      "data": {
+        "parent": {
+          "child": "value"
+        }
+      },
+      "path": [
+        "parent",
+        "child"
+      ]
+    },
+    "expected": {
+      "value": "value",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_UpdateSelectorValue_WithUpdation",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "field.subfield",
+      "selectorID": "selector-id",
+      "selectorValue": "new-value",
+      "updation": "replace",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_WithIntType",
+    "kind": "handleString",
+    "args": {
+      "types": "int",
+      "value": 123
+    },
+    "expected": {
+      "value": 123,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertCondition_ComplexCondition",
+    "kind": "convertCondition",
+    "args": {
+      "condition": "field1 == 'value1' AND field2 \u003e 10"
+    },
+    "expected": {
+      "value": "field1 == 'value1' AND field2 \u003e 10",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ConvertConditions_WithOperators",
+    "kind": "convertConditions",
+    "args": {
+      "conditions": "(field1 == 'value1' AND field2 == 'value2') OR field3 == 'value3'"
+    },
+    "expected": {
+      "value": "(field1 == 'value1' AND field2 == 'value2') OR field3 == 'value3'",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_DeepDiveData_WithNestedStructure",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "level1",
+        "level2"
+      ],
+      "value": {
+        "level1": {
+          "level2": "value"
+        }
+      }
+    },
+    "expected": {
+      "value": "value",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_WithValidParts",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "selector1",
+        "selector2"
+      ],
+      "value": "test-value",
+      "valueParts": [
+        "part1",
+        "part2"
+      ]
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_WithValidValue",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "selector-id",
+      "value": "test-value",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_SplitNestedRegexSelector_WithRegexPattern",
+    "kind": "splitNestedRegexSelector",
+    "args": {
+      "selector": "regex(pattern1).regex(pattern2)"
+    },
+    "expected": {
+      "value": [
+        "regex(pattern1)",
+        "regex(pattern2)"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveLaneSelector_WithValidLaneSelector",
+    "kind": "resolveLaneSelector",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "parent-uuid",
+      "selector": "lane.property",
+      "selectorID": "selector-id",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "workflow-uuid"
+    },
+    "repo": {
+      "ExtractLanePropertiesByLaneCode": {
+        "returns": [
+          "lane-value",
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExtractValue_ArrayIndex",
+    "kind": "extractValue",
+    "args": {
+      "data": {
+        "items": [
+          "a",
+          "b",
+          "c"
+        ]
+      },
+      "path": [
+        "items[1]"
+      ]
+    },
+    "source_expected": "b",
+    "expected": {
+      "value": "b",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExtractValue_InvalidArrayIndex",
+    "kind": "extractValue",
+    "args": {
+      "data": {
+        "items": [
+          "a"
+        ]
+      },
+      "path": [
+        "items[abc]"
+      ]
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExtractValue_ArrayIndexOutOfBounds",
+    "kind": "extractValue",
+    "args": {
+      "data": {
+        "items": [
+          "a"
+        ]
+      },
+      "path": [
+        "items[5]"
+      ]
+    },
+    "expected": {
+      "value": null,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExtractValue_KeyNotFound",
+    "kind": "extractValue",
+    "args": {
+      "data": {
+        "key": "val"
+      },
+      "path": [
+        "missing"
+      ]
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExtractValue_NotAnArray",
+    "kind": "extractValue",
+    "args": {
+      "data": {
+        "key": "val"
+      },
+      "path": [
+        "key[0]"
+      ]
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExtractValue_TopLevelArray",
+    "kind": "extractValue",
+    "args": {
+      "data": [
+        {
+          "name": "first"
+        },
+        {
+          "name": "second"
+        }
+      ],
+      "path": [
+        "[1]"
+      ]
+    },
+    "expected": {
+      "value": {
+        "name": "second"
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExtractValue_TopLevelArrayNoIndex",
+    "kind": "extractValue",
+    "args": {
+      "data": [
+        "a",
+        "b"
+      ],
+      "path": [
+        "key"
+      ]
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExtractValue_UnexpectedType",
+    "kind": "extractValue",
+    "args": {
+      "data": "string_data",
+      "path": [
+        "key"
+      ]
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_BoolToString",
+    "kind": "handleString",
+    "args": {
+      "types": "string",
+      "value": true
+    },
+    "source_expected": "true",
+    "expected": {
+      "value": "true",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_IntToString",
+    "kind": "handleString",
+    "args": {
+      "types": "string",
+      "value": {
+        "$int": 42
+      }
+    },
+    "source_expected": "42",
+    "expected": {
+      "value": "42",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_Int64ToString",
+    "kind": "handleString",
+    "args": {
+      "types": "string",
+      "value": {
+        "$int": 100
+      }
+    },
+    "source_expected": "100",
+    "expected": {
+      "value": "100",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_HandleString_Float32ToString",
+    "kind": "handleString",
+    "args": {
+      "types": "string",
+      "value": 3.14
+    },
+    "expected": {
+      "value": "3.140000",
+      "error": null
+    }
+  }
+]

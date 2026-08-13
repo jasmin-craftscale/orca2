@@ -64,7 +64,10 @@ public enum CoreErrorCode implements ErrorCode {
 	LANE_UNKNOWN("LANE_UNKNOWN", 422),
 
 	/** The submitted rule set names the same (screen, lane) pair twice. */
-	ROUTING_RULE_DUPLICATE("ROUTING_RULE_DUPLICATE", 422);
+	ROUTING_RULE_DUPLICATE("ROUTING_RULE_DUPLICATE", 422),
+
+	/** A custom-entity declaration violates its closed identifier, key or type-shape rules. */
+	CUSTOM_ENTITY_DECLARATION_INVALID("CUSTOM_ENTITY_DECLARATION_INVALID", 422);
 
 	private final String code;
 	private final int httpStatus;

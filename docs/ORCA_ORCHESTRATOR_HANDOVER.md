@@ -97,7 +97,7 @@ Taken by the product owner on 6 August 2026 unless noted. Each cascaded further 
 | **Keep the ORCA workflow builder; compile BPMN behind it** | Reverses the authoring half of ADR-006. The engine half stands |
 | **Microsoft SQL Server only. PostgreSQL deferred** | Keep the engine seam; build no second implementation |
 | **Keycloak stays** | With three trims: settle decision 7, de-fork the themes, drop the unused jar |
-| **React for the console** | Closed earlier |
+| **Angular for all frontends; Foblex Flow as the builder canvas** | Re-ruled 12 Aug 2026, superseding the earlier React/reactflow rulings — register items 3 and 15 carry the rationale and the verified licence facts |
 | **Availability: sell the arrangement, commit RTO/RPO after measurement** | A number invented before the device-retry characterisation becomes contractual |
 | **Java 25, Spring Boot 4.0.7, Gradle Kotlin DSL, `com.lynxis.orca`** | Java 25 is LTS; a non-LTS JVM is unsuitable for an unattended appliance |
 | **Each service owns its own migrations** | A schema defined outside the service that owns it is not owned by it |
@@ -115,7 +115,7 @@ The ones that gate work:
 - **NEW-1b** — whether the cloud tier is one instance per customer or one shared instance. Decides the whole tier's shape.
 - **Spike 1** — whether Flowable can start exactly one process when two device events for the same truck arrive simultaneously. Gates the engine decision, and therefore runtime.
 - **NEW-2** — who owns ORCA 1.x. Existing customers stay on it, and it has a documented security posture and no maintainer.
-- **The frontend is unstaffed.** Two React applications, the kiosk mode and both builders are not among the seven services and are not covered by four backend developers.
+- **The frontend is partly unstaffed.** The applications are Angular (re-ruled 12 Aug 2026): the workflow builder — UI, API and design storage — became stream 5 on 12 Aug; the operator console and the kiosk still have no owner.
 
 ---
 
@@ -262,7 +262,7 @@ These are not preferences. Each was learned by getting it wrong.
 
 - ✅ **The repository is hosted** (`github.com:jasmin-craftscale/orca2`). CI exists but its triggers still name only `main` and `phase-*`, so nothing fires for `feature/*` → `develop` — handed to devops, not fixed here.
 - **The vendor call (register NEW-4).** Does the .NET device host validate the `Authorization` token on the barrier command? It blocks the first real device host; the brief is `docs/device-host-outbound-from-1x.md` §3.
-- **The frontend is unstaffed** — two React apps, the kiosk, both builders. Nothing can be demoed to a customer without it.
+- **The frontend is partly unstaffed** — Angular now (12 Aug 2026): the workflow builder is stream 5; the operator console and the kiosk still have no owner, and nothing can be demoed to a customer without the console.
 - **The builder-developer** owns the BPMN service-task boundary-timer question (`docs/BPMN_EXECUTION_PROFILE.md` §8) and should see the profile.
 
 ### For a fresh orchestrator session

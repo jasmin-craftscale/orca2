@@ -1,0 +1,1158 @@
+[
+  {
+    "source": "TestSelectorService_FetchCDLScanData_ValidWithFirstName",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "first_name"
+      ],
+      "value": "DACJOHN",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "first_name"
+      ]
+    },
+    "source_expected": "JOHN",
+    "expected": {
+      "value": "JOHN",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_UnknownField",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "unknown_field"
+      ],
+      "value": "DCSSMITH",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "unknown_field"
+      ]
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_UpdateSelectorValue_PushToSlice",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "push($.wf.workflowExecution.status)",
+      "selectorID": "push($.wf.workflowExecution.status)",
+      "selectorValue": [
+        "a"
+      ],
+      "updation": "push($.wf.workflowExecution.status)",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchWorkflowExecutionData": {
+        "returns": [
+          "pushed-val",
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": [
+        "a",
+        "pushed-val"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_UpdateSelectorValue_PushToNil",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "push($.wf.workflowExecution.status)",
+      "selectorID": "push($.wf.workflowExecution.status)",
+      "selectorValue": null,
+      "updation": "push($.wf.workflowExecution.status)",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchWorkflowExecutionData": {
+        "returns": [
+          "new-val",
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": [
+        "new-val"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_UpdateSelectorValue_PushToEmpty",
+    "kind": "updateSelectorValue",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "push($.wf.workflowExecution.status)",
+      "selectorID": "push($.wf.workflowExecution.status)",
+      "selectorValue": "",
+      "updation": "push($.wf.workflowExecution.status)",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchWorkflowExecutionData": {
+        "returns": [
+          "new-val",
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": [
+        "new-val"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_NodeSelector",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.wf-uuid.node.node-uuid.response",
+      "selectorID": "$.wf-uuid.node.node-uuid.response",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchNodeExecution": {
+        "returns": [
+          {},
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_GetPrimaryKeyRecordNotFound",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.wf-uuid.node.node-uuid.response",
+      "selectorID": "$.wf-uuid.node.node-uuid.response",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          0,
+          {
+            "gorm_not_found": true
+          }
+        ]
+      }
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "dto": "record not found"
+      }
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_WithUpdation",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.wf-uuid.workflowExecution.status@increment",
+      "selectorID": "$.wf-uuid.workflowExecution.status@increment",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "FetchWorkflowExecutionData": {
+        "returns": [
+          "5",
+          null
+        ]
+      },
+      "GetPreviousWorkflowExecutionID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      }
+    },
+    "source_expected": 6,
+    "expected": {
+      "value": 6,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveSelectors_LaneSelector",
+    "kind": "resolveSelectors",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.lane.LC001.name",
+      "selectorID": "$.lane.LC001.name",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "ExtractLanePropertiesByLaneCode": {
+        "returns": [
+          "lane-value",
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_SplitNestedRegexSelector_RegexWithParams",
+    "kind": "splitNestedRegexSelector",
+    "args": {
+      "selector": "$.helper.regex.isMatch(pattern,value)"
+    },
+    "source_expected": [
+      "helper",
+      "regex",
+      "isMatch(pattern,value)"
+    ],
+    "expected": {
+      "value": [
+        "helper",
+        "regex",
+        "isMatch(pattern,value)"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_SplitNestedRegexSelector_RegexWithIndex",
+    "kind": "splitNestedRegexSelector",
+    "args": {
+      "selector": "$.helper.regex.getMatches(pattern,value)[0]"
+    },
+    "source_expected": [
+      "helper",
+      "regex",
+      "getMatches(pattern,value)[0]",
+      "[0]"
+    ],
+    "expected": {
+      "value": [
+        "helper",
+        "regex",
+        "getMatches(pattern,value)[0]",
+        "[0]"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_SplitNestedRegexSelector_StandardSelector",
+    "kind": "splitNestedRegexSelector",
+    "args": {
+      "selector": "$.workflow.dataset.key"
+    },
+    "source_expected": [
+      "workflow",
+      "dataset",
+      "key"
+    ],
+    "expected": {
+      "value": [
+        "workflow",
+        "dataset",
+        "key"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_SplitNestedRegexSelector_StandardWithIndex",
+    "kind": "splitNestedRegexSelector",
+    "args": {
+      "selector": "$.workflow.dataset.items[0]"
+    },
+    "source_expected": [
+      "workflow",
+      "dataset",
+      "items[0]",
+      "[0]"
+    ],
+    "expected": {
+      "value": [
+        "workflow",
+        "dataset",
+        "items[0]",
+        "[0]"
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_MiddleName",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "middle_name"
+      ],
+      "value": "DCTJOHN\nDACJOHN\nDCSMIDDLE",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "middle_name"
+      ]
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_LicenseNumber",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "license_number"
+      ],
+      "value": "DAQD1234567",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "license_number"
+      ]
+    },
+    "source_expected": "D1234567",
+    "expected": {
+      "value": "D1234567",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_IntNonZero2",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel",
+      "value": 42,
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf"
+    },
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_IntZero2",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel",
+      "value": [
+        "a",
+        "b"
+      ],
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf"
+    },
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessArrayItems_ArrayType",
+    "kind": "processArrayItems",
+    "args": {
+      "fields": null,
+      "items": {
+        "field": [
+          {
+            "key": "nested",
+            "value": "ignored",
+            "type": "array",
+            "items": {
+              "field": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "type": "string"
+                }
+              ]
+            },
+            "fields": []
+          }
+        ]
+      }
+    },
+    "expected": {
+      "value": [
+        {
+          "nested": [
+            {
+              "id": "1"
+            }
+          ]
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ProcessArrayItems_ArrayNoItems",
+    "kind": "processArrayItems",
+    "args": {
+      "fields": null,
+      "items": {
+        "field": [
+          {
+            "key": "nested",
+            "value": "ignored",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    "expected": {
+      "value": [
+        {
+          "nested": []
+        }
+      ],
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_GetResourceConfigurations_LaneType",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "key1",
+      "resourceType": "lane",
+      "resourceUUID": "uuid-1"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "{\"setting\":\"value\"}",
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Success",
+        "code": 0,
+        "message": "Resource configurations retrieved successfully",
+        "data": "{\"setting\":\"value\"}",
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_GetResourceConfigurations_DeviceType",
+    "kind": "getResourceConfigurations",
+    "args": {
+      "configKey": "key1",
+      "resourceType": "device",
+      "resourceUUID": "uuid-1"
+    },
+    "repo": {
+      "GetPrimaryKeyByUUID": {
+        "returns": [
+          1,
+          null
+        ]
+      },
+      "GetResourceConfigurations": {
+        "returns": [
+          "{\"setting\":\"value\"}",
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": {
+        "status": "Success",
+        "code": 0,
+        "message": "Resource configurations retrieved successfully",
+        "data": "{\"setting\":\"value\"}",
+        "request_id": "fixture-conformance",
+        "timestamp": ""
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveLaneSelector_Simple",
+    "kind": "resolveLaneSelector",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.lane(LC001).name",
+      "selectorID": "$.lane(LC001).name",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "repo": {
+      "ExtractLanePropertiesByLaneCode": {
+        "returns": [
+          "lane-value",
+          null
+        ]
+      }
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ResolveLaneSelector_MissingCloseParen",
+    "kind": "resolveLaneSelector",
+    "args": {
+      "parentExecutionWorkflowID": 0,
+      "parentWorkflowUUID": "",
+      "selector": "$.lane(LC001.name",
+      "selectorID": "$.lane(LC001.name",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf-uuid"
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestExtractKeyAndIndex_NoBracketClose",
+    "kind": "extractKeyAndIndex",
+    "args": {
+      "input": "items[2"
+    },
+    "source_expected": {
+      "key": "items[2",
+      "index": -1
+    },
+    "expected": {
+      "value": {
+        "index": -1,
+        "key": "items[2"
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestToUpperCaseFunction_EmptyArgs",
+    "kind": "toUpperCaseFunction",
+    "args": {
+      "selector": "toUpper()",
+      "selectorParts": null
+    },
+    "expected": {
+      "value": "",
+      "error": {
+        "go": "No arguments found"
+      }
+    }
+  },
+  {
+    "source": "TestToUpperCaseFunction_NoArgsParsed",
+    "kind": "toUpperCaseFunction",
+    "args": {
+      "selector": "toUpper(   )",
+      "selectorParts": null
+    },
+    "source_expected": "",
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_ExpirationDate",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "expiration_date"
+      ],
+      "value": "DBA01012030",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "expiration_date"
+      ]
+    },
+    "expected": {
+      "value": "01/01/2030",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_DateOfBirth",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "date_of_birth"
+      ],
+      "value": "DBB01011990",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "date_of_birth"
+      ]
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_IssueDate",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "issue_date"
+      ],
+      "value": "DBD01012020",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "issue_date"
+      ]
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_Sex",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "sex"
+      ],
+      "value": "DBC1",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "sex"
+      ]
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_EyeColor",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "eye_color"
+      ],
+      "value": "DAYBRO",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "eye_color"
+      ]
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_Height",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "height"
+      ],
+      "value": "DAU510",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "height"
+      ]
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_AddressStreet",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "address_street"
+      ],
+      "value": "DAG123 MAIN ST",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "address_street"
+      ]
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_AddressCity",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "address_city"
+      ],
+      "value": "DAIANYTOWN",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "address_city"
+      ]
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_AddressState",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "address_state"
+      ],
+      "value": "DAJCA",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "address_state"
+      ]
+    },
+    "expected": {
+      "value": "CA",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_FetchCDLScanData_AddressZip",
+    "kind": "fetchCDLScanData",
+    "args": {
+      "selectorIDParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "address_zip"
+      ],
+      "value": "DAK12345",
+      "valueParts": [
+        "helper",
+        "getcdldata",
+        "parse",
+        "address_zip"
+      ]
+    },
+    "expected": {
+      "value": "",
+      "error": null
+    }
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_Channel",
+    "kind": "skip",
+    "args": {},
+    "skip": "value is a Go channel (make(chan int)), not JSON-representable"
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_NilChannel",
+    "kind": "skip",
+    "args": {},
+    "skip": "value is a nil Go channel, not JSON-representable"
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_Func",
+    "kind": "skip",
+    "args": {},
+    "skip": "value is a Go function value, not JSON-representable"
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_NilFunc",
+    "kind": "skip",
+    "args": {},
+    "skip": "value is a nil Go function value, not JSON-representable"
+  },
+  {
+    "source": "TestSelectorService_ExistsHelperFunction_Interface",
+    "kind": "existsHelperFunction",
+    "args": {
+      "selectorID": "sel",
+      "value": "hello",
+      "workflowExecutionID": 1,
+      "workflowExecutionUUID": "wf"
+    },
+    "expected": {
+      "value": true,
+      "error": null
+    }
+  },
+  {
+    "source": "TestExtractKeyAndIndex_EmptyBrackets",
+    "kind": "extractKeyAndIndex",
+    "args": {
+      "input": "items[]"
+    },
+    "source_expected": {
+      "key": "items[]",
+      "index": -1
+    },
+    "expected": {
+      "value": {
+        "index": -1,
+        "key": "items[]"
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestExtractKeyAndIndex_NegativeIndex",
+    "kind": "extractKeyAndIndex",
+    "args": {
+      "input": "items[-1]"
+    },
+    "source_expected": {
+      "key": "items[-1]",
+      "index": -1
+    },
+    "expected": {
+      "value": {
+        "index": -1,
+        "key": "items[-1]"
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "TestNewSelectorService_ReturnsInterface",
+    "kind": "skip",
+    "args": {},
+    "skip": "constructor smoke test (NewSelectorService), not a dispatchable evaluation"
+  },
+  {
+    "source": "TestConvertCondition_EqOperator",
+    "kind": "convertCondition",
+    "args": {
+      "condition": "field eq value"
+    },
+    "source_expected": "field = 'value'",
+    "expected": {
+      "value": "field = 'value'",
+      "error": null
+    }
+  },
+  {
+    "source": "TestConvertCondition_NeqOperator",
+    "kind": "convertCondition",
+    "args": {
+      "condition": "field neq value"
+    },
+    "source_expected": "field != 'value'",
+    "expected": {
+      "value": "field != 'value'",
+      "error": null
+    }
+  },
+  {
+    "source": "TestConvertCondition_LtOperator",
+    "kind": "convertCondition",
+    "args": {
+      "condition": "field lt value"
+    },
+    "source_expected": "field \u003c 'value'",
+    "expected": {
+      "value": "field \u003c 'value'",
+      "error": null
+    }
+  },
+  {
+    "source": "TestConvertCondition_LeOperator",
+    "kind": "convertCondition",
+    "args": {
+      "condition": "field le value"
+    },
+    "source_expected": "field \u003c= 'value'",
+    "expected": {
+      "value": "field \u003c= 'value'",
+      "error": null
+    }
+  },
+  {
+    "source": "TestConvertCondition_GtOperator",
+    "kind": "convertCondition",
+    "args": {
+      "condition": "field gt value"
+    },
+    "source_expected": "field \u003e 'value'",
+    "expected": {
+      "value": "field \u003e 'value'",
+      "error": null
+    }
+  },
+  {
+    "source": "TestConvertCondition_GeOperator",
+    "kind": "convertCondition",
+    "args": {
+      "condition": "field ge value"
+    },
+    "source_expected": "field \u003e= 'value'",
+    "expected": {
+      "value": "field \u003e= 'value'",
+      "error": null
+    }
+  },
+  {
+    "source": "TestConvertCondition_LikeOperator",
+    "kind": "convertCondition",
+    "args": {
+      "condition": "field like value"
+    },
+    "source_expected": "field LIKE 'value'",
+    "expected": {
+      "value": "field LIKE 'value'",
+      "error": null
+    }
+  },
+  {
+    "source": "TestConvertCondition_NoMatchReturnsOriginal",
+    "kind": "convertCondition",
+    "args": {
+      "condition": "field unknown value"
+    },
+    "source_expected": "field unknown value",
+    "expected": {
+      "value": "field unknown value",
+      "error": null
+    }
+  },
+  {
+    "source": "TestDeepDiveData_MapKeyWithIndex",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "items[1]"
+      ],
+      "value": {
+        "items": [
+          "a",
+          "b",
+          "c"
+        ]
+      }
+    },
+    "source_expected": "b",
+    "expected": {
+      "value": "b",
+      "error": null
+    }
+  },
+  {
+    "source": "TestDeepDiveData_MapEmptyKeyError",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "[0]"
+      ],
+      "value": {
+        "k": "v"
+      }
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "go": "cannot use index on a map (code: WORK_FLOW_EXECUTOR_VAL_001)"
+      }
+    }
+  },
+  {
+    "source": "TestDeepDiveData_MapKeyNotFound",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "missing"
+      ],
+      "value": {
+        "k": "v"
+      }
+    },
+    "expected": {
+      "value": null,
+      "error": {
+        "go": "key not found: missing (code: WORK_FLOW_EXECUTOR_VAL_001)"
+      }
+    }
+  },
+  {
+    "source": "TestDeepDiveData_ArrayWithIndex",
+    "kind": "deepDiveData",
+    "args": {
+      "parts": [
+        "[2]"
+      ],
+      "value": [
+        "x",
+        "y",
+        "z"
+      ]
+    },
+    "source_expected": "z",
+    "expected": {
+      "value": "z",
+      "error": null
+    }
+  }
+]

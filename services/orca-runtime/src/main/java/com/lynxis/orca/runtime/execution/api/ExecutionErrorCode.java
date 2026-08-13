@@ -52,7 +52,18 @@ public enum ExecutionErrorCode implements ErrorCode {
 	 * "you asked for a status that does not exist", which is the reading that sends
 	 * somebody looking for a fault in the gate.
 	 */
-	VISIT_FILTER_UNKNOWN_STATUS("VISIT_FILTER_UNKNOWN_STATUS", 422);
+	VISIT_FILTER_UNKNOWN_STATUS("VISIT_FILTER_UNKNOWN_STATUS", 422),
+
+	/**
+	 * The designer draft in the request body could not be read as a publish payload.
+	 *
+	 * <p>400, and only for the namespace route. The validate route deliberately
+	 * answers {@code 200} with {@code compiles=false} instead — an unreadable draft
+	 * is still an answer the builder can draw ("not publishable, and here is why"),
+	 * but a namespace cannot be computed from a payload that has no graph, so there
+	 * is nothing truthful to return but the refusal.
+	 */
+	DRAFT_UNREADABLE("DRAFT_UNREADABLE", 400);
 
 	private final String code;
 	private final int httpStatus;

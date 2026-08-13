@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:orca="http://lynxis.com/orca"
+             targetNamespace="http://lynxis.com/orca">
+  <process id="proc_10000090" name="PLT Best Match Reservation@3" isExecutable="true">
+    <startEvent id="n_c14a0e03-8833-406c-b271-9b70d2a77abb" name="START"/>
+    <endEvent id="n_a3c20a4f-600f-4e1d-866b-da8c5fa78c58" name="End Process - Send Results"/>
+    <exclusiveGateway id="n_edc65369-317f-404e-bb08-0ef099d4a224" name="Results set to 0" default="flow_2"/>
+    <exclusiveGateway id="n_d7fdd682-3080-4a7f-bdc9-d74b2a49a665" name="Truck eligible?" default="flow_4"/>
+    <exclusiveGateway id="n_edbd3fa1-f2cf-44d1-8634-43a2eca07d32" name="Load type?" default="flow_7"/>
+    <exclusiveGateway id="n_279d52c6-f97d-441c-a3c4-692c5ef3f567" name="Empty type?" default="flow_9"/>
+    <exclusiveGateway id="n_a3fe031f-a3a4-4dd7-b14a-66d435021889" name="Evaluate Best Match" default="flow_11"/>
+    <serviceTask id="n_dd55c930-c8b3-46e4-b525-0a3c086eccb7" name="TRS Truck Lookup" flowable:delegateExpression="${orcaConnectorDelegate}" orca:kind="effect"/>
+    <serviceTask id="n_86991959-f122-461f-a142-3f03edfd16ca" name="Validated Reservations - Loaded" flowable:delegateExpression="${orcaConnectorDelegate}" orca:kind="effect"/>
+    <serviceTask id="n_94083897-40bb-40bb-b806-345660aed74d" name="Validated Reservations - Generic Empty" flowable:delegateExpression="${orcaConnectorDelegate}" orca:kind="effect"/>
+    <serviceTask id="n_c0f282be-56de-4981-90db-d9f1e24fa6ae" name="Validated Reservations - Specific Empty" flowable:delegateExpression="${orcaConnectorDelegate}" orca:kind="effect"/>
+    <serviceTask id="n_288f22e0-e2ac-4d1b-b116-5ecd06a38e65" name="Validated Reservations - Bobtail" flowable:delegateExpression="${orcaConnectorDelegate}" orca:kind="effect"/>
+    <sequenceFlow id="flow_1" sourceRef="n_c14a0e03-8833-406c-b271-9b70d2a77abb" targetRef="n_dd55c930-c8b3-46e4-b525-0a3c086eccb7"/>
+    <sequenceFlow id="flow_2" sourceRef="n_edc65369-317f-404e-bb08-0ef099d4a224" targetRef="n_a3c20a4f-600f-4e1d-866b-da8c5fa78c58"/>
+    <sequenceFlow id="flow_3" sourceRef="n_d7fdd682-3080-4a7f-bdc9-d74b2a49a665" targetRef="n_edbd3fa1-f2cf-44d1-8634-43a2eca07d32">
+      <extensionElements>
+        <orca:field var="v_workflow_dataset_plt_truck_active" selector="$.workflow.dataset.plt_truck_active"/>
+        <orca:field var="v_workflow_dataset_plt_truck_banned" selector="$.workflow.dataset.plt_truck_banned"/>
+        <orca:field var="v_workflow_dataset_plt_truck_program_status" selector="$.workflow.dataset.plt_truck_program_status"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orca:grp(((orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_truck_active&apos;, null), &apos;true&apos;) and orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_truck_banned&apos;, null), &apos;false&apos;)) and orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_truck_program_status&apos;, null), &apos;1&apos;)))}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_4" sourceRef="n_d7fdd682-3080-4a7f-bdc9-d74b2a49a665" targetRef="n_edc65369-317f-404e-bb08-0ef099d4a224"/>
+    <sequenceFlow id="flow_5" sourceRef="n_edbd3fa1-f2cf-44d1-8634-43a2eca07d32" targetRef="n_86991959-f122-461f-a142-3f03edfd16ca">
+      <extensionElements>
+        <orca:field var="v_workflow_dataset_plt_trs_load_type" selector="$.workflow.dataset.plt_trs_load_type"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orca:grp(orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_trs_load_type&apos;, null), &apos;Loaded&apos;))}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_6" sourceRef="n_edbd3fa1-f2cf-44d1-8634-43a2eca07d32" targetRef="n_279d52c6-f97d-441c-a3c4-692c5ef3f567">
+      <extensionElements>
+        <orca:field var="v_workflow_dataset_plt_trs_load_type" selector="$.workflow.dataset.plt_trs_load_type"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orca:grp(orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_trs_load_type&apos;, null), &apos;Empty&apos;))}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_7" sourceRef="n_edbd3fa1-f2cf-44d1-8634-43a2eca07d32" targetRef="n_288f22e0-e2ac-4d1b-b116-5ecd06a38e65"/>
+    <sequenceFlow id="flow_8" sourceRef="n_279d52c6-f97d-441c-a3c4-692c5ef3f567" targetRef="n_94083897-40bb-40bb-b806-345660aed74d">
+      <extensionElements>
+        <orca:field var="v_workflow_dataset_plt_trs_generic_empty" selector="$.workflow.dataset.plt_trs_generic_empty"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orca:grp(orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_trs_generic_empty&apos;, null), &apos;true&apos;))}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_9" sourceRef="n_279d52c6-f97d-441c-a3c4-692c5ef3f567" targetRef="n_c0f282be-56de-4981-90db-d9f1e24fa6ae"/>
+    <sequenceFlow id="flow_10" sourceRef="n_a3fe031f-a3a4-4dd7-b14a-66d435021889" targetRef="n_a3c20a4f-600f-4e1d-866b-da8c5fa78c58">
+      <extensionElements>
+        <orca:field var="v_workflow_dataset_plt_bm_found" selector="$.workflow.dataset.plt_bm_found"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orca:grp(orca:cmp(&apos;is equal to&apos;, variables:getOrDefault(&apos;v_workflow_dataset_plt_bm_found&apos;, null), &apos;true&apos;))}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_11" sourceRef="n_a3fe031f-a3a4-4dd7-b14a-66d435021889" targetRef="n_edc65369-317f-404e-bb08-0ef099d4a224"/>
+    <exclusiveGateway id="gw_resp_1" name="status of TRS Truck Lookup" default="flow_15"/>
+    <sequenceFlow id="flow_12" sourceRef="n_dd55c930-c8b3-46e4-b525-0a3c086eccb7" targetRef="gw_resp_1"/>
+    <sequenceFlow id="flow_13" sourceRef="gw_resp_1" targetRef="n_d7fdd682-3080-4a7f-bdc9-d74b2a49a665">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 200}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_14" sourceRef="gw_resp_1" targetRef="n_edc65369-317f-404e-bb08-0ef099d4a224">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 404}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_15" sourceRef="gw_resp_1" targetRef="n_edc65369-317f-404e-bb08-0ef099d4a224"/>
+    <exclusiveGateway id="gw_resp_2" name="status of Validated Reservations - Loaded" default="flow_19"/>
+    <sequenceFlow id="flow_16" sourceRef="n_86991959-f122-461f-a142-3f03edfd16ca" targetRef="gw_resp_2"/>
+    <sequenceFlow id="flow_17" sourceRef="gw_resp_2" targetRef="n_a3fe031f-a3a4-4dd7-b14a-66d435021889">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 200}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_18" sourceRef="gw_resp_2" targetRef="n_edc65369-317f-404e-bb08-0ef099d4a224">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 404}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_19" sourceRef="gw_resp_2" targetRef="n_edc65369-317f-404e-bb08-0ef099d4a224"/>
+    <exclusiveGateway id="gw_resp_3" name="status of Validated Reservations - Generic Empty" default="flow_23"/>
+    <sequenceFlow id="flow_20" sourceRef="n_94083897-40bb-40bb-b806-345660aed74d" targetRef="gw_resp_3"/>
+    <sequenceFlow id="flow_21" sourceRef="gw_resp_3" targetRef="n_a3fe031f-a3a4-4dd7-b14a-66d435021889">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 200}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_22" sourceRef="gw_resp_3" targetRef="n_edc65369-317f-404e-bb08-0ef099d4a224">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 404}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_23" sourceRef="gw_resp_3" targetRef="n_edc65369-317f-404e-bb08-0ef099d4a224"/>
+    <exclusiveGateway id="gw_resp_4" name="status of Validated Reservations - Specific Empty" default="flow_27"/>
+    <sequenceFlow id="flow_24" sourceRef="n_c0f282be-56de-4981-90db-d9f1e24fa6ae" targetRef="gw_resp_4"/>
+    <sequenceFlow id="flow_25" sourceRef="gw_resp_4" targetRef="n_a3fe031f-a3a4-4dd7-b14a-66d435021889">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 200}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_26" sourceRef="gw_resp_4" targetRef="n_edc65369-317f-404e-bb08-0ef099d4a224">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 404}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_27" sourceRef="gw_resp_4" targetRef="n_edc65369-317f-404e-bb08-0ef099d4a224"/>
+    <exclusiveGateway id="gw_resp_5" name="status of Validated Reservations - Bobtail" default="flow_31"/>
+    <sequenceFlow id="flow_28" sourceRef="n_288f22e0-e2ac-4d1b-b116-5ecd06a38e65" targetRef="gw_resp_5"/>
+    <sequenceFlow id="flow_29" sourceRef="gw_resp_5" targetRef="n_a3fe031f-a3a4-4dd7-b14a-66d435021889">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 200}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_30" sourceRef="gw_resp_5" targetRef="n_edc65369-317f-404e-bb08-0ef099d4a224">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${orcaResponseStatus == 404}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_31" sourceRef="gw_resp_5" targetRef="n_edc65369-317f-404e-bb08-0ef099d4a224"/>
+  </process>
+</definitions>
