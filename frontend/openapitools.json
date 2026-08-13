@@ -1,0 +1,45 @@
+{
+  "$schema": "./node_modules/@openapitools/openapi-generator-cli/config.schema.json",
+  "spaces": 2,
+  "generator-cli": {
+    "version": "7.24.0",
+    "generators": {
+      "runtime": {
+        "generatorName": "typescript-angular",
+        "inputSpec": "../services/orca-runtime/src/main/resources/openapi/orca-runtime.yaml",
+        "output": "projects/api-client/src/lib/runtime",
+        "globalProperty": {
+          "apis": "WorkItems:Visits:Lanes:Presence:Designer",
+          "models": "",
+          "supportingFiles": ""
+        },
+        "additionalProperties": {
+          "providedInRoot": true,
+          "fileNaming": "kebab-case",
+          "apiModulePrefix": "Runtime",
+          "configurationPrefix": "Runtime",
+          "ngPackagrVersion": "22.0.0",
+          "ngVersion": "22.0.0"
+        }
+      },
+      "core": {
+        "generatorName": "typescript-angular",
+        "inputSpec": "../services/orca-core/src/main/resources/openapi/orca-core.yaml",
+        "output": "projects/api-client/src/lib/core",
+        "globalProperty": {
+          "apis": "Users:Roles:Teams:TeamRouting:Screens:Devices:DeviceCatalogs:ShiftTemplates:BreakTemplates:Settings:Workspace:Audit:CustomEntities:Entitlements:SiteBranding:ResourceConfigurations",
+          "models": "",
+          "supportingFiles": ""
+        },
+        "additionalProperties": {
+          "providedInRoot": true,
+          "fileNaming": "kebab-case",
+          "apiModulePrefix": "Core",
+          "configurationPrefix": "Core",
+          "ngPackagrVersion": "22.0.0",
+          "ngVersion": "22.0.0"
+        }
+      }
+    }
+  }
+}

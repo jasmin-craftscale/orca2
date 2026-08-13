@@ -1,0 +1,11 @@
+export * from './designer.service';
+import { DesignerService } from './designer.service';
+export * from './lanes.service';
+import { LanesService } from './lanes.service';
+export * from './presence.service';
+import { PresenceService } from './presence.service';
+export * from './visits.service';
+import { VisitsService } from './visits.service';
+export * from './work-items.service';
+import { WorkItemsService } from './work-items.service';
+export const APIS = [DesignerService, LanesService, PresenceService, VisitsService, WorkItemsService];

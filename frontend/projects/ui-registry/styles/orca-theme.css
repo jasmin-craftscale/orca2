@@ -1,0 +1,111 @@
+/*
+ * ORCA design tokens — DERIVED-FROM-1X.
+ *
+ * Every value here was extracted from the 1.x gate app (Bootstrap 5 + SCSS
+ * variables + a runtime CSS-variable layer), so the rewrite feels like the
+ * ORCA operators already know. Evidence: docs/frontend-from-1x.md — do not
+ * change a value here without updating the sheet.
+ *
+ * Site branding: 1.x lets each site override six brand colors at runtime
+ * (core owns site_color in 2.0). These tokens compile to plain CSS variables
+ * on :root, so a future branding service overrides them by setting the same
+ * variables — no rebuild, same mechanism as 1.x, minus its two defects
+ * (positional API mapping, divergent lighten/darken algorithms — the shades
+ * below are FIXED tokens; a branding feature must derive shades with one
+ * algorithm, in one place).
+ *
+ * Deliberately kept from 1.x even though off-palette (operators know them):
+ * queued #FE9900 and in-progress #576CF3 — tokenized here so they exist in
+ * exactly one place instead of being copy-pasted across grids.
+ */
+/* `static` is load-bearing: without it Tailwind prunes tokens no utility
+   references yet, and this file exists precisely so every future component
+   and the runtime site-branding override find the full set on :root. */
+@theme static {
+  /* Brand */
+  --color-primary: #296ff0;
+  --color-primary-light: #ecf2fe;
+  --color-primary-dark: #0f55d7;
+  --color-secondary: #ededed;
+  --color-secondary-dark: #e0e0e0;
+  --color-navy: #2b388f;
+  --color-cyan: #00adeb;
+
+  /* Surfaces */
+  --color-surface: #f9fafb;
+  --color-card: #ffffff;
+  --color-surface-subtle: #f6f8fb;
+  --color-table-header: #ecf2fe;
+  --color-row-divider: #ecf3ff;
+  --color-edge: #dee0e9;
+
+  /* Text */
+  --color-ink: #151618;
+  --color-ink-heading: #121010;
+  --color-ink-table-header: #344155;
+  --color-ink-muted: #777777;
+  --color-ink-label: #5d6479;
+  --color-ink-placeholder: #909090;
+
+  /* Status — semantic, shared vocabulary of every grid and chip */
+  --color-positive: #33c475;
+  --color-positive-text: #179952;
+  --color-positive-bg: #e7fff2;
+  --color-positive-tint: #e4f8ed;
+  --color-negative: #f06868;
+  --color-negative-bg: #ffeaea;
+  --color-negative-tint: #fef3f3;
+  --color-negative-edge: #f7aeae;
+  --color-negative-row: #fdeaea;
+  --color-neutral: #fda700;
+  --color-neutral-bg: #fff5e8;
+  --color-info: #296ff0;
+  --color-info-bg: #ebf2ff;
+  --color-idle: #8d8d8d;
+  --color-idle-bg: #f6f6f6;
+  --color-queued: #fe9900;
+  --color-queued-bg: #f5eff4;
+  --color-in-progress: #576cf3;
+  --color-in-progress-bg: #e5fafa;
+  --color-break: #ffbf00;
+  --color-alert: #ff5765;
+
+  /* Typography — Open Sans self-hosted (appliance has no internet; 1.x
+     self-hosts too). 1.x ships four font *families*; we use one family with
+     the four weights it actually meant: 400 / 500 / 600 / 700. */
+  --font-sans: 'Open Sans', ui-sans-serif, system-ui, sans-serif;
+  --text-base: 13px; /* the grid/base size operators see today */
+
+  /* Radius — 6px is 1.x's dominant radius (buttons, inputs, timers) */
+  --radius-chip: 4px;
+  --radius-status: 5px;
+  --radius-base: 6px;
+  --radius-card: 8px;
+  --radius-modal: 10px;
+
+  /* Shadows — the exact 1.x elevations (navy-tinted, very flat) */
+  --shadow-card: 0 0 2px 0 #d4dcfbf2;
+  --shadow-header: 3px 1px 13px 0 #0000000a;
+  --shadow-pill: 0 0.5px 2px rgba(43, 56, 143, 0.22);
+}
+
+/* The 1.x base feel: light grey canvas, near-black text, thin scrollbars. */
+@layer base {
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 4px;
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: #d9d9d9;
+    border-radius: 3px;
+  }
+  ::placeholder {
+    color: var(--color-ink-placeholder);
+  }
+}
