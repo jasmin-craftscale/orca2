@@ -287,6 +287,24 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "orca-console",
+      "name": "ORCA console (LOCAL DEV ONLY)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:4200/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
     }
   ],
   "scopeMappings": [
@@ -374,6 +392,22 @@
       "serviceAccountClientId": "orca-fleet",
       "realmRoles": [
         "orca-service"
+      ]
+    },
+    {
+      "username": "clerk",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "clerk@local.dev",
+      "firstName": "Demo",
+      "lastName": "Clerk",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "clerk",
+          "temporary": false
+        }
       ]
     }
   ]

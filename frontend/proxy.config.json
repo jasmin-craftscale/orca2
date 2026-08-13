@@ -1,0 +1,9 @@
+{
+  "/api/v1/work-items": { "target": "http://127.0.0.1:18082", "secure": false },
+  "/api/v1/visits": { "target": "http://127.0.0.1:18082", "secure": false },
+  "/api/v1/lanes": { "target": "http://127.0.0.1:18082", "secure": false },
+  "/api/v1/me/presence": { "target": "http://127.0.0.1:18082", "secure": false },
+  "/api/v1/operators": { "target": "http://127.0.0.1:18082", "secure": false },
+  "/api/v1/designer": { "target": "http://127.0.0.1:18082", "secure": false },
+  "/api/v1": { "target": "http://127.0.0.1:18081", "secure": false }
+}
