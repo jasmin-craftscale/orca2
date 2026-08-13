@@ -81,6 +81,7 @@ class WorkItemRoutingIT {
 					// No engine in this suite; completion is WorkItemLifecycleIT's.
 				},
 				laneExternalId -> Optional.empty(),
+				new com.lynxis.orca.runtime.readmodel.NoopLaneMonitorProjectionPort(),
 				transactions, SITE);
 
 		jdbc.update("INSERT INTO execution (external_id, site_external_id, lane_id, status) "

@@ -6,6 +6,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.lynxis.orca.runtime.execution.domain.ExecutionTables.Execution;
 import com.lynxis.orca.runtime.execution.persistence.AdmissionRepository;
+import com.lynxis.orca.runtime.readmodel.api.LaneMonitorProjectionPort;
 import com.lynxis.orca.runtime.workitem.api.WorkItemIntake;
 
 import lombok.extern.slf4j.Slf4j;
@@ -33,14 +34,19 @@ public class LaneResetService {
 	private final AdmissionRepository repository;
 	private final ProcessEngineGateway engine;
 	private final WorkItemIntake workItems;
+	private final LaneMonitorProjectionPort laneMonitor;
 	private final TransactionTemplate transactions;
+	private final String siteExternalId;
 
 	public LaneResetService(AdmissionRepository repository, ProcessEngineGateway engine,
-			WorkItemIntake workItems, TransactionTemplate transactions) {
+			WorkItemIntake workItems, LaneMonitorProjectionPort laneMonitor,
+			TransactionTemplate transactions, String siteExternalId) {
 		this.repository = repository;
 		this.engine = engine;
 		this.workItems = workItems;
+		this.laneMonitor = laneMonitor;
 		this.transactions = transactions;
+		this.siteExternalId = siteExternalId;
 	}
 
 	/**
@@ -75,6 +81,8 @@ public class LaneResetService {
 			}
 			repository.completeVisit(visit.executionId(), Execution.FAILED);
 			repository.bindLane(laneId, null, false);
+			laneMonitor.recordVisitClosed(new LaneMonitorProjectionPort.VisitClosed(siteExternalId,
+					laneId, laneExternalId, visit.externalId(), Execution.FAILED));
 
 			log.info("lane {} reset by {}: visit {} failed, {} open work item(s) failed with it",
 					laneExternalId, actor, visit.externalId(), failedItems);
@@ -116,6 +124,8 @@ public class LaneResetService {
 			repository.bindLane(visit.laneId(), null, false);
 
 			String laneExternalId = repository.laneExternalIdOf(visit.laneId()).orElse(null);
+			laneMonitor.recordVisitClosed(new LaneMonitorProjectionPort.VisitClosed(siteExternalId,
+					visit.laneId(), laneExternalId, visit.externalId(), Execution.FAILED));
 			return new LaneReset(laneExternalId, visit.externalId(), failedItems);
 		});
 	}

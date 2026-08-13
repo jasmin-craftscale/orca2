@@ -490,11 +490,18 @@ class AdmissionThroughHttpIT {
 		for (int lane = 1; lane <= LANES; lane++) {
 			rows.append(lane == 1 ? "" : ", ")
 					.append("(CAST(").append(lane).append(" AS BIGINT), ''")
-					.append(laneOf(lane)).append("'', ''").append(SITE).append("'')");
+					.append(laneOf(lane)).append("'', ''").append(SITE)
+					.append("'', ''").append(SITE)
+					.append("'', CAST(1 AS BIT), CAST(10 AS BIGINT), ''AREA-IT'', ''AREA'', ''")
+					.append("L").append(lane).append("'', N''Lane ").append(lane)
+					.append("'', CAST(").append(lane).append(" AS INT), CAST(0 AS BIT))");
 		}
 		admin("EXEC('CREATE VIEW core.topology_lane AS SELECT lane_id, lane_external_id, "
-				+ "site_external_id FROM (VALUES " + rows + ") AS lanes (lane_id, lane_external_id, "
-				+ "site_external_id)')");
+				+ "site_external_id, site_code, site_is_primary, area_id, area_external_id, area_code, "
+				+ "lane_code, lane_name, lane_priority, is_out_of_service FROM (VALUES " + rows
+				+ ") AS lanes (lane_id, lane_external_id, site_external_id, site_code, "
+				+ "site_is_primary, area_id, area_external_id, area_code, lane_code, lane_name, "
+				+ "lane_priority, is_out_of_service)')");
 	}
 
 	private static void grantTopologyLaneTo(String login) {

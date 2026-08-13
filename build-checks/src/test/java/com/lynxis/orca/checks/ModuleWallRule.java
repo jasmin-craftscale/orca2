@@ -38,13 +38,6 @@ class ModuleWallRule {
 					.that().resideInAPackage(OrcaClasses.ROOT + ".runtime." + owner + "..")
 					.should().dependOnClassesThat()
 					.resideInAnyPackage(othersPersistence.toArray(String[]::new))
-					// This rule was introduced before the runtime modules held business logic.
-					// ArchUnit normally fails a rule that checks nothing, but the wall had to
-					// land WITH the module structure rather than after the first class arrived.
-					// notify and readmodel are still empty, so the exemption remains;
-					// ImportedSetGuard records the exact empty set and deliberate violations
-					// during verification proved that the rule fires.
-					.allowEmptyShould(true)
 					.because("a module reaching into another module's repositories is a module reading "
 							+ "another module's tables. The lane monitor legitimately needs running visits "
 							+ "beside queued work items, and the answer is readmodel's projection built from "
@@ -71,7 +64,6 @@ class ModuleWallRule {
 					.that().resideInAPackage(OrcaClasses.ROOT + ".runtime." + owner + "..")
 					.should().dependOnClassesThat()
 					.resideInAnyPackage(othersDomain.toArray(String[]::new))
-					.allowEmptyShould(true)
 					.because("modules talk through their api packages, or through readmodel's projections. "
 							+ "the integration seam is narrow on purpose: that narrowness is what makes "
 							+ "the partner-facing surface replaceable without touching the engine.")

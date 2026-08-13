@@ -16,6 +16,7 @@ import com.lynxis.orca.platform.scope.ScopeContext;
 import com.lynxis.orca.platform.scope.ScopeSeam;
 import com.lynxis.orca.runtime.execution.api.LaneVisitPort;
 import com.lynxis.orca.runtime.execution.api.ManualStepPort;
+import com.lynxis.orca.runtime.readmodel.api.LaneMonitorProjectionPort;
 import com.lynxis.orca.runtime.workitem.api.OperatorIdentity;
 import com.lynxis.orca.runtime.workitem.api.WorkItemController;
 import com.lynxis.orca.runtime.workitem.domain.WorkItemService;
@@ -74,10 +75,11 @@ public class WorkItemConfiguration {
 	public WorkItemService workItemService(WorkItemRepository repository, RoutingReadRepository routing,
 			com.lynxis.orca.runtime.workitem.domain.PresenceService presence,
 			ManualStepPort manualSteps, LaneVisitPort laneVisits,
+			LaneMonitorProjectionPort laneMonitor,
 			PlatformTransactionManager transactionManager,
 			@Value("${orca.installation.site-external-id}") String siteExternalId) {
 		return new WorkItemService(repository, routing, presence, manualSteps, laneVisits,
-				new TransactionTemplate(transactionManager), siteExternalId);
+				laneMonitor, new TransactionTemplate(transactionManager), siteExternalId);
 	}
 
 	/**

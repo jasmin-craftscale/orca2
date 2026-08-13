@@ -83,7 +83,11 @@ class WorkItemSlaIT {
 		admin("IF SCHEMA_ID(N'core') IS NULL EXEC('CREATE SCHEMA [core]')");
 		admin("IF OBJECT_ID(N'core.topology_lane', 'V') IS NOT NULL DROP VIEW core.topology_lane");
 		admin("EXEC('CREATE VIEW core.topology_lane AS SELECT CAST(1 AS BIGINT) AS lane_id, "
-				+ "''" + LANE + "'' AS lane_external_id, ''" + SITE + "'' AS site_external_id')");
+				+ "''" + LANE + "'' AS lane_external_id, ''" + SITE + "'' AS site_external_id, "
+				+ "''" + SITE + "'' AS site_code, CAST(1 AS BIT) AS site_is_primary, "
+				+ "CAST(10 AS BIGINT) AS area_id, ''AREA-IT'' AS area_external_id, "
+				+ "''AREA'' AS area_code, ''L01'' AS lane_code, N''Lane 1'' AS lane_name, "
+				+ "CAST(1 AS INT) AS lane_priority, CAST(0 AS BIT) AS is_out_of_service')");
 		admin("GRANT SELECT ON core.topology_lane TO [it_" + SCHEMA + "]");
 		RoutingTopologyFixture.publish(WorkItemSlaIT::admin, "it_" + SCHEMA);
 
