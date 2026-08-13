@@ -57,7 +57,7 @@ it matters.
 **A corollary:** the database's clock decides anything two instances must agree on.
 Never a JVM clock. Expiry comparisons live inside the statement.
 
-## 3 · The five primitives, and when to reach for each
+## 3 · The six primitives, and when to reach for each
 
 | You need | Use | The rule |
 |---|---|---|
@@ -66,6 +66,7 @@ Never a JVM clock. Expiry comparisons live inside the statement.
 | To read or write any table | `platform/scope` | The seam applies the site condition before your filter. No scope set means **zero rows**, never all rows |
 | A command that might be retried | `platform/idempotency` | A replay returns the **recorded outcome**, never "duplicate" — the caller retried because it never saw the answer |
 | To return anything over HTTP | `platform/web` | One envelope, machine-readable codes, no internal detail. Background work enters an explicit system identity |
+| To store a recoverable secret | `platform/secrets` | AES-256-GCM with a fresh nonce, versioned key id and binary purpose-bound AAD. The owning service stores the sealed fields; the primitive owns no table |
 
 **Nothing in `platform/` may name a visit, lane, ticket, driver or truck.** A build
 check enforces it. If a primitive needs to know about the domain, the design is
@@ -130,10 +131,11 @@ Useful to know before you write, rather than after the build stops you:
 ## 8 · Where to read, in order, to understand this properly
 
 1. `platform/scope/…/JdbcScopeSeam.java` — the seam every read passes through, and the deny-by-default behaviour.
-2. `platform/outbox/…/OutboxRelay.java` — the claim, the per-key ordering, and why acknowledgement happens after delivery.
-3. `services/orca-runtime/…/execution/domain/AdmissionService.java` — one truck, one visit. The clearest example of how this codebase reasons about concurrency, and its comments explain the ordering that was found by measurement.
-4. `services/orca-runtime/src/main/resources/processes/gate-visit.bpmn20.xml` — the process the platform exists to run, written as a compiler would emit it.
-5. `build-checks/src/test/java/com/lynxis/orca/checks/` — all of them. They are the architecture as executable constraints, and reading them tells you what the codebase will and will not permit.
+2. `platform/secrets/…/SecretBox.java` — versioned sealing, fixed redacted failure, and the purpose-bound AAD boundary.
+3. `platform/outbox/…/OutboxRelay.java` — the claim, the per-key ordering, and why acknowledgement happens after delivery.
+4. `services/orca-runtime/…/execution/domain/AdmissionService.java` — one truck, one visit. The clearest example of how this codebase reasons about concurrency, and its comments explain the ordering that was found by measurement.
+5. `services/orca-runtime/src/main/resources/processes/gate-visit.bpmn20.xml` — the process the platform exists to run, written as a compiler would emit it.
+6. `build-checks/src/test/java/com/lynxis/orca/checks/` — all of them. They are the architecture as executable constraints, and reading them tells you what the codebase will and will not permit.
 
 ---
 

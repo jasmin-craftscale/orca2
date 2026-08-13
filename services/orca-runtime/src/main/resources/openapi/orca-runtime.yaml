@@ -75,6 +75,10 @@ tags:
       a console uses to open the live WebSocket. Cross-instance live fan-out,
       email and push are deliberately outside this contract until their open
       questions are settled.
+  - name: designer
+    description: |
+      Runtime-facing support for process design. Core owns the authored design;
+      runtime exposes only the execution-side operations a published design needs.
 
 paths:
   /api/v1/health:

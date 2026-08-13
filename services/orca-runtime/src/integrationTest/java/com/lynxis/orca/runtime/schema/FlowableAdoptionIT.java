@@ -321,6 +321,8 @@ class FlowableAdoptionIT {
 		// migration ≥ V115 must be droppable here, or this suite's fixture stops
 		// being constructible.
 		jdbc.update("""
+				IF OBJECT_ID(N'connector_credential_audit', 'U') IS NOT NULL DROP TABLE connector_credential_audit;
+				IF OBJECT_ID(N'connector_credential', 'U') IS NOT NULL DROP TABLE connector_credential;
 				IF OBJECT_ID(N'work_item_audit', 'U') IS NOT NULL DROP TABLE work_item_audit;
 				IF OBJECT_ID(N'work_item', 'U') IS NOT NULL DROP TABLE work_item;
 				IF OBJECT_ID(N'user_activity', 'U') IS NOT NULL DROP TABLE user_activity;

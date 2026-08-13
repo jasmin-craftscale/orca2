@@ -37,7 +37,7 @@ This file is a map. It does not restate the architecture — follow the link.
 | **New here? Start with these three, in order** | `docs/LOCAL_DEVELOPMENT.md` (set up and run) → `docs/DEVELOPER_ONBOARDING.md` (how to work) → `docs/BUILD_ROADMAP.md` (**what exists, what is being built, what does NOT exist yet**) |
 | What is the target design, and what does it guarantee? | `docs/ORCA_ARCHITECTURE.md` — **read §B10 first; it is the acceptance criteria** |
 | What is deliberately unsettled? | `docs/ORCA_OPEN_QUESTIONS_REGISTER.md` |
-| What are the five primitives, and what pattern is each? | `docs/PLATFORM_PRIMITIVES.md` |
+| What are the six current primitives, and what pattern is each? | `docs/PLATFORM_PRIMITIVES.md` |
 | Where does anything live in this repository? | `docs/REPOSITORY_GUIDE.md` |
 | What shape does a change take here — the patterns that repeat? | `docs/CODE_PATTERNS.md` |
 | What was built in each phase, what was NOT, and every decision the plan did not dictate | `docs/phase-*-report.md`, newest first. Each one's "what was not built", "decisions the plan did not dictate" and "found wrong" sections are where the value is |
@@ -109,13 +109,13 @@ written.
 ./gradlew build              # compile, unit tests, build checks — the whole tree
 ./gradlew test               # unit tests only
 ./gradlew check              # unit tests + the ten build checks
-./gradlew integrationTest    # 224 property tests, real SQL Server, real Flowable
+./gradlew integrationTest    # 266 property tests, real SQL Server, real Flowable
 ```
 
 ⚠️ **`test` runs almost none of what proves this repository.** `integrationTest`
 is a separate source set and a separate task, deliberately **not** wired into
 `check`, so that `build` succeeds on a machine with no Docker daemon. What it
-skips is eighteen suites and every property that matters — the admission race, the
+skips is 33 suites and every property that matters — the admission race, the
 severed link, the lease handover, the expired command, the outbox's atomicity.
 **Full verification is `./gradlew check integrationTest`.**
 

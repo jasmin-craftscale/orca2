@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -39,6 +40,9 @@ import com.lynxis.orca.runtime.api.generated.model.DeviceEvent;
 import com.lynxis.orca.runtime.api.generated.model.DeviceEventBatch;
 import com.lynxis.orca.runtime.api.generated.model.DeviceEventBatchEnvelope;
 import com.lynxis.orca.runtime.execution.domain.VisitCompletion;
+import com.lynxis.orca.runtime.integration.domain.ConnectorCredentialService;
+import com.lynxis.orca.runtime.integration.domain.CredentialMutation.Replace;
+import com.lynxis.orca.runtime.integration.domain.CredentialMutation.SetBasic;
 
 import com.sun.net.httpserver.HttpServer;
 
@@ -101,6 +105,7 @@ class VisitLifecycleIT {
 	/** What each fake answered, so a test can assert on what actually crossed the wire. */
 	private static final AtomicInteger tosStatus = new AtomicInteger(200);
 	private static final AtomicInteger tosDelayMillis = new AtomicInteger(0);
+	private static final List<String> tosAuthorization = new CopyOnWriteArrayList<>();
 	private static final List<String> deviceCommands = new CopyOnWriteArrayList<>();
 	private static final java.util.concurrent.atomic.AtomicReference<String> deviceOutcome =
 			new java.util.concurrent.atomic.AtomicReference<>("EXECUTED");
@@ -113,6 +118,9 @@ class VisitLifecycleIT {
 
 	@Autowired
 	private com.lynxis.orca.runtime.workitem.domain.WorkItemService workItems;
+
+	@Autowired
+	private ConnectorCredentialService credentials;
 
 	private JdbcTemplate jdbc;
 	private RestClient runtime;
@@ -131,6 +139,8 @@ class VisitLifecycleIT {
 
 		tos = start("/tos/v1/visits", exchange -> {
 			sleep(tosDelayMillis.get());
+			tosAuthorization.add(exchange.getRequestHeaders().getFirst("Authorization") == null
+					? "<absent>" : exchange.getRequestHeaders().getFirst("Authorization"));
 			respond(exchange, tosStatus.get(), "{\"decision\":\"stub\"}");
 		});
 		edge = start("/internal/commands/v1", exchange -> {
@@ -166,6 +176,8 @@ class VisitLifecycleIT {
 		jdbc.execute("DELETE FROM execution");
 		jdbc.execute("DELETE FROM lane_session");
 		jdbc.execute("DELETE FROM idempotency_record");
+		jdbc.execute("DELETE FROM connector_credential_audit");
+		jdbc.execute("DELETE FROM connector_credential");
 		jdbc.execute("DELETE FROM connector_route");
 		jdbc.execute("DELETE FROM connector_config");
 
@@ -179,6 +191,7 @@ class VisitLifecycleIT {
 
 		tosStatus.set(200);
 		tosDelayMillis.set(0);
+		tosAuthorization.clear();
 		deviceOutcome.set("EXECUTED");
 		deviceCommands.clear();
 
@@ -188,6 +201,30 @@ class VisitLifecycleIT {
 				.defaultHeader("X-Orca-Service", "orca-edge")
 				.defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
 				.build();
+	}
+
+	@Test
+	@Timeout(value = 10, unit = TimeUnit.MINUTES)
+	@DisplayName("the complete gate process presents BASIC credentials and still records the completed visit")
+	void oneBasicAuthenticatedTruckCompletesTheGateProcess() {
+		String password = "CRED-IT-GATE-SENTINEL-DO-NOT-USE";
+		com.lynxis.orca.platform.scope.ScopeContext.runIn(
+				com.lynxis.orca.platform.scope.Scope.of("site_external_id", java.util.Set.of(SITE)),
+				() -> credentials.mutate("tos", 0,
+						new SetBasic("gate-user", new Replace(password)), "integration-test"));
+
+		String visit = admit();
+		awaitStatus(visit, "COMPLETED");
+
+		String expected = "Basic " + Base64.getEncoder().encodeToString(
+				("gate-user:" + password).getBytes(StandardCharsets.UTF_8));
+		assertThat(tosAuthorization).containsExactly(expected);
+		assertThat(deviceCommands).hasSize(1);
+		assertThat(count("SELECT COUNT(*) FROM outbox WHERE event_type = 'visit.completed'"))
+				.isEqualTo(1);
+		assertThat(count("SELECT COUNT(*) FROM ACT_HI_VARINST WHERE TEXT_ LIKE '%CRED-IT-GATE-SENTINEL%'"))
+				.as("the recoverable password never becomes a process variable")
+				.isZero();
 	}
 
 	// ------------------------------------------------------------------------

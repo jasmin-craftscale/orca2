@@ -1,11 +1,12 @@
 # Decision brief — connector credentials at rest
 
-**For the product owner · 10 August 2026 · Decision required**
+**For the product owner · 10 August 2026 · APPROVED: Option A**
 
-**Blocked by this decision:** stream 1 Track B (outbound REST/SOAP authentication)
-and stream 3 scheduled SFTP ingestion. This is one security decision with two
-consumers. Choosing separate mechanisms would create two key lifecycles, two
-rotation procedures and two failure modes.
+**Product-owner ruling, 10 August 2026:** use Option A, including the seven
+conditions in this brief. This unblocks the shared at-rest mechanism for stream 1
+Track B (outbound REST/SOAP authentication) and stream 3 scheduled SFTP ingestion.
+It does not settle the adjacent authorization, SSRF, trust-material or SFTP
+host-verification questions listed below.
 
 ## The decision
 
@@ -13,7 +14,9 @@ ORCA must recover credentials in plaintext when it calls a customer system. Hash
 is therefore not available. The choice is **where the recoverable value is stored,
 what protects it there, and where the protecting key is kept**.
 
-This brief recommends an answer. It does not authorise implementation.
+The product owner approved the recommended answer on 10 August 2026. This document
+is now the decision record and authorises implementation of that answer within the
+scope and conditions stated here.
 
 ## What has been verified
 
@@ -101,11 +104,11 @@ configuration is performed through the application.
 Plaintext columns protected only by disk encryption or SQL Server TDE are not a
 credible fifth option: a database reader or logical backup still receives plaintext.
 
-## Recommendation
+## Ruling
 
-**Recommend Option A: versioned AES-GCM ciphertext in separate credential records in
+**Approved Option A: versioned AES-GCM ciphertext in separate credential records in
 each owning schema, with versioned per-service keys provisioned outside SQL Server
-through one installer-owned lifecycle.** This is advice; the product owner rules.
+through one installer-owned lifecycle.**
 
 Treat the following as part of that ruling:
 
@@ -141,6 +144,11 @@ Treat the following as part of that ruling:
 
 ## Adjacent questions this does not decide
 
+- The shared web chain authenticates every public route but deliberately implements
+  no per-route authorization. The entitlement and cross-service seam that may
+  authorise connector-credential mutation are a separate security ruling. Until it
+  exists, this decision authorises the storage and consumer, not an authenticated-
+  only public mutation endpoint.
 - Stream 3 says SFTP; the architecture says FTP/SFTP. That scope contradiction needs
   its own answer.
 - SFTP host-key verification must be designed. 1.x uses
@@ -151,13 +159,11 @@ Treat the following as part of that ruling:
 - Device credentials may later consume the same primitive, but adding them now would
   expand this ruling's scope.
 
-## Ruling requested
+## Decision record
 
-1. Choose **A, B, C or D**.
-2. If A, confirm the seven conditions above and that runtime-administered connectors
-   remain product scope.
-3. Authorise the installer/key-lifecycle design as a named prerequisite, rather than
-   allowing each stream to invent how its key arrives.
-
-Until that ruling, both streams should continue to stop at their planned
-PROPOSE-and-report boundary.
+- **Decision:** Option A.
+- **Date:** 10 August 2026.
+- **Conditions:** all seven conditions above are part of the ruling.
+- **Product scope:** runtime-administered connectors remain in scope.
+- **Programme commitment:** the installer/key lifecycle is one named prerequisite;
+  individual streams do not invent independent provisioning or recovery paths.

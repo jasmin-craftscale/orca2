@@ -241,6 +241,11 @@ build**, and when they disagree, report it rather than picking the reading you p
 
 Four developers work in parallel on separate streams.
 
+Before the four sessions start, read `docs/PARALLEL_STREAM_LAUNCH.md`. It records the
+launch gates, first mergeable slices, database-serialization rule, decision stops and
+report ownership. The reviewed copy/paste prompts live in
+`docs/DEVELOPER_KICKOFF_PROMPTS.md`.
+
 - **Stay inside your stream's scope.** It is named in your stream plan, and the
   module walls are enforced by a build check.
 - **Use your assigned migration number range** — `docs/MIGRATION_NUMBER_RANGES.md`.

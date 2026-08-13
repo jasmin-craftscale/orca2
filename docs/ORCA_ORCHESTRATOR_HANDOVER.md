@@ -83,7 +83,7 @@ You will be asked to verify claims against this codebase. It is the evidence bas
 - **No message broker inside a site.** A transactional outbox, claimed with a skip-locked read.
 - **Multi-instance by design.** Coordination is database-held with leases and fence tokens. Device ingestion elects one owner per lane, because cameras address a single endpoint.
 - **One installation serves exactly one customer.** Cross-customer data (carriers, drivers) is cloud-authoritative.
-- **Five shared primitives** — outbox, lease, scope, idempotency, web envelope — built once, before any service.
+- **Six shared primitives** — outbox, lease, scope, idempotency, web envelope, and purpose-bound secrets — built once rather than per service.
 
 ---
 
@@ -208,14 +208,14 @@ These are not preferences. Each was learned by getting it wrong.
 
 | Stream | Owns | Reference sheet | Plan |
 |---|---|---|---|
-| 1 · Partner event API & integration breadth | `orca-runtime` → `integration` | ✅ `docs/partner-event-api-from-1x.md` | ✅ **`docs/stream-1-plan.md`** (written 10 Aug) — two tracks, one shared work package, six questions left open on purpose |
+| 1 · Partner event API & integration breadth | `orca-runtime` → `integration` | ✅ `docs/partner-event-api-from-1x.md` | ✅ **`docs/stream-1-plan.md`** (written 10 Aug) — two tracks, one shared work package, five questions left open on purpose; connector credentials are ruled and handed over in `docs/connector-credentials-plan.md` |
 | 2 · Read models & notifications | `orca-runtime` → `readmodel`, `notify` | ✅ `docs/read-models-notify-from-1x.md` (10 Aug) — six inversions | ✅ **`docs/stream-2-plan.md`** — sequenced so its one open question (Q1, the cross-instance fan-out) blocks only the final work package |
 | 3 · Core remainder (custom entities + DDL executor, licence verification) | `orca-core` | ✅ `docs/custom-entities-from-1x.md` (10 Aug) — six inversions + the vocabulary warning (1.x calls it *reference data*) | ✅ **`docs/stream-3-plan.md`** — DDL executor design is proposed and handed over, not built, so nothing else waits on it |
 | 4 · Retention & purge | every schema | — | Last. Not concurrent with anything. **Still blocked on the retention-class list** |
 
 **All four developers can now be given something.** Streams 1–3 each have a reference sheet and a plan; each plan carries its open questions in a §5 rather than resolving them, and each is sequenced so an unanswered question blocks at most one work package. Stream 4 remains last and still needs the retention-class list settled from the real tables before it starts.
 
-✅ **Migration ranges are assigned — `docs/MIGRATION_NUMBER_RANGES.md`** (10 Aug). Stream 1 takes `runtime` V118–V137, stream 2 V138–V157, stream 3 `core` V111–V140, stream 4 a band in each schema.
+✅ **Migration ranges are assigned — `docs/MIGRATION_NUMBER_RANGES.md`** (10 Aug). Stream 1 Track A takes `runtime` V118–V127 and Track B takes V128–V137; stream 2 takes V138–V157, stream 3 `core` V111–V140, stream 4 a band in each schema.
 
 ⚠️ **The ranges alone do not close the risk, and this was proven rather than assumed.** They stop two people writing `V118`; they *guarantee* migrations arriving out of numeric order. Every service is `validate-on-migrate: true` with `out-of-order` unset — Flyway's default is `false` — so a developer whose database applied stream 2's `V138` and who then pulls stream 1's `V118` gets `FlywayValidateException: Detected resolved migration not applied to database: 118` and **the service does not start**. Reproduced against this stack on 10 Aug with the committed settings, and the remedy verified. Two consequences are recorded in that document: **a developer-machine fix** (re-migrate, or allow out-of-order locally — ⚠️ *relaxing it in committed configuration is the product owner's call and is a proposal, not applied*), and **a new platform primitive must take `V900`, never `V004`**, because the primitives sit *below* every service migration and a sixth one numbered `V004` would be refused in all six schemas at once.
 
@@ -231,22 +231,22 @@ These are not preferences. Each was learned by getting it wrong.
 
 ### Session of 10 August (later) — the streams are handed over and the first outside work has landed
 
-**The shipped baseline is on `main`, pushed, and was independently re-verified on 10 August: 31 suites, 236 integration tests, 0 failures.** The repository is hosted at `github.com:jasmin-craftscale/orca2`. A local `feature/utc-timestamps` branch now also exists; it is reviewed and green at 32 suites / 240 tests, but is not merged or pushed.
+**The shipped baseline is on `main`, pushed, and was verified on 10 August at 32 suites, 240 integration tests, 0 failures.** The repository is hosted at `github.com:jasmin-craftscale/orca2`. The UTC timestamp work is now on `main` as commits `6eb11cf`, `87bd3b5`, `30f077e` and `84e9a52`; `develop` was created at the same resulting commit as `main`.
 
 **All four developers now have something.** Streams 1–3 each have a reference sheet *and* a self-contained plan; two new extractions were written (`read-models-notify-from-1x.md`, `custom-entities-from-1x.md`), and `MIGRATION_NUMBER_RANGES.md` assigns bands per stream.
 
 **A first slice was built end to end by an outside agent working from a now-retired plan** — three endpoints in modules no stream owns: `GET /lanes/{id}/visit`, `POST /lanes/{id}/take-next`, `POST /visits/{id}/abort`. The surviving evidence is `docs/lane-operations-report.md`. **That exercise found five defects, and every one was in the plan rather than in the work.** The report preserves the corrections worth carrying forward: a running service poisons the suite (they share the `runtime` schema); a port's implementation must not also register a second bean of the same type; a port on an engine-dependent class forms a startup cycle; a port that throws a *domain* exception breaks the module wall the port exists to keep; and — the one that matters most — **a compound guard needs a test per clause**. The prescribed abort test aborted the same visit twice, which only ever reached the empty-lane branch, so deleting the identity comparison left it green. It certified a guard it never executed.
 
-⚠️ **The UTC defect and the visit-search binding were implemented together on `feature/utc-timestamps`.** Four commits add a forced-non-UTC property suite and `docs/utc-timestamps-report.md`; the branch's forced run is 32 suites / 240 tests. Review found two required corrections before merge: three `VisitReadPropertiesIT` fixtures still bind with `Timestamp.from`, and runtime is the third service-local UTC helper (core already has one), so the report's “second copy” statement and platform-promotion recommendation need correcting. One review question remains explicit rather than silently waived: the prescribed four properties cover the shared conversion and the shipped work-item/visit failures, but do not force a non-UTC zone through the changed presence, admission or audit paths; decide at review whether those repository-specific regressions need direct properties too.
+⚠️ **The UTC defect and visit-search binding are implemented on `main`, but a post-implementation audit found follow-up corrections still outstanding.** Four commits add a forced-non-UTC property suite and `docs/utc-timestamps-report.md`; the forced run was 32 suites / 240 tests. Three `VisitReadPropertiesIT` fixtures still bind with `Timestamp.from`, and runtime is the third service-local UTC helper (core already has one), so `Utc.java` and the report's “second copy” statement are factually wrong and the platform-promotion recommendation must be updated. One review question remains explicit rather than silently waived: the four properties cover the shared conversion and the shipped work-item/visit failures, but do not force a non-UTC zone through the changed presence, admission or audit paths; decide whether those repository-specific regressions need direct properties too. These are follow-ups on current `main`, not pre-merge work on a feature branch.
 
 **Waiting on product-owner rulings or review:**
 
-- **`feature/utc-timestamps`** — implementation and report complete; address the two review findings above, rerun, then review/merge by the normal path.
-- **`docs/decision-connector-credentials.md`** — one at-rest answer for stream 1 Track B and stream 3 SFTP; options, recommendation and commitments, awaiting the product owner.
+- **UTC follow-up on `main`** — correct the three integration fixtures and the third-copy/report wording, decide the repository-specific regression coverage question, then rerun through a feature branch based on `develop`.
+- ✅ **`docs/decision-connector-credentials.md`** — product owner approved Option A with all seven conditions on 10 August. `docs/connector-credentials-plan.md` carries the implementation handover; credential mutation authorization remains an explicit gate rather than an invented resolution.
 - **`docs/decision-notification-fanout.md`** — cross-instance live-update options and recommendation, awaiting the product owner before stream 2 WP4.
 - **`docs/decision-retention-classes.md`** — 49 declared ORCA/platform tables swept, 12 traffic-growing and nine current provisional values; proposes a closed catalogue for the product owner. Stream 4 remains unplannable until that ruling.
 
-⚠️ **`develop` does not exist.** The ruled model is `feature/*` → `develop` → `main`, and both branches this session merged straight to `main` because there was nowhere else.
+✅ **`develop` now exists on origin.** On 10 August it was normalised to the same commit as `main`; new work branches from `develop` and returns there through the normal review path.
 
 ✅ **The lane-operations plan was retired on 10 August; `docs/lane-operations-report.md` remains.** That is the established pattern: the plan goes, the report survives.
 
@@ -288,7 +288,7 @@ Everything durable is in three places: this document (the map), the phase report
 
 1. **Run it before you read much of it.** An hour of executing teaches more than a day of reading. From `~/Documents/Projects/orca`: bring up the stack and bootstrap (`docs/deployment.md`), run `./gradlew check integrationTest --rerun-tasks`, boot the three gate-path services, then drive a truck through (`./gradlew sendPlate`) and follow it in the database. Then force the exception branch and take a work item through claim → complete. You now understand the product's spine from the outside.
 2. **Read the load-bearing code directly** — this is the short list that carries the design:
-   - `platform/` — the five primitives. Start with `platform/outbox` and `platform/scope`; they are the two everything else leans on.
+   - `platform/` — the six current primitives. Start with `platform/outbox` and `platform/scope`; they are the two most service state leans on, then read `platform/secrets` before adding any recoverable credential.
    - `build-checks/src/test/java/com/lynxis/orca/checks/` — **ten rules; read all of them.** They are the architecture written as executable constraints, and reading them tells you what the codebase will and will not permit.
    - `services/orca-runtime/src/main/java/com/lynxis/orca/runtime/execution` (admission, the engine gateway, delegates) and `.../workitem` (the clerk lifecycle) — the two hardest pieces of domain logic.
    - `services/orca-runtime/src/main/resources/processes/gate-visit.bpmn20.xml` — the process the whole platform exists to run.
@@ -323,5 +323,5 @@ The shape itself:
 2. **Write the plan self-contained** — its reader may have none of your context. Include: what the phase delivers and what it explicitly does *not*; the ground rules; **work packages in dependency order**, each with its own "done when"; a verification table of commands to execute; what to do when blocked; and the report the work must end with.
 3. **Make each work package delegable.** One concern, its own migration/code/tests together, acceptance criteria a reviewer can check, and an explicit statement of what it must not touch. Sequential dependencies named, so packages that can run in parallel are visible.
 4. **State where behaviour comes from.** For anything ported: *1.x is the reference for the data; the architecture governs the behaviour.* Name the inversions explicitly, or they will be copied.
-5. **Anything security-shaped, commercial, or scope-changing is the product owner's** — the plan says PROPOSE-and-report, never implement.
+5. **Anything security-shaped, commercial, or scope-changing is the product owner's.** Implement only where a named decision record authorises the exact choice and scope; otherwise PROPOSE-and-report. Connector credentials at rest now have such a record, while their public mutation authorization does not.
 6. **Close the loop.** When the work lands, verify it yourself by executing: re-run the suite, re-drive the truck, break a check to prove it still fails. A report is a claim until it is re-run.

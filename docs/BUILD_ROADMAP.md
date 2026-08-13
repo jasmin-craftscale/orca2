@@ -88,6 +88,12 @@ that streams 1 and 2 create, which is the second reason it goes last.
 
 Three mechanisms. Without them, "parallel" means "merge conflicts".
 
+The executable launch gates, first work-package branches, shared-database rule,
+review cadence and copy/paste agent prompts are maintained in
+`docs/PARALLEL_STREAM_LAUNCH.md` and
+`docs/DEVELOPER_KICKOFF_PROMPTS.md`. They coordinate the work; the stream plans remain
+the specification.
+
 - **Each stream owns whole modules.** Streams 1 and 2 both work inside
   `orca-runtime`, but on different modules — and the module walls are already
   enforced by a build check, so the check polices the boundary for you.
@@ -111,7 +117,9 @@ out (SOAP, four authentication modes, per-connector certificate trust).
 - **Reference:** `docs/partner-event-api-from-1x.md` — **already written**, and its
   §0 lists seven defects in the old system that must not be repeated
 - **Plan:** ✅ **`docs/stream-1-plan.md`** — work packages, the two-developer split,
-  the verification table, and six questions that must be surfaced rather than settled
+  the verification table, five questions that must still be surfaced rather than
+  settled, and the connector-credentials ruling that is implemented through
+  `docs/connector-credentials-plan.md`
 - **Can assume:** the engine, admission, connectors and the outbox all exist
 - **Shape:** splits naturally in two — the partner-facing API surface and its
   dispatch queue (Track A), then the connector breadth (Track B). Large enough for
@@ -153,8 +161,10 @@ the licence-verification module.
   "custom entity" finds nothing
 - **Plan:** ✅ **`docs/stream-3-plan.md`** — the DDL executor's design is written and
   handed over before it is built, so the other four work packages are never blocked
-- **Can assume:** nothing from the other streams — **this is the cleanly parallel
-  one.** Different service, different schema, no shared files
+- **Can assume:** WP1, WP2, WP4 and WP5 share no implementation dependency with the
+  other streams and remain cleanly parallel. WP3 (licence upload over SFTP) waits
+  for Stream 1 Track B's generic `platform/secrets` primitive, then consumes it with
+  core-owned credential storage and core-specific production key material
 - ⚠️ **The DDL executor is security-shaped.** It is the one component allowed to
   change the schema at runtime. Its design is surfaced to the product owner, not
   settled by whoever implements it
@@ -225,7 +235,7 @@ Not forgotten. Each is a decision with a reason.
 
 Not when the code is written. When:
 
-1. `./gradlew check integrationTest` is green — **236 integration tests** on current
+1. `./gradlew check integrationTest` is green — **240 integration tests** on current
    `main`, independently re-run on 10 August 2026, with yours added to that count.
    Run it with `--rerun-tasks`: without it Gradle answers
    from cache in under a second and reports a success it did not run.

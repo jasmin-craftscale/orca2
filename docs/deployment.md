@@ -112,7 +112,7 @@ surprise: every ❌/🟡 is tracked in the register or a phase report.
 | 3 | **Install ORCA release artifacts** — container images from a registry, versioned, signed | ❌ **No images, no registry, no release pipeline exist.** The largest single gap |
 | 4 | Database bootstrap — schemas, logins, grants, with **generated per-installation passwords** | 🟡 The four SQL files are built and proven; password generation/storage is the pending secrets design |
 | 5 | Keycloak: per-site realm, first admin user | 🟡 Dev realm export exists; realm provisioning design open (register U3); first-admin bootstrap surfaces in Phase 2's report |
-| 6 | Per-installation secrets provisioned (7 DB logins, inter-service credential, Keycloak) | 🟡 Mechanisms exist — incl. the guard that refuses dev fixtures outside `local` — the provisioning/rotation design is owed to the product owner |
+| 6 | Per-installation secrets provisioned (7 DB logins, inter-service credential, Keycloak, per-service credential-encryption keys) | 🟡 Connector/SFTP credentials-at-rest are ruled as application-encrypted records (`docs/decision-connector-credentials.md`); implementation and the installer-owned provisioning/backup/rotation procedure remain to be built. Existing fixture guards remain mandatory |
 | 7 | Licence file installed and verified at startup | ❌ Licence verification module not yet built (deferred with the licensing cluster) |
 | 8 | Reverse proxy + TLS in front of every surface | ❌ Not in the repository at all yet |
 | 9 | Services started; health checks green | ✅ Proven |
@@ -132,6 +132,6 @@ surprise: every ❌/🟡 is tracked in the register or a phase report.
 **The deployment phase** (next implementation plan after Phase 2) turns this table
 into working software and this section into `docs/install-runbook.md` — written,
 then **executed start-to-finish on a clean machine, with the transcript committed
-alongside it**. Prerequisites it waits on: the NEW-4 vendor answer, the secrets
-design decision, and a repository host (until then there is no registry to publish
-images to).
+alongside it**. Prerequisites it waits on: the NEW-4 vendor answer, implementation of
+the approved secrets decision plus its installer/key-lifecycle procedure, and a
+repository host (until then there is no registry to publish images to).

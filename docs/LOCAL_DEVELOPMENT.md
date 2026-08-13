@@ -205,10 +205,11 @@ Run them together and you get failures that look exactly like real concurrency
 defects and are not. **This has already cost this project two debugging sessions.**
 
 ```bash
-# stop the services
-for p in 18081 18082 18083; do
+# stop the three gate-path services on either the committed default ports or the
+# +10000 demo offset. Stopping only one set leaves the other free to poison the suite.
+for p in 8081 8082 8083 18081 18082 18083; do
   PID=$(lsof -nP -iTCP:$p -sTCP:LISTEN -t 2>/dev/null | head -1)
-  [ -n "$PID" ] && kill $PID
+  [ -n "$PID" ] && kill "$PID"
 done
 
 # stop Gradle — orphaned workers survive a FAILED run and hold memory and connections
@@ -238,7 +239,7 @@ second and prints `BUILD SUCCESSFUL` for a suite it never ran.
 
 ⚠️ **`./gradlew test` runs almost nothing that matters.** The property suites live
 in a separate source set so the build works on a machine with no Docker. Full
-verification is `check integrationTest` — **236 integration tests** against a real
+verification is `check integrationTest` — **266 integration tests** against a real
 SQL Server and a real workflow engine.
 
 ⚠️ **Count what ran, do not trust the word "SUCCESSFUL".** A suite that was filtered

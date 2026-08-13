@@ -41,7 +41,8 @@ against the running database, 10 Aug 2026):
 
 | Range | Owner |
 |---|---|
-| **V118–V137** | **Stream 1** — partner event API, dispatch queue, connector breadth |
+| **V118–V127** | **Stream 1 Track A** — partner event API and dispatch queue |
+| **V128–V137** | **Stream 1 Track B** — connector breadth, including the shared credentials-at-rest first consumer |
 | **V138–V157** | **Stream 2** — read models and notifications |
 | **V158–V167** | **Stream 4** — retention and purge, runtime's share |
 | V168–V199 | Reserved: Flowable version upgrades, and anything urgent that cannot wait for a band |
@@ -67,9 +68,11 @@ traffic-growing table in one, it takes **V101–V110** there and says so in its 
 **Platform primitives — a new one takes `V900`, not `V004`.** See §3; this is the
 non-obvious half.
 
-Twenty numbers is far more than any phase has used (Phase 2's entire configuration
-world took eight; Phase 3 took three). The bands are wide because a wide band costs
-nothing and a narrow one costs a merge.
+Stream 1 is split because its two developers work in the same schema at the same
+time. Giving Track A and Track B separate sub-bands prevents the credentials
+foundation from taking Track A's first number while that developer is writing it.
+The wider stream bands remain deliberately generous: unused numbers cost nothing;
+a collision costs a merge and usually a local schema rebuild.
 
 ## 3 · ⚠️ Two traps that ranges alone do not fix
 
